@@ -20,6 +20,7 @@
 
 ## 📢 News
 
+- **2026-02-10** 🔐 Added secret sanitizer & interactive configuration wizard — secure, user-friendly setup!
 - **2026-02-09** 💬 Added Slack, Email, and QQ support — nanobot now supports multiple chat platforms!
 - **2026-02-08** 🔧 Refactored Providers—adding a new LLM provider now takes just 2 simple steps! Check [here](#providers).
 - **2026-02-07** 🚀 Released v0.1.3.post5 with Qwen support & several key improvements! Check [here](https://github.com/HKUDS/nanobot/releases/tag/v0.1.3.post5) for details.
@@ -93,7 +94,6 @@ pip install nanobot-ai
 ## 🚀 Quick Start
 
 > [!TIP]
-> Set your API key in `~/.nanobot/config.json`.
 > Get API keys: [OpenRouter](https://openrouter.ai/keys) (Global) · [DashScope](https://dashscope.console.aliyun.com) (Qwen) · [Brave Search](https://brave.com/search/api/) (optional, for web search)
 
 **1. Initialize**
@@ -102,9 +102,15 @@ pip install nanobot-ai
 nanobot onboard
 ```
 
-**2. Configure** (`~/.nanobot/config.json`)
+**2. Configure Interactively** ⭐ NEW
 
-For OpenRouter - recommended for global users:
+```bash
+nanobot configure
+```
+
+This launches an interactive wizard to set up your API keys, models, and channels. No manual JSON editing required!
+
+Or manually edit `~/.nanobot/config.json`:
 ```json
 {
   "providers": {
@@ -672,14 +678,134 @@ See [ROUTING.md](ROUTING.md) for detailed configuration and customization.
 </details>
 
 
-### Security
+### Interactive Configuration Wizard ⭐ NEW
 
-> For production deployments, set `"restrictToWorkspace": true` in your config to sandbox the agent.
+**No more manual JSON editing!** Use the interactive wizard to configure nanobot:
+
+```bash
+nanobot configure
+```
+
+**Features:**
+- 🎯 **Visual status indicators** — See what's configured/missing at a glance
+- 🔐 **Secure API key input** — Keys visible as you type (no blind typing!)
+- ✅ **Validation** — Tests API keys before saving
+- 📊 **Provider selection** — Choose from 11+ LLM providers
+- 💬 **Channel setup** — Configure Telegram, Discord, WhatsApp, etc.
+- 🧠 **Smart routing** — Customize tier models and costs
+- ⚙️ **All settings** — Agents, tools, gateway, security
+
+**Wizard Menu:**
+```
+🤖 nanobot Configuration Wizard
+
+[1] 🤖 Model Providers (Required)
+[2] 💬 Chat Channels
+[3] ⚙️  Agent Settings
+[4] 🧠 Smart Routing
+[5] 🛠️  Tool Settings
+[6] 📊 View Full Status
+[7] ✓  Done
+```
+
+**Example Session:**
+```bash
+$ nanobot configure
+
+Step 1/3: Select Model Provider
+
+Available providers:
+  [1] OpenRouter (recommended - multi-model)
+  [2] Anthropic
+  [3] OpenAI
+  ...
+
+Select [1-4]: 1
+
+Step 2/3: API Configuration
+
+Enter your OpenRouter API key: sk-or-xxxxxx...
+Preview: sk-or-xxx...xxxx
+Test connection... ✓ Valid
+
+Step 3/3: Default Model
+
+Available models:
+  [1] anthropic/claude-opus-4-5
+  [2] openai/gpt-4o
+  ...
+
+Select default [1-3]: 1
+
+✓ Configuration saved!
+```
+
+### Security 🔐
+
+nanobot includes multiple layers of security to protect your data and prevent unauthorized access.
+
+#### **Secret Sanitizer** ⭐ NEW
+
+Automatically detects and masks sensitive information (API keys, passwords, tokens) to prevent accidental exposure:
+
+- ✅ **Before sending to LLMs** — Secrets are masked in messages
+- ✅ **In log files** — No secrets written to disk
+- ✅ **In session history** — Masked before storage
+- ✅ **Warning alerts** — Notifies when secrets are detected
+
+**Supported patterns:**
+- API keys (OpenRouter, Anthropic, OpenAI, Groq, etc.)
+- Bearer tokens and JWTs
+- Passwords
+- GitHub/Discord tokens
+- Database connection strings
+- Private keys
+
+**Example:**
+```
+Input:  "My key is sk-or-abc123..."
+Output: "My key is sk-or-abc1****..." (masked)
+```
+
+#### **Sandbox Modes**
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `tools.restrictToWorkspace` | `false` | When `true`, restricts **all** agent tools (shell, file read/write/edit, list) to the workspace directory. Prevents path traversal and out-of-scope access. |
-| `channels.*.allowFrom` | `[]` (allow all) | Whitelist of user IDs. Empty = allow everyone; non-empty = only listed users can interact. |
+| `tools.restrictToWorkspace` | `false` | When `true`, restricts **all** agent tools to the workspace directory only. |
+| `tools.evolutionary` | `false` | ⭐ NEW — Enable self-improvement mode (see below) |
+| `tools.allowedPaths` | `[]` | ⭐ NEW — Whitelist of paths accessible in evolutionary mode |
+| `tools.protectedPaths` | `["~/.nanobot/config.json"]` | ⭐ NEW — Always-blocked paths (e.g., config with secrets) |
+| `channels.*.allowFrom` | `[]` | Whitelist of user IDs. Empty = allow everyone. |
+
+#### **Evolutionary Mode** ⭐ NEW
+
+Allow the bot to self-improve by modifying its own source code while maintaining security boundaries:
+
+```json
+{
+  "tools": {
+    "evolutionary": true,
+    "allowedPaths": [
+      "/projects/nanobot-turbo",
+      "~/.nanobot"
+    ],
+    "protectedPaths": [
+      "~/.nanobot/config.json"
+    ]
+  }
+}
+```
+
+**How it works:**
+- Bot can read/write files in `allowedPaths`
+- Bot **cannot** access files outside `allowedPaths`
+- Files in `protectedPaths` are always blocked (even if in allowedPaths)
+- Perfect for development and self-improvement scenarios
+
+**Security:**
+- Protected paths take precedence over allowed paths
+- No system file access outside whitelist
+- API keys in config.json remain protected
 
 
 ## CLI Reference
@@ -687,6 +813,7 @@ See [ROUTING.md](ROUTING.md) for detailed configuration and customization.
 | Command | Description |
 |---------|-------------|
 | `nanobot onboard` | Initialize config & workspace |
+| `nanobot configure` | ⭐ Interactive configuration wizard |
 | `nanobot agent -m "..."` | Chat with the agent |
 | `nanobot agent` | Interactive chat mode |
 | `nanobot agent --no-markdown` | Show plain-text replies |

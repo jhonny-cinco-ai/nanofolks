@@ -151,16 +151,44 @@ class RoutingStage:
         """Record classification for future calibration."""
         import asyncio
         
+        # Extract context information from decision metadata
+        metadata = decision.metadata
+        comparison = metadata.get("feedback_comparison", {})
+        
+        # Determine action type
+        action_type = metadata.get("action_type", "general")
+        if not action_type and comparison:
+            # Try to extract from client decision if available
+            action_type = "general"  # Default
+        
+        # Check for negations
+        negations = metadata.get("negations", [])
+        has_negations = len(negations) > 0
+        
+        # Calculate code presence from content
+        content = ctx.message.content.lower()
+        code_indicators = ["```", "function", "class", "def ", "import ", "code"]
+        code_presence = sum(1 for indicator in code_indicators if indicator in content) / len(code_indicators)
+        
+        # Determine question type
+        question_type = self._determine_question_type(ctx.message.content)
+        
         record = {
             "content_preview": ctx.message.content[:200],
             "final_tier": decision.tier.value,
             "final_confidence": decision.confidence,
             "layer": decision.layer,
+            # NEW: Full context for intelligent calibration
+            "action_type": action_type,
+            "has_negations": has_negations,
+            "negation_details": negations,
+            "code_presence": code_presence,
+            "question_type": question_type,
+            "content_length": len(ctx.message.content),
         }
         
         # Add comparison data if available
-        if "feedback_comparison" in decision.metadata:
-            comparison = decision.metadata["feedback_comparison"]
+        if comparison:
             record.update({
                 "client_tier": comparison.get("client_tier"),
                 "client_confidence": comparison.get("client_confidence"),
@@ -171,6 +199,32 @@ class RoutingStage:
         
         # Fire-and-forget recording
         asyncio.create_task(self._async_record(record))
+    
+    def _determine_question_type(self, content: str) -> str:
+        """Determine the type of question in the content."""
+        content_lower = content.lower().strip()
+        
+        # Check for question words
+        wh_words = ["what", "how", "why", "when", "where", "who", "which"]
+        for word in wh_words:
+            if content_lower.startswith(word + " ") or content_lower.startswith(word + "'s "):
+                return f"{word}_question"
+        
+        # Check for yes/no questions
+        if content_lower.startswith(("is ", "are ", "can ", "do ", "does ", "will ", "would ", "could ", "should ", "has ", "have ", "did ", "was ", "were ")):
+            return "yes_no_question"
+        
+        # Check for commands/imperatives
+        imperative_starters = ["write", "create", "build", "make", "generate", "implement", "add", "fix", "update", "delete", "remove", "refactor", "explain", "show", "tell", "give"]
+        first_word = content_lower.split()[0] if content_lower else ""
+        if first_word in imperative_starters:
+            return "imperative"
+        
+        # Check if it's a statement (no question mark)
+        if not content.strip().endswith("?"):
+            return "statement"
+        
+        return "unknown"
     
     async def _async_record(self, record: dict) -> None:
         """Async recording to avoid blocking."""

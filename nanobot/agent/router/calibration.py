@@ -2,11 +2,12 @@
 
 import json
 import re
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
-from .models import RoutingPattern, RoutingTier
+from .models import ClassificationScores, RoutingPattern, RoutingTier
 
 
 class CalibrationManager:
@@ -15,9 +16,10 @@ class CalibrationManager:
     
     Runs periodically to:
     1. Analyze classification accuracy
-    2. Generate new patterns from successful LLM classifications
-    3. Update confidence thresholds
-    4. Evict low-success patterns
+    2. Generate new patterns from successful LLM classifications (with n-grams)
+    3. Update confidence thresholds based on accuracy data
+    4. Evict low-success patterns intelligently
+    5. Learn tier-specific confusion patterns
     """
     
     def __init__(
@@ -55,20 +57,54 @@ class CalibrationManager:
     
     def record_classification(self, record: dict) -> None:
         """
-        Record a classification for later analysis.
+        Record a classification with full context for later analysis.
         
         Args:
-            record: Dict with keys like:
-                - content_preview
-                - client_tier
-                - client_confidence
-                - llm_tier (optional)
-                - llm_confidence (optional)
-                - final_tier
-                - timestamp
+            record: Dict with comprehensive context:
+                - content_preview: str
+                - client_tier: str
+                - client_confidence: float
+                - llm_tier: str (optional)
+                - llm_confidence: float (optional)
+                - final_tier: str
+                - layer: str ("client" or "llm")
+                
+                # NEW: Context fields
+                - action_type: str ("write", "explain", "analyze", etc.)
+                - has_negations: bool
+                - negations: list of dicts
+                - question_type: str ("yes_no", "wh_question", "open")
+                - code_presence: float
+                - simple_indicators: float
+                - technical_terms: float
+                - social_interaction: float
         """
-        record["timestamp"] = datetime.now().isoformat()
-        self._classifications.append(record)
+        enhanced_record = {
+            # Core classification data
+            "content_preview": record.get("content_preview", ""),
+            "client_tier": record.get("client_tier"),
+            "client_confidence": record.get("client_confidence", 0.0),
+            "llm_tier": record.get("llm_tier"),
+            "llm_confidence": record.get("llm_confidence", 0.0),
+            "final_tier": record.get("final_tier"),
+            "layer_used": record.get("layer", "client"),
+            
+            # NEW: Full context
+            "action_type": record.get("action_type", "general"),
+            "has_negations": record.get("has_negations", False),
+            "negations": record.get("negations", []),
+            "question_type": record.get("question_type"),
+            "code_presence": record.get("code_presence", 0.0),
+            "simple_indicators": record.get("simple_indicators", 0.0),
+            "technical_terms": record.get("technical_terms", 0.0),
+            "social_interaction": record.get("social_interaction", 0.0),
+            
+            # Metadata
+            "timestamp": datetime.now().isoformat(),
+            "was_calibration": record.get("was_calibration", False),
+        }
+        
+        self._classifications.append(enhanced_record)
         
         # Keep only recent classifications (last 1000)
         if len(self._classifications) > 1000:
@@ -96,10 +132,10 @@ class CalibrationManager:
     
     def calibrate(self) -> dict:
         """
-        Run calibration and return results.
+        Run comprehensive calibration and return results.
         
         Returns:
-            Dict with calibration results
+            Dict with detailed calibration results
         """
         if self.backup_before and self.patterns_file.exists():
             self._backup_patterns()
@@ -110,40 +146,56 @@ class CalibrationManager:
             "patterns_added": 0,
             "patterns_removed": 0,
             "threshold_adjustments": {},
+            "tier_specific_learning": {},
         }
         
-        # Analyze accuracy
+        # 1. Analyze accuracy
         accuracy_report = self._analyze_accuracy()
+        results["accuracy"] = accuracy_report["accuracy"]
+        results["matches"] = accuracy_report["matches"]
+        results["mismatches_count"] = len(accuracy_report["mismatches"])
         
-        # Generate new patterns from mismatches
-        new_patterns = self._generate_patterns(accuracy_report["mismatches"])
+        # 2. Learn tier-specific confusion patterns
+        if accuracy_report["mismatches"]:
+            tier_learning = self._learn_tier_specific_patterns(accuracy_report["mismatches"])
+            results["tier_specific_learning"] = tier_learning
         
-        # Load existing patterns
+        # 3. Generate new patterns from mismatches (with context awareness)
+        new_patterns = self._generate_enhanced_patterns(accuracy_report["mismatches"])
+        
+        # 4. Load existing patterns and update performance stats
         existing_patterns = self._load_existing_patterns()
+        self._update_pattern_performance(existing_patterns)
         
-        # Add new patterns
+        # 5. Add new patterns
         for pattern in new_patterns:
             if len(existing_patterns) < self.max_patterns:
                 existing_patterns.append(pattern)
                 results["patterns_added"] += 1
         
-        # Evict low-success patterns
+        # 6. Intelligent pattern eviction
         before_count = len(existing_patterns)
-        existing_patterns = self._evict_patterns(existing_patterns)
+        existing_patterns = self._evict_patterns_intelligent(existing_patterns)
         results["patterns_removed"] = before_count - len(existing_patterns)
         
-        # Save updated patterns
+        # 7. Adaptive threshold calibration
+        threshold_adjustments = self._calibrate_thresholds()
+        results["threshold_adjustments"] = threshold_adjustments
+        
+        # 8. Save updated patterns
         self._save_patterns(existing_patterns)
         
-        # Update analytics
+        # 9. Update analytics
         self._last_calibration = datetime.now()
         self._save_analytics()
         
         results["total_patterns"] = len(existing_patterns)
+        results["effective_patterns"] = sum(1 for p in existing_patterns if p.is_effective)
+        
         return results
     
     def _analyze_accuracy(self) -> dict:
-        """Analyze classification accuracy."""
+        """Analyze classification accuracy with detailed breakdown."""
         total = len(self._classifications)
         matches = 0
         mismatches = []
@@ -160,90 +212,232 @@ class CalibrationManager:
         
         accuracy = matches / total if total > 0 else 0.0
         
+        # Analyze by tier
+        tier_accuracy = {}
+        for tier in ["simple", "medium", "complex", "coding", "reasoning"]:
+            tier_records = [r for r in self._classifications if r.get("client_tier") == tier and r.get("llm_tier")]
+            if tier_records:
+                tier_matches = sum(1 for r in tier_records if r["client_tier"] == r["llm_tier"])
+                tier_accuracy[tier] = tier_matches / len(tier_records)
+        
         return {
             "total": total,
             "matches": matches,
             "accuracy": accuracy,
             "mismatches": mismatches,
+            "tier_accuracy": tier_accuracy,
         }
     
-    def _generate_patterns(self, mismatches: list[dict]) -> list[RoutingPattern]:
-        """Generate new patterns from mismatched classifications."""
+    def _learn_tier_specific_patterns(self, mismatches: list[dict]) -> dict:
+        """Learn patterns specific to each tier confusion type."""
+        confusion_pairs = defaultdict(list)
+        
+        # Group mismatches by (client_tier, llm_tier) pairs
+        for m in mismatches:
+            key = (m.get("client_tier"), m.get("llm_tier"))
+            confusion_pairs[key].append(m)
+        
+        learned = {}
+        
+        for (client_tier, llm_tier), records in confusion_pairs.items():
+            if len(records) < 5:  # Need at least 5 examples
+                continue
+            
+            # Analyze patterns in this confusion
+            contents = [r.get("content_preview", "") for r in records]
+            action_types = [r.get("action_type", "general") for r in records]
+            
+            # Extract common n-grams for this confusion
+            common_ngrams = self._extract_ngrams(contents, n=2)
+            
+            # Find dominant action type
+            action_counter = Counter(action_types)
+            dominant_action = action_counter.most_common(1)[0][0] if action_counter else "general"
+            
+            learned[f"{client_tier}_vs_{llm_tier}"] = {
+                "count": len(records),
+                "common_ngrams": common_ngrams[:5],
+                "dominant_action": dominant_action,
+                "action_distribution": dict(action_counter.most_common(3)),
+                "example": contents[0] if contents else "",
+            }
+        
+        return learned
+    
+    def _generate_enhanced_patterns(self, mismatches: list[dict]) -> list[RoutingPattern]:
+        """Generate new patterns from mismatched classifications with context awareness."""
         patterns = []
         
-        # Group mismatches by correct tier
-        by_tier: dict[str, list[dict]] = {}
+        # Group mismatches by the correct tier (llm_tier)
+        by_tier: dict[str, list[dict]] = defaultdict(list)
         for m in mismatches:
             tier = m.get("llm_tier", "medium")
             if tier not in by_tier:
                 by_tier[tier] = []
             by_tier[tier].append(m)
         
-        # Analyze each tier group for common patterns
+        # Analyze each tier group
         for tier, records in by_tier.items():
             if len(records) < 3:  # Need at least 3 examples
                 continue
             
-            # Extract common words/phrases
             content_samples = [r.get("content_preview", "") for r in records]
-            common_patterns = self._extract_patterns(content_samples)
+            action_types = [r.get("action_type", "general") for r in records]
             
-            for pattern_text in common_patterns[:3]:  # Top 3 patterns per tier
+            # Extract n-gram patterns (2-3 word phrases)
+            bigrams = self._extract_ngrams(content_samples, n=2)
+            trigrams = self._extract_ngrams(content_samples, n=3)
+            
+            # Weight by frequency
+            all_ngrams = bigrams + trigrams
+            ngram_counter = Counter(all_ngrams)
+            
+            # Find dominant action context
+            action_counter = Counter(action_types)
+            dominant_action = action_counter.most_common(1)[0][0] if action_counter else None
+            
+            # Create patterns from top n-grams
+            for ngram, count in ngram_counter.most_common(3):
+                # Create regex pattern
+                escaped = re.escape(ngram)
+                regex = rf"\b{escaped}\b"
+                
                 pattern = RoutingPattern(
-                    regex=pattern_text,
+                    regex=regex,
                     tier=RoutingTier(tier),
-                    confidence=0.8,
+                    confidence=0.7,  # Start conservative, will improve with usage
                     examples=content_samples[:3],
                     added_at=datetime.now().isoformat(),
+                    source="auto_calibration",
+                    action_context=dominant_action,
                 )
                 patterns.append(pattern)
         
         return patterns
     
-    def _extract_patterns(self, contents: list[str]) -> list[str]:
-        """Extract common patterns from content samples."""
-        # Simple pattern extraction - look for common words/phrases
-        words_by_content = []
+    def _extract_ngrams(self, contents: list[str], n: int = 2) -> list[str]:
+        """Extract n-grams (word phrases) from content samples."""
+        ngrams = []
+        
         for content in contents:
-            words = set(re.findall(r'\b\w+\b', content.lower()))
-            words_by_content.append(words)
+            # Clean and tokenize
+            words = re.findall(r'\b\w+\b', content.lower())
+            
+            # Filter out very short words (likely not meaningful)
+            words = [w for w in words if len(w) > 2]
+            
+            # Generate n-grams
+            for i in range(len(words) - n + 1):
+                ngram = " ".join(words[i:i+n])
+                ngrams.append(ngram)
         
-        # Find words common to multiple contents
-        if not words_by_content:
-            return []
-        
-        common_words = set.intersection(*words_by_content[:min(5, len(words_by_content))])
-        
-        # Filter for meaningful words (length > 3)
-        meaningful = [w for w in common_words if len(w) > 3]
-        
-        # Create regex patterns
-        patterns = []
-        for word in meaningful[:10]:  # Top 10 words
-            patterns.append(rf"\b{re.escape(word)}\b")
-        
-        return patterns
+        return ngrams
     
-    def _evict_patterns(self, patterns: list[RoutingPattern]) -> list[RoutingPattern]:
-        """Remove low-success patterns."""
-        # Keep patterns with good success rates or recent additions
-        threshold = 0.3  # Minimum 30% success rate
+    def _update_pattern_performance(self, patterns: list[RoutingPattern]) -> None:
+        """Update performance stats for all patterns based on classification history."""
+        for pattern in patterns:
+            # Count how many times this pattern was used
+            for record in self._classifications:
+                content = record.get("content_preview", "").lower()
+                
+                if re.search(pattern.regex, content, re.IGNORECASE):
+                    pattern.times_used += 1
+                    pattern.times_matched += 1
+                    
+                    # Check if match led to correct tier
+                    final_tier = record.get("final_tier")
+                    if final_tier and pattern.tier.value == final_tier:
+                        pattern.times_correct += 1
+    
+    def _evict_patterns_intelligent(self, patterns: list[RoutingPattern]) -> list[RoutingPattern]:
+        """Intelligent pattern eviction considering multiple factors."""
+        # Score all patterns
+        scored_patterns = []
         
-        filtered = []
-        for p in patterns:
-            # Keep if high success or recently added
-            if p.success_rate >= threshold:
-                filtered.append(p)
-            else:
-                # Check if recently added (< 7 days)
-                try:
-                    added = datetime.fromisoformat(p.added_at)
-                    if datetime.now() - added < timedelta(days=7):
-                        filtered.append(p)
-                except:
-                    pass
+        for pattern in patterns:
+            score = pattern.effectiveness_score
+            scored_patterns.append((pattern, score))
         
-        return filtered
+        # Sort by score descending
+        scored_patterns.sort(key=lambda x: x[1], reverse=True)
+        
+        # Keep top patterns up to max_patterns
+        return [p for p, score in scored_patterns[:self.max_patterns]]
+    
+    def _calibrate_thresholds(self) -> dict:
+        """Adaptively calibrate tier thresholds based on accuracy data."""
+        adjustments = {}
+        
+        # Current default thresholds
+        current_thresholds = {
+            "simple": 0.0,
+            "medium": 0.5,
+            "complex": 0.85,
+            "coding": 0.90,
+            "reasoning": 0.97,
+        }
+        
+        for tier in current_thresholds.keys():
+            # Get classifications for this tier
+            tier_records = [
+                r for r in self._classifications 
+                if r.get("client_tier") == tier and r.get("llm_tier")
+            ]
+            
+            if len(tier_records) < 20:
+                continue  # Not enough data
+            
+            # Group by client confidence buckets
+            buckets = defaultdict(list)
+            for r in tier_records:
+                conf = r.get("client_confidence", 0)
+                bucket = round(conf * 10) / 10  # Round to nearest 0.1
+                buckets[bucket].append(r)
+            
+            # Find optimal threshold
+            best_threshold = current_thresholds[tier]
+            best_accuracy = 0
+            best_sample_size = 0
+            
+            # Test different thresholds
+            test_thresholds = [0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95]
+            if tier == "simple":
+                test_thresholds = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+            
+            for threshold in test_thresholds:
+                # Get records above this threshold
+                above_threshold = [
+                    r for bucket, records in buckets.items() 
+                    if bucket >= threshold for r in records
+                ]
+                
+                if len(above_threshold) < 10:
+                    continue
+                
+                # Calculate accuracy
+                matches = sum(1 for r in above_threshold if r["client_tier"] == r["llm_tier"])
+                accuracy = matches / len(above_threshold)
+                
+                # Prefer higher accuracy, but also consider sample size
+                # Use a weighted score
+                weighted_score = accuracy * 0.8 + (min(len(above_threshold), 100) / 100) * 0.2
+                
+                if weighted_score > (best_accuracy * 0.8 + (min(best_sample_size, 100) / 100) * 0.2):
+                    best_threshold = threshold
+                    best_accuracy = accuracy
+                    best_sample_size = len(above_threshold)
+            
+            if best_threshold != current_thresholds[tier]:
+                baseline_accuracy = sum(1 for r in tier_records if r["client_tier"] == r["llm_tier"]) / len(tier_records)
+                adjustments[tier] = {
+                    "old_threshold": current_thresholds[tier],
+                    "new_threshold": best_threshold,
+                    "accuracy": best_accuracy,
+                    "sample_size": best_sample_size,
+                    "improvement": best_accuracy - baseline_accuracy,
+                }
+        
+        return adjustments
     
     def _load_existing_patterns(self) -> list[RoutingPattern]:
         """Load existing patterns from file."""
@@ -260,9 +454,15 @@ class CalibrationManager:
         """Save patterns to file."""
         data = {
             "patterns": [p.to_dict() for p in patterns],
-            "version": "1.0",
+            "version": "2.0",
             "last_calibration": datetime.now().isoformat(),
             "total_classifications": len(self._classifications),
+            "pattern_stats": {
+                "total": len(patterns),
+                "effective": sum(1 for p in patterns if p.is_effective),
+                "auto_generated": sum(1 for p in patterns if p.source == "auto_calibration"),
+                "manual": sum(1 for p in patterns if p.source == "manual"),
+            }
         }
         
         self.patterns_file.parent.mkdir(parents=True, exist_ok=True)
@@ -271,7 +471,8 @@ class CalibrationManager:
     def _backup_patterns(self) -> None:
         """Create backup of current patterns."""
         if self.patterns_file.exists():
-            backup_file = self.patterns_file.with_suffix(".backup.json")
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_file = self.patterns_file.parent / f"patterns_backup_{timestamp}.json"
             backup_file.write_text(self.patterns_file.read_text())
     
     def _save_analytics(self) -> None:
@@ -279,6 +480,7 @@ class CalibrationManager:
         data = {
             "classifications": self._classifications,
             "last_calibration": self._last_calibration.isoformat() if self._last_calibration else None,
+            "total_count": len(self._classifications),
         }
         
         self.analytics_file.parent.mkdir(parents=True, exist_ok=True)
@@ -297,3 +499,57 @@ class CalibrationManager:
                 return 24  # Default 24 hours
         except ValueError:
             return 24  # Default 24 hours on any parsing error
+    
+    def get_calibration_report(self) -> dict:
+        """Generate a comprehensive calibration report."""
+        if not self._classifications:
+            return {"error": "No classification data available"}
+        
+        accuracy_report = self._analyze_accuracy()
+        
+        # Pattern effectiveness
+        patterns = self._load_existing_patterns()
+        effective_count = sum(1 for p in patterns if p.is_effective)
+        
+        # Top performing patterns
+        top_patterns = sorted(
+            patterns, 
+            key=lambda p: p.effectiveness_score, 
+            reverse=True
+        )[:10]
+        
+        # Low performing patterns (candidates for eviction)
+        low_patterns = [
+            p for p in patterns 
+            if not p.is_effective and p.times_used > 10
+        ]
+        
+        return {
+            "total_classifications": len(self._classifications),
+            "accuracy": accuracy_report["accuracy"],
+            "matches": accuracy_report["matches"],
+            "tier_accuracy": accuracy_report.get("tier_accuracy", {}),
+            "total_patterns": len(patterns),
+            "effective_patterns": effective_count,
+            "ineffective_patterns": len(patterns) - effective_count,
+            "top_patterns": [
+                {
+                    "regex": p.regex[:50],
+                    "tier": p.tier.value,
+                    "effectiveness": p.effectiveness_score,
+                    "success_rate": p.success_rate,
+                    "times_used": p.times_used,
+                }
+                for p in top_patterns
+            ],
+            "low_performers": [
+                {
+                    "regex": p.regex[:50],
+                    "tier": p.tier.value,
+                    "success_rate": p.success_rate,
+                    "times_used": p.times_used,
+                }
+                for p in low_patterns[:5]
+            ],
+            "last_calibration": self._last_calibration.isoformat() if self._last_calibration else None,
+        }

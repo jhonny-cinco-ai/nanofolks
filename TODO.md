@@ -181,19 +181,41 @@ cd /projects/nanobot-turbo
 python -m pytest tests/router/ -v
 ```
 
-### Priority 4: Documentation 📚
-- [ ] **Add routing documentation to README.md**
+### Priority 4: Documentation 📚 ✅ COMPLETED
+- [x] **Add routing documentation to README.md**
   - How smart routing works
   - Configuration examples
   - Cost savings explanation
   
-- [ ] **Create ROUTING.md**
+- [x] **Create ROUTING.md**
   - Detailed architecture explanation
   - How to customize tiers
   - How to add custom patterns
   - Calibration tuning guide
 
-- [ ] **Add inline code documentation**
+- [x] **Update CLI reference**
+  - Added routing commands to main CLI table
+  - Created dedicated routing CLI section
+
+**Documentation Created:**
+- **README.md**: Added comprehensive smart routing section with:
+  - Architecture overview
+  - Quick start guide
+  - Cost savings examples
+  - Example classifications table
+  - CLI commands
+  - Link to detailed ROUTING.md
+
+- **ROUTING.md** (420+ lines): Complete documentation including:
+  - Two-layer classification explained
+  - All 14 dimensions documented
+  - Configuration options
+  - CLI commands reference
+  - Sticky routing behavior
+  - Auto-calibration details
+  - Troubleshooting guide
+  - Best practices
+  - API reference
 
 ### Priority 5: Analytics & Monitoring 📊
 - [ ] **Cost tracking**

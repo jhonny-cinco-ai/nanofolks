@@ -11,6 +11,7 @@ class RoutingTier(str, Enum):
     MEDIUM = "medium"
     COMPLEX = "complex"
     REASONING = "reasoning"
+    CODING = "coding"
 
 
 @dataclass

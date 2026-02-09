@@ -50,10 +50,12 @@ class LLMRouter:
         provider: LLMProvider,
         model: str = "gpt-4o-mini",
         timeout_ms: int = 500,
+        secondary_model: str | None = None,
     ):
         self.provider = provider
         self.model = model
         self.timeout_ms = timeout_ms
+        self.secondary_model = secondary_model
     
     async def classify(self, content: str) -> RoutingDecision:
         """
@@ -99,6 +101,27 @@ class LLMRouter:
             )
             
         except Exception as e:
+            # Fallback to secondary model if configured, then to MEDIUM on failure
+            if self.secondary_model:
+                try:
+                    response = await self._call_llm(messages, model=self.secondary_model)
+                    result = self._parse_response(response)
+                    return RoutingDecision(
+                        tier=RoutingTier(result["tier"].lower()),
+                        model="",
+                        confidence=result["confidence"],
+                        layer="llm",
+                        reasoning=result["reasoning"],
+                        estimated_tokens=result["estimated_tokens"],
+                        needs_tools=result["needs_tools"],
+                        metadata={
+                            "llm_primary": self.model,
+                            "llm_secondary": self.secondary_model,
+                            "raw_response": response,
+                        },
+                    )
+                except Exception:
+                    pass
             # Fallback to medium tier on error
             return RoutingDecision(
                 tier=RoutingTier.MEDIUM,
@@ -111,15 +134,16 @@ class LLMRouter:
                 metadata={"error": str(e)},
             )
     
-    async def _call_llm(self, messages: list[dict[str, Any]]) -> str:
+    async def _call_llm(self, messages: list[dict[str, Any]], model: str | None = None) -> str:
         """Call the LLM with timeout."""
         import asyncio
         
         # Create task for LLM call
+        actual_model = model or self.model
         llm_task = asyncio.create_task(
             self.provider.chat(
                 messages=messages,
-                model=self.model,
+                model=actual_model,
                 max_tokens=200,  # Short response needed
                 temperature=0.1,  # Low temperature for consistency
             )

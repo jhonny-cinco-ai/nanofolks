@@ -125,25 +125,35 @@ class RoutingTierConfig(BaseModel):
     """Configuration for a routing tier."""
     model: str
     cost_per_mtok: float = 1.0
+    secondary_model: str | None = None  # Fallback if primary fails
 
 
 class RoutingTiersConfig(BaseModel):
     """Configuration for all routing tiers."""
     simple: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
-        model="deepseek-chat",
-        cost_per_mtok=0.27
+        model="deepseek/deepseek-chat-v3-0324",
+        cost_per_mtok=0.27,
+        secondary_model="deepseek/deepseek-chat-v3.1"
     ))
     medium: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
-        model="gpt-4o-mini",
-        cost_per_mtok=0.60
+        model="openai/gpt-4.1-mini",
+        cost_per_mtok=0.40,
+        secondary_model="openai/gpt-4o-mini"
     ))
     complex: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
-        model="anthropic/claude-sonnet-4",
-        cost_per_mtok=15.0
+        model="anthropic/claude-sonnet-4.5",
+        cost_per_mtok=3.0,
+        secondary_model="anthropic/claude-sonnet-4"
     ))
     reasoning: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
-        model="o3",
-        cost_per_mtok=10.0
+        model="openai/o3",
+        cost_per_mtok=2.0,
+        secondary_model="openai/gpt-4o"
+    ))
+    coding: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
+        model="moonshotai/kimi-k2.5",
+        cost_per_mtok=0.45,
+        secondary_model="anthropic/claude-sonnet-4"
     ))
 
 
@@ -156,6 +166,8 @@ class LLMClassifierConfig(BaseModel):
     """Configuration for LLM-assisted classifier."""
     model: str = "gpt-4o-mini"
     timeout_ms: int = 500
+    # Optional secondary model to use if the primary LLM classifier fails
+    secondary_model: str | None = None
 
 
 class StickyRoutingConfig(BaseModel):

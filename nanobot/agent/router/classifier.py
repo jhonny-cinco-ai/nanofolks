@@ -33,6 +33,7 @@ DEFAULT_THRESHOLDS = {
     "simple": 0.0,
     "medium": 0.5,
     "complex": 0.85,
+    "coding": 0.90,  # High threshold to ensure it's truly coding
     "reasoning": 0.97,
 }
 
@@ -57,6 +58,13 @@ DEFAULT_PATTERNS = [
         tier=RoutingTier.COMPLEX,
         confidence=0.85,
         examples=["Debug this issue", "Find the race condition"],
+        added_at=datetime.now().isoformat(),
+    ),
+    RoutingPattern(
+        regex=r"\b(write code|implement function|code review|unit test|integration test|api endpoint|database query|algorithm|data structure|fix bug|optimize code|refactor|code generator)\b",
+        tier=RoutingTier.CODING,
+        confidence=0.92,
+        examples=["Write a function to sort an array", "Create an API endpoint", "Fix this bug"],
         added_at=datetime.now().isoformat(),
     ),
     RoutingPattern(
@@ -262,11 +270,23 @@ class ClientSideClassifier:
         if reasoning_count >= 2 and confidence >= 0.95:
             return RoutingTier.REASONING
         
+        # Special rule: Check for coding-specific patterns first
+        coding_indicators = ["write code", "implement function", "code review", "unit test", 
+                          "integration test", "api endpoint", "database query", "algorithm", 
+                          "data structure", "fix bug", "optimize code", "refactor", "code generator"]
+        coding_count = sum(1 for indicator in coding_indicators if indicator in content.lower())
+        
+        # High code presence + code-specific patterns = CODING tier
+        if coding_count >= 1 and confidence >= self.thresholds["coding"]:
+            return RoutingTier.CODING
+        
         # Check thresholds
         if confidence >= self.thresholds["reasoning"]:
             return RoutingTier.REASONING
         elif confidence >= self.thresholds["complex"]:
             return RoutingTier.COMPLEX
+        elif confidence >= self.thresholds["coding"]:
+            return RoutingTier.CODING
         elif confidence >= self.thresholds["medium"]:
             return RoutingTier.MEDIUM
         else:
@@ -291,6 +311,7 @@ class ClientSideClassifier:
             RoutingTier.SIMPLE: 50,
             RoutingTier.MEDIUM: 200,
             RoutingTier.COMPLEX: 1000,
+            RoutingTier.CODING: 800,  # Between medium and complex
             RoutingTier.REASONING: 2000,
         }
         

@@ -39,6 +39,8 @@ class RoutingContext:
         tier_config = getattr(self.config.tiers, decision.tier.value, None)
         if tier_config:
             self.model = tier_config.model
+            # Store secondary model for fallback
+            self.metadata["secondary_model"] = tier_config.secondary_model
         
         self.metadata["routing_tier"] = decision.tier.value
         self.metadata["routing_confidence"] = decision.confidence
@@ -87,6 +89,7 @@ class RoutingStage:
                 provider=self.provider,
                 model=self.config.llm_classifier.model,
                 timeout_ms=self.config.llm_classifier.timeout_ms,
+                secondary_model=self.config.llm_classifier.secondary_model,
             )
         
         # Sticky router (combines both layers)
@@ -193,8 +196,9 @@ class RoutingStage:
                 tier: {
                     "model": getattr(self.config.tiers, tier).model,
                     "cost_per_mtok": getattr(self.config.tiers, tier).cost_per_mtok,
+                    "secondary_model": getattr(self.config.tiers, tier).secondary_model,
                 }
-                for tier in ["simple", "medium", "complex", "reasoning"]
+                for tier in ["simple", "medium", "complex", "reasoning", "coding"]
             },
             "client_confidence_threshold": self.config.client_classifier.min_confidence,
             "llm_classifier": {

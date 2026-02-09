@@ -177,7 +177,7 @@ class AgentLoop:
                 message=msg,
                 session=session,
                 default_model=self.model,
-                config=self.routing_config,
+                config=self.routing_config or RoutingConfig(),
             )
             
             # Execute routing stage
@@ -246,16 +246,40 @@ class AgentLoop:
         # Agent loop
         iteration = 0
         final_content = None
+        secondary_model = None
         
         while iteration < self.max_iterations:
             iteration += 1
             
             # Call LLM with selected model
-            response = await self.provider.chat(
-                messages=messages,
-                tools=self.tools.get_definitions(),
-                model=selected_model
-            )
+            try:
+                response = await self.provider.chat(
+                    messages=messages,
+                    tools=self.tools.get_definitions(),
+                    model=selected_model
+                )
+            except Exception as e:
+                # Try secondary model if available
+                if secondary_model is None and self.routing_config:
+                    # Get routing context to find secondary model
+                    routing_ctx = RoutingContext(
+                        message=msg,
+                        session=session,
+                        default_model=self.model,
+                        config=self.routing_config,
+                    )
+                    if self.routing_stage:
+                        await self.routing_stage.execute(routing_ctx)
+                        tier_config = getattr(self.routing_config.tiers, routing_ctx.metadata.get("routing_tier", "medium"), None)
+                        secondary_model = tier_config.secondary_model if tier_config else None
+                
+                if secondary_model and selected_model != secondary_model:
+                    logger.warning(f"Primary model {selected_model} failed: {e}. Trying secondary model {secondary_model}")
+                    selected_model = secondary_model
+                    iteration -= 1  # Retry with secondary model
+                    continue
+                else:
+                    raise e
             
             # Handle tool calls
             if response.has_tool_calls:

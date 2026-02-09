@@ -37,6 +37,7 @@ class SubagentManager:
         restrict_to_workspace: bool = False,
         evolutionary: bool = False,
         allowed_paths: list[str] | None = None,
+        protected_paths: list[str] | None = None,
     ):
         from nanobot.config.schema import ExecToolConfig
         self.provider = provider
@@ -47,6 +48,7 @@ class SubagentManager:
         self.exec_config = exec_config or ExecToolConfig()
         self.restrict_to_workspace = restrict_to_workspace
         self.evolutionary = evolutionary
+        self.protected_paths = protected_paths or []
         self.allowed_paths = allowed_paths or []
         self._running_tasks: dict[str, asyncio.Task[None]] = {}
     
@@ -107,13 +109,15 @@ class SubagentManager:
             if self.evolutionary and self.allowed_paths:
                 # Evolutionary mode: use allowed_paths whitelist
                 allowed_dirs = [Path(p).expanduser().resolve() for p in self.allowed_paths]
-                tools.register(ReadFileTool(allowed_paths=allowed_dirs))
-                tools.register(WriteFileTool(allowed_paths=allowed_dirs))
-                tools.register(ListDirTool(allowed_paths=allowed_dirs))
+                protected_dirs = [Path(p).expanduser().resolve() for p in self.protected_paths]
+                tools.register(ReadFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
+                tools.register(WriteFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
+                tools.register(ListDirTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
                 tools.register(ExecTool(
                     working_dir=str(self.workspace),
                     timeout=self.exec_config.timeout,
                     allowed_paths=self.allowed_paths,
+                    protected_paths=self.protected_paths,
                 ))
             else:
                 # Standard mode: use restrict_to_workspace behavior

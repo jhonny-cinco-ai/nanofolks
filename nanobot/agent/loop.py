@@ -51,6 +51,7 @@ class AgentLoop:
         routing_config: RoutingConfig | None = None,
         evolutionary: bool = False,
         allowed_paths: list[str] | None = None,
+        protected_paths: list[str] | None = None,
     ):
         from nanobot.config.schema import ExecToolConfig
         from nanobot.cron.service import CronService
@@ -65,6 +66,7 @@ class AgentLoop:
         self.restrict_to_workspace = restrict_to_workspace
         self.evolutionary = evolutionary
         self.allowed_paths = allowed_paths or []
+        self.protected_paths = protected_paths or []
         
         self.context = ContextBuilder(workspace)
         self.sessions = session_manager or SessionManager(workspace)
@@ -91,6 +93,7 @@ class AgentLoop:
             restrict_to_workspace=restrict_to_workspace,
             evolutionary=evolutionary,
             allowed_paths=allowed_paths,
+            protected_paths=protected_paths,
         )
         
         self._running = False
@@ -103,16 +106,18 @@ class AgentLoop:
             # Evolutionary mode: use allowed_paths whitelist
             logger.info(f"Evolutionary mode enabled with allowed paths: {self.allowed_paths}")
             allowed_dirs = [Path(p).expanduser().resolve() for p in self.allowed_paths]
-            self.tools.register(ReadFileTool(allowed_paths=allowed_dirs))
-            self.tools.register(WriteFileTool(allowed_paths=allowed_dirs))
-            self.tools.register(EditFileTool(allowed_paths=allowed_dirs))
-            self.tools.register(ListDirTool(allowed_paths=allowed_dirs))
+            protected_dirs = [Path(p).expanduser().resolve() for p in self.protected_paths]
+            self.tools.register(ReadFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
+            self.tools.register(WriteFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
+            self.tools.register(EditFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
+            self.tools.register(ListDirTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
             
             # Shell tool with allowed_paths
             self.tools.register(ExecTool(
                 working_dir=str(self.workspace),
                 timeout=self.exec_config.timeout,
                 allowed_paths=self.allowed_paths,
+                protected_paths=self.protected_paths,
             ))
         else:
             # Standard mode: use restrict_to_workspace behavior

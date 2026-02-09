@@ -182,6 +182,7 @@ class ToolsConfig(BaseModel):
     restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
     evolutionary: bool = False  # If true, use allowed_paths whitelist instead of restrict_to_workspace
     allowed_paths: list[str] = Field(default_factory=list)  # Paths allowed when evolutionary mode is enabled (e.g., ["/projects/nanobot-turbo", "~/.nanobot"])
+    protected_paths: list[str] = Field(default_factory=lambda: ["~/.nanobot/config.json"])  # Paths that are always blocked, even within allowed_paths (e.g., config files with secrets)
 
 
 class RoutingTierConfig(BaseModel):

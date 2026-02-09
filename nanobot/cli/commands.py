@@ -363,8 +363,9 @@ def gateway(
         routing_config=config.routing,
         evolutionary=config.tools.evolutionary,
         allowed_paths=config.tools.allowed_paths,
+        protected_paths=config.tools.protected_paths,
     )
-    
+
     # Set cron callback (needs agent)
     async def on_cron_job(job: CronJob) -> str | None:
         """Execute a cron job through the agent."""
@@ -468,8 +469,9 @@ def agent(
         routing_config=config.routing,
         evolutionary=config.tools.evolutionary,
         allowed_paths=config.tools.allowed_paths,
+        protected_paths=config.tools.protected_paths,
     )
-    
+
     # Show spinner when logs are off (no output to miss); skip when logs are on
     def _thinking_ctx():
         if logs:

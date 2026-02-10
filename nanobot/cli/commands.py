@@ -239,21 +239,153 @@ def onboard():
         border_style="green"
     ))
     
-    # Pre-load configuration modules while user is reading
-    # This prevents delay when they confirm configuration
-    with console.status("[cyan]Preparing configuration interface...[/cyan]", spinner="dots"):
-        from nanobot.cli.configure import configure_cli
-    console.print("[green]✓[/green] Ready")
+    # Run step-by-step onboarding wizard
+    _run_onboard_wizard()
+
+
+def _run_onboard_wizard():
+    """Run the step-by-step onboarding wizard."""
+    import asyncio
+    from rich.prompt import Prompt, Confirm
+    from nanobot.agent.tools.update_config import UpdateConfigTool
     
-    # Offer to run configuration immediately
-    console.print("\n[bold]Next Step: API Configuration[/bold]")
-    console.print("[dim]Your workspace is ready. Now let's set up API keys to start chatting.[/dim]\n")
+    tool = UpdateConfigTool()
     
-    if typer.confirm("Ready to run the configuration wizard?"):
-        configure_cli()
+    console.print("\n[bold cyan]Let's get you set up![/bold cyan]")
+    console.print("[dim]I'll guide you through the essential configuration.[/dim]\n")
+    
+    # Step 1: Model Provider
+    console.print("[bold]Step 1: Select Model Provider[/bold]")
+    console.print("Choose the AI provider for your bot:\n")
+    
+    providers = {
+        "1": ("openrouter", "OpenRouter - Access multiple AI models (recommended)"),
+        "2": ("anthropic", "Anthropic - Claude models"),
+        "3": ("openai", "OpenAI - GPT models"),
+        "4": ("groq", "Groq - Fast inference"),
+        "5": ("deepseek", "DeepSeek - Chinese models"),
+    }
+    
+    for key, (name, desc) in providers.items():
+        console.print(f"  [{key}] {desc}")
+    
+    provider_choice = Prompt.ask("\nSelect provider", choices=list(providers.keys()), default="1")
+    provider_name, provider_desc = providers[provider_choice]
+    
+    # Get API key
+    console.print(f"\n[dim]{provider_desc}[/dim]")
+    api_key = Prompt.ask(f"Enter your {provider_name.title()} API key", password=False)
+    
+    if not api_key:
+        console.print("[yellow]⚠ No API key provided. You can configure this later with: nanobot configure[/yellow]")
     else:
-        console.print("\n[yellow]Come back soon! nanobot won't work without API keys.[/yellow]")
-        console.print("[dim]When you're ready, run: [/dim][cyan]nanobot configure[/cyan]")
+        with console.status(f"[cyan]Saving {provider_name} API key...[/cyan]", spinner="dots"):
+            result = asyncio.run(tool.execute(
+                path=f"providers.{provider_name}.apiKey",
+                value=api_key
+            ))
+        if "Error" not in result:
+            console.print(f"[green]✓ {provider_name.title()} configured[/green]\n")
+    
+    # Step 2: Primary Model
+    console.print("[bold]Step 2: Select Primary Model[/bold]")
+    console.print("This is the default model your bot will use:\n")
+    
+    # Show available models for the provider
+    schema = tool.SCHEMA['providers']['providers']
+    provider_schema = schema.get(provider_name, {})
+    available_models = provider_schema.get('models', ['anthropic/claude-opus-4-5'])
+    
+    for i, model in enumerate(available_models[:5], 1):
+        console.print(f"  [{i}] {model}")
+    console.print("  [c] Custom model")
+    
+    model_choice = Prompt.ask("\nSelect model", choices=[str(i) for i in range(1, min(6, len(available_models)+1))] + ["c"], default="1")
+    
+    if model_choice == "c":
+        primary_model = Prompt.ask("Enter custom model name")
+    else:
+        primary_model = available_models[int(model_choice) - 1]
+    
+    if primary_model:
+        with console.status("[cyan]Setting primary model...[/cyan]", spinner="dots"):
+            result = asyncio.run(tool.execute(
+                path="agents.defaults.model",
+                value=primary_model
+            ))
+        if "Error" not in result:
+            console.print(f"[green]✓ Primary model set to {primary_model}[/green]\n")
+    
+    # Step 3: Smart Routing
+    console.print("[bold]Step 3: Smart Routing[/bold]")
+    console.print("""
+[dim]Smart routing automatically selects the best model based on query complexity:[/dim]
+  • Simple queries → Cheaper models
+  • Complex tasks → Stronger models
+  • Coding → Specialized coding models
+  • Reasoning → Advanced reasoning models
+
+This saves costs while maintaining quality.
+    """)
+    
+    enable_routing = Confirm.ask("Enable smart routing?", default=True)
+    
+    if enable_routing:
+        with console.status("[cyan]Enabling smart routing...[/cyan]", spinner="dots"):
+            result = asyncio.run(tool.execute(path="routing.enabled", value=True))
+        if "Error" not in result:
+            console.print("[green]✓ Smart routing enabled[/green]")
+            
+            # Show suggested tier configuration
+            console.print("\n[dim]Suggested tier configuration for {provider}:[/dim]".format(provider=provider_name.title()))
+            console.print("  Simple:    {model}".format(model=provider_schema.get('models', ['deepseek/deepseek-chat-v3-0324'])[0] if provider_schema.get('models') else 'deepseek/deepseek-chat-v3-0324'))
+            console.print("  Medium:    openai/gpt-4.1-mini")
+            console.print("  Complex:   anthropic/claude-sonnet-4.5")
+            console.print("  Reasoning: openai/o3")
+            console.print("  Coding:    moonshotai/kimi-k2.5")
+            console.print("\n[dim]You can customize these later in: nanobot configure[/dim]\n")
+    else:
+        console.print("[dim]Smart routing disabled. Your bot will use the primary model for all queries.[/dim]\n")
+    
+    # Step 4: Evolutionary Mode
+    console.print("[bold]Step 4: Evolutionary Mode[/bold]")
+    console.print("""
+[dim]Evolutionary mode allows the bot to:[/dim]
+  • Modify its own source code
+  • Access paths outside the workspace
+  • Self-improve and adapt
+
+[yellow]⚠ Security Note:[/yellow] Only enable if you understand the risks.
+    """)
+    
+    enable_evo = Confirm.ask("Enable evolutionary mode?", default=False)
+    
+    if enable_evo:
+        with console.status("[cyan]Enabling evolutionary mode...[/cyan]", spinner="dots"):
+            result = asyncio.run(tool.execute(path="tools.evolutionary", value=True))
+            # Set default allowed paths
+            asyncio.run(tool.execute(
+                path="tools.allowedPaths", 
+                value=["/projects/nanobot-turbo", "~/.nanobot"]
+            ))
+        if "Error" not in result:
+            console.print("[green]✓ Evolutionary mode enabled[/green]")
+            console.print("[dim]Allowed paths: /projects/nanobot-turbo, ~/.nanobot[/dim]")
+            console.print("[dim]Configure additional paths later with: nanobot configure[/dim]\n")
+    else:
+        console.print("[dim]Evolutionary mode disabled. Bot restricted to workspace only.[/dim]\n")
+    
+    # Completion
+    console.print(Panel.fit(
+        "[bold green]🎉 Setup Complete![/bold green]\n\n"
+        "Your nanobot is ready to use.",
+        border_style="green"
+    ))
+    
+    console.print("\n[bold]Get started:[/bold]")
+    console.print("  [cyan]nanobot agent[/cyan]     - Start interactive chat")
+    console.print("  [cyan]nanobot gateway[/cyan]   - Start gateway server")
+    console.print("  [cyan]nanobot configure[/cyan] - Advanced settings")
 
 
 @app.command()

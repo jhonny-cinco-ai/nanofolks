@@ -686,8 +686,14 @@ def _configure_tools():
         console.print("[dim]Required for web search functionality[/dim]")
         console.print("[dim]Get API key from: https://api.search.brave.com/app/keys[/dim]")
         
-        if Confirm.ask("\nConfigure Brave Search API key?", default=not has_key):
-            api_key = Prompt.ask("Enter Brave Search API key", password=True)
+        console.print("\n  [1] Enter API key")
+        console.print("  [0] Back")
+        console.print()
+        
+        choice = Prompt.ask("Select", choices=["0", "1"], default="1")
+        
+        if choice == "1":
+            api_key = Prompt.ask("Enter Brave Search API key", password=False)
             
             if api_key:
                 with console.status("[cyan]Saving web search configuration...[/cyan]", spinner="dots"):

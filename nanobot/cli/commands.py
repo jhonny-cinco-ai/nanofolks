@@ -218,8 +218,11 @@ def onboard():
     # Offer to run configuration immediately
     console.print("\n[green]Now let's configure your API keys to get started.[/green]")
     if typer.confirm("Ready to run the configuration wizard?"):
-        from nanobot.cli.configure import configure_cli
-        configure_cli()
+        import time
+        with console.status("[cyan]Loading configuration interface...[/cyan]", spinner="dots"):
+            time.sleep(0.1)  # Brief pause to show spinner
+            from nanobot.cli.configure import configure_cli
+            configure_cli()
     else:
         console.print("\n[yellow]⚠️ nanobot won't work without API keys.[/yellow]")
         console.print("When you're ready, run: [cyan]nanobot configure[/cyan]")
@@ -228,8 +231,11 @@ def onboard():
 @app.command()
 def configure():
     """Interactive configuration wizard."""
-    from nanobot.cli.configure import configure_cli
-    configure_cli()
+    import time
+    with console.status("[cyan]Loading configuration interface...[/cyan]", spinner="dots"):
+        time.sleep(0.1)  # Brief pause to show spinner
+        from nanobot.cli.configure import configure_cli
+        configure_cli()
 
 
 

@@ -1009,6 +1009,545 @@ class AgentLoop:
 ### Future Enhancement
 
 If you later need multi-user support or higher throughput, you can upgrade to the WorkerPool/TaskQueue architecture without changing the public API. The ActivityTracker and BackgroundProcessor interface remain the same.
+
+## Detailed Design: Entity Resolution Algorithm
+
+Entity resolution is the core deduplication mechanism in Phase 3 (Knowledge Graph Extraction). It prevents the knowledge graph from fragmenting into redundant entities ("John", "john", "John Smith", "J. Smith" should all resolve to one canonical entity).
+
+### Design Goals
+
+1. **High precision** (false positive merges are worse than false negatives)
+2. **Fast execution** (<50ms p99 for typical workloads)
+3. **No LLM calls on hot path** (everything is heuristic or embedding-based)
+4. **Progressive resolution** (cheap fast checks first, expensive checks only when necessary)
+5. **Auditable** (track why entities were merged, support manual correction)
+
+### Resolution Pipeline (5 Layers)
+
+```
+New mention → Layer 1: Rule-based exact/case-insensitive match
+           → Layer 2: Fuzzy string matching (Levenshtein)
+           → Layer 3: Semantic embedding similarity
+           → Layer 4: Contextual scoring (shared relationships)
+           → Layer 5: LLM fallback (optional, batched, async)
+           → Decision: merge, create new, or tentative
+```
+
+### Layer 1: Rule-Based Matching
+
+**Speed**: <1ms per candidate set  
+**Precision**: 100% (no false positives)  
+**Coverage**: ~40-50% of mentions
+
+```python
+def rule_based_match(
+    mention: str,
+    mention_type: str,
+    candidates: list[Entity]
+) -> Entity | None:
+    """
+    Fast exact matching with case/whitespace normalization.
+    """
+    normalized = normalize_mention(mention)
+    
+    for entity in candidates:
+        # Exact match on canonical name
+        if normalize_mention(entity.name) == normalized:
+            return entity
+        
+        # Exact match on any alias
+        for alias in entity.aliases:
+            if normalize_mention(alias) == normalized:
+                return entity
+    
+    return None
+
+def normalize_mention(text: str) -> str:
+    """Normalization preserving semantic identity."""
+    text = text.strip().lower()
+    text = re.sub(r'\s+', ' ', text)  # Collapse whitespace
+    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
+    return text
+```
+
+### Layer 2: Fuzzy String Matching
+
+**Speed**: ~1-5ms for 100 candidates  
+**Precision**: ~85% (with tuned threshold)  
+**Coverage**: +20-25% of mentions
+
+```python
+from rapidfuzz import fuzz
+
+def fuzzy_match(
+    mention: str,
+    candidates: list[Entity],
+    threshold: float = 0.85
+) -> Entity | None:
+    """
+    Fuzzy string matching using Levenshtein distance.
+    """
+    best_entity = None
+    best_score = 0.0
+    
+    for entity in candidates:
+        # Check canonical name
+        score = fuzz.ratio(mention.lower(), entity.name.lower()) / 100.0
+        if score > best_score:
+            best_score = score
+            best_entity = entity
+        
+        # Check aliases
+        for alias in entity.aliases:
+            score = fuzz.ratio(mention.lower(), alias.lower()) / 100.0
+            if score > best_score:
+                best_score = score
+                best_entity = entity
+    
+    if best_score >= threshold:
+        return best_entity
+    
+    return None
+```
+
+**Threshold tuning**:
+- PERSON: 0.85 (stricter - "John Smith" vs "Jane Smith" are different)
+- ORG: 0.80 (looser - "Acme Corp" vs "Acme Corporation")
+- LOCATION: 0.90 (stricter - "Paris, France" vs "Paris, Texas")
+- CONCEPT: 0.75 (looser - "machine learning" vs "ML")
+
+### Layer 3: Semantic Embedding Similarity
+
+**Speed**: ~10-30ms for 100 candidates (with FAISS index)  
+**Precision**: ~75% (embedding models can conflate similar concepts)  
+**Coverage**: +15-20% of mentions
+
+```python
+import numpy as np
+
+def semantic_match(
+    mention: str,
+    mention_embedding: np.ndarray,
+    candidates: list[Entity],
+    threshold: float = 0.80
+) -> Entity | None:
+    """
+    Semantic similarity using cosine distance on embeddings.
+    """
+    best_entity = None
+    best_similarity = 0.0
+    
+    for entity in candidates:
+        if entity.name_embedding is None:
+            continue
+        
+        # Cosine similarity
+        entity_emb = unpack_embedding(entity.name_embedding)
+        similarity = np.dot(mention_embedding, entity_emb) / (
+            np.linalg.norm(mention_embedding) * np.linalg.norm(entity_emb)
+        )
+        
+        if similarity > best_similarity:
+            best_similarity = similarity
+            best_entity = entity
+    
+    if best_similarity >= threshold:
+        return best_entity
+    
+    return None
+```
+
+**Optimization**: For large entity sets (>1000), use FAISS approximate nearest neighbor search instead of brute-force.
+
+```python
+# Optional FAISS index for scaling to 10K+ entities
+import faiss
+
+class EntityIndex:
+    def __init__(self, embedding_dim: int = 384):
+        self.index = faiss.IndexFlatIP(embedding_dim)  # Inner product (cosine)
+        self.entity_ids: list[str] = []
+    
+    def add(self, entity_id: str, embedding: np.ndarray):
+        # Normalize for cosine similarity
+        embedding = embedding / np.linalg.norm(embedding)
+        self.index.add(embedding.reshape(1, -1))
+        self.entity_ids.append(entity_id)
+    
+    def search(self, query_embedding: np.ndarray, k: int = 10) -> list[tuple[str, float]]:
+        query_embedding = query_embedding / np.linalg.norm(query_embedding)
+        scores, indices = self.index.search(query_embedding.reshape(1, -1), k)
+        return [(self.entity_ids[i], scores[0][idx]) for idx, i in enumerate(indices[0])]
+```
+
+### Layer 4: Contextual Scoring
+
+**Speed**: ~5-10ms (requires DB queries)  
+**Precision**: ~90% (high signal)  
+**Coverage**: +5-10% of mentions
+
+```python
+def contextual_match(
+    mention: str,
+    mention_context: dict,  # {event_id, nearby_entities, session_key}
+    candidates: list[Entity],
+    threshold: float = 0.70
+) -> Entity | None:
+    """
+    Score candidates by shared context (co-occurring entities, session).
+    """
+    scores = {}
+    
+    for entity in candidates:
+        score = 0.0
+        
+        # Boost if mentioned in same session
+        if mention_context.get("session_key") in entity.metadata.get("sessions", []):
+            score += 0.3
+        
+        # Boost if shares relationships with nearby entities
+        nearby_entity_ids = mention_context.get("nearby_entities", [])
+        for nearby_id in nearby_entity_ids:
+            if has_edge(entity.id, nearby_id):
+                score += 0.2
+        
+        # Boost if mentioned in recent events
+        days_since_last_seen = (datetime.now() - entity.last_seen).days
+        if days_since_last_seen < 7:
+            score += 0.2
+        
+        scores[entity.id] = score
+    
+    best_entity = max(candidates, key=lambda e: scores.get(e.id, 0.0))
+    if scores.get(best_entity.id, 0.0) >= threshold:
+        return best_entity
+    
+    return None
+```
+
+### Layer 5: LLM Fallback (Optional)
+
+**Speed**: ~200-2000ms (batched, async)  
+**Precision**: ~95% (best, but expensive)  
+**Coverage**: Remaining ~5-10% of hard cases
+
+```python
+async def llm_fallback_match(
+    mention: str,
+    mention_context: str,
+    candidates: list[Entity],
+    llm_client: LLM
+) -> Entity | None:
+    """
+    LLM-based disambiguation for hard cases.
+    Batched and async to avoid blocking.
+    """
+    if not candidates:
+        return None
+    
+    prompt = f"""Given the mention "{mention}" in context:
+    {mention_context}
+    
+    Which entity does this refer to?
+    
+    Candidates:
+    {format_candidates(candidates)}
+    
+    Respond with ONLY the candidate number (1-{len(candidates)}) or "NEW" if none match.
+    """
+    
+    response = await llm_client.complete(prompt, model="gpt-5-nano")
+    
+    if response.strip().upper() == "NEW":
+        return None
+    
+    try:
+        idx = int(response.strip()) - 1
+        if 0 <= idx < len(candidates):
+            return candidates[idx]
+    except ValueError:
+        pass
+    
+    return None
+```
+
+**Usage policy**:
+- Only enabled if `extraction.api_fallback = true`
+- Only used for mentions with 2+ viable candidates after Layer 4
+- Batched every 60 seconds (not per-mention)
+- Falls back to "create new entity" if LLM fails
+
+### Full Resolution Flow
+
+```python
+@dataclass
+class ResolutionResult:
+    entity: Entity | None
+    confidence: float
+    method: str  # "rule", "fuzzy", "semantic", "contextual", "llm", "new"
+
+async def resolve_entity(
+    mention: str,
+    mention_type: str,
+    mention_embedding: np.ndarray,
+    context: dict,
+    config: ExtractionConfig,
+    store: MemoryStore
+) -> ResolutionResult:
+    """
+    Progressive entity resolution through 5 layers.
+    """
+    # Step 1: Candidate filtering (cheap, fast)
+    candidates = get_candidate_entities(
+        entity_type=mention_type,
+        max_candidates=100,
+        filters={
+            "last_seen_after": datetime.now() - timedelta(days=90),
+            "event_count_min": 2  # Skip one-off entities
+        }
+    )
+    
+    if not candidates:
+        return ResolutionResult(None, 1.0, "new")
+    
+    # Step 2: Layer 1 - Rule-based
+    entity = rule_based_match(mention, mention_type, candidates)
+    if entity:
+        return ResolutionResult(entity, 1.0, "rule")
+    
+    # Step 3: Layer 2 - Fuzzy
+    entity = fuzzy_match(mention, candidates, threshold=get_threshold(mention_type))
+    if entity:
+        return ResolutionResult(entity, 0.85, "fuzzy")
+    
+    # Step 4: Layer 3 - Semantic
+    entity = semantic_match(mention, mention_embedding, candidates, threshold=0.80)
+    if entity:
+        return ResolutionResult(entity, 0.75, "semantic")
+    
+    # Step 5: Layer 4 - Contextual
+    entity = contextual_match(mention, context, candidates, threshold=0.70)
+    if entity:
+        return ResolutionResult(entity, 0.80, "contextual")
+    
+    # Step 6: Layer 5 - LLM fallback (optional, async)
+    if config.api_fallback and len(candidates) <= 5:
+        entity = await llm_fallback_match(mention, context, candidates, store.llm_client)
+        if entity:
+            return ResolutionResult(entity, 0.95, "llm")
+    
+    # Step 7: Create new entity
+    return ResolutionResult(None, 1.0, "new")
+```
+
+### Performance Optimizations
+
+#### 1. Candidate Filtering
+
+Don't check all entities; pre-filter by:
+- Entity type (PERSON mentions only check PERSON entities)
+- Recency (entities mentioned in last 90 days)
+- Frequency (entities mentioned 2+ times)
+- First letter (for large sets, use prefix index)
+
+```python
+def get_candidate_entities(
+    entity_type: str,
+    max_candidates: int = 100,
+    filters: dict = None
+) -> list[Entity]:
+    """
+    Fetch candidate entities with smart filtering.
+    """
+    query = """
+        SELECT * FROM entities
+        WHERE entity_type = ?
+        AND last_seen > ?
+        AND event_count >= ?
+        ORDER BY event_count DESC
+        LIMIT ?
+    """
+    # Returns top N most-mentioned entities of the right type
+```
+
+#### 2. Caching
+
+Cache resolution results for the duration of an extraction batch:
+```python
+@dataclass
+class ResolutionCache:
+    cache: dict[str, Entity | None] = field(default_factory=dict)
+    
+    def get(self, mention: str, mention_type: str) -> Entity | None:
+        key = f"{mention_type}:{normalize_mention(mention)}"
+        return self.cache.get(key)
+    
+    def set(self, mention: str, mention_type: str, entity: Entity | None):
+        key = f"{mention_type}:{normalize_mention(mention)}"
+        self.cache[key] = entity
+```
+
+#### 3. Tentative Merges
+
+For low-confidence matches (0.70-0.85), create "tentative" merge records instead of immediate merges. After 3+ confirmations (same mention resolves to same entity), promote to permanent.
+
+```python
+@dataclass
+class TentativeMerge:
+    mention: str
+    entity_id: str
+    confidence: float
+    confirmation_count: int
+    created_at: datetime
+```
+
+### Configuration Schema
+
+```python
+class EntityResolutionConfig(BaseModel):
+    """Entity resolution algorithm configuration."""
+    
+    # Candidate filtering
+    max_candidates: int = 100
+    candidate_recency_days: int = 90
+    candidate_min_mentions: int = 2
+    
+    # Layer thresholds
+    fuzzy_threshold_person: float = 0.85
+    fuzzy_threshold_org: float = 0.80
+    fuzzy_threshold_location: float = 0.90
+    fuzzy_threshold_concept: float = 0.75
+    semantic_threshold: float = 0.80
+    contextual_threshold: float = 0.70
+    
+    # Tentative merges
+    tentative_threshold: float = 0.70
+    tentative_confirmation_count: int = 3
+    
+    # LLM fallback
+    llm_fallback_enabled: bool = False
+    llm_fallback_max_candidates: int = 5
+    
+    # Performance
+    use_faiss_index: bool = False  # Enable for 10K+ entities
+    faiss_neighbors: int = 10
+```
+
+Example config:
+```json
+{
+  "memory": {
+    "extraction": {
+      "entity_resolution": {
+        "fuzzy_threshold_person": 0.85,
+        "semantic_threshold": 0.80,
+        "llm_fallback_enabled": false
+      }
+    }
+  }
+}
+```
+
+### Monitoring and Observability
+
+Track resolution metrics:
+```python
+@dataclass
+class ResolutionMetrics:
+    total_resolutions: int
+    method_counts: dict[str, int]  # {"rule": 450, "fuzzy": 230, ...}
+    avg_latency_ms: dict[str, float]  # {"rule": 0.8, "fuzzy": 3.2, ...}
+    confidence_distribution: dict[str, int]  # {"high": 600, "medium": 100, ...}
+    tentative_merges: int
+    false_positive_reports: int  # User-reported incorrect merges
+```
+
+CLI command to inspect:
+```bash
+$ nanobot memory resolution-stats
+Entity Resolution Statistics (last 7 days)
+─────────────────────────────────────────
+Total resolutions:    1,234
+  - Rule-based:       45% (avg 0.8ms)
+  - Fuzzy:            28% (avg 3.2ms)
+  - Semantic:         18% (avg 12ms)
+  - Contextual:       7%  (avg 8ms)
+  - LLM fallback:     0%  (disabled)
+  - New entities:     2%
+
+Tentative merges:     23 (awaiting confirmation)
+False positives:      2 (0.16%)
+```
+
+### Testing Strategy
+
+```python
+# tests/memory/test_entity_resolution.py
+
+def test_rule_based_exact_match():
+    """Layer 1: Exact match on canonical name."""
+    entity = Entity(id="1", name="John Smith", entity_type="person", aliases=[])
+    result = rule_based_match("john smith", "person", [entity])
+    assert result == entity
+
+def test_fuzzy_match_nickname():
+    """Layer 2: Fuzzy match for nickname."""
+    entity = Entity(id="1", name="Elizabeth", entity_type="person", aliases=["Liz"])
+    result = fuzzy_match("Lizzy", [entity], threshold=0.80)
+    assert result == entity
+
+def test_semantic_match_synonym():
+    """Layer 3: Semantic match for synonym."""
+    entity = Entity(
+        id="1", 
+        name="machine learning", 
+        entity_type="concept",
+        name_embedding=embed("machine learning")
+    )
+    result = semantic_match("ML", embed("ML"), [entity], threshold=0.75)
+    assert result == entity
+
+def test_no_false_positive_merge():
+    """Precision: Don't merge different people with similar names."""
+    john_smith = Entity(id="1", name="John Smith", entity_type="person", aliases=[])
+    jane_smith = Entity(id="2", name="Jane Smith", entity_type="person", aliases=[])
+    result = fuzzy_match("John Smith", [jane_smith], threshold=0.85)
+    assert result is None  # Should NOT match Jane
+```
+
+### Performance Targets
+
+| Percentile | Latency Target | Notes |
+|------------|---------------|-------|
+| p50 | <1ms | Rule-based fast path |
+| p90 | <5ms | Fuzzy + semantic |
+| p95 | <10ms | Contextual scoring |
+| p99 | <50ms | Rare LLM fallback |
+
+For 100 entity candidates:
+- Layer 1 (rule): ~0.5ms
+- Layer 2 (fuzzy): ~2-3ms
+- Layer 3 (semantic): ~10ms (brute force) or ~2ms (FAISS)
+- Layer 4 (contextual): ~5ms (requires DB queries)
+- Layer 5 (LLM): ~200-2000ms (batched, async)
+
+### Resource Requirements
+
+**Memory**:
+- Entity cache: ~10KB per 100 entities
+- Embedding cache: ~1.5KB per entity (384 dims × 4 bytes)
+- FAISS index (optional): ~2MB per 10K entities
+
+**Disk**:
+- SQLite indexes on entities.name, entities.entity_type, entities.last_seen
+
+**CPU**:
+- Minimal (string operations + vector dot products)
+- FAISS index build: ~1-2 seconds for 10K entities (one-time)
+
+---
+
+
 ## References
 
 - [babyagi3 memory system](https://github.com/yoheinakajima/babyagi3/tree/main/memory) - Inspiration for 3-layer architecture

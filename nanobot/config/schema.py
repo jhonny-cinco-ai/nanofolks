@@ -297,6 +297,79 @@ class RoutingConfig(BaseModel):
     auto_calibration: AutoCalibrationConfig = Field(default_factory=AutoCalibrationConfig)
 
 
+class BackgroundConfig(BaseModel):
+    """Background processing configuration for memory system."""
+    enabled: bool = True
+    interval_seconds: int = 60          # Check every 60s
+    quiet_threshold_seconds: int = 30   # User inactive for 30s = safe to run
+
+
+class EmbeddingConfig(BaseModel):
+    """Embedding provider configuration."""
+    provider: str = "local"             # "local" or "api"
+    local_model: str = "BAAI/bge-small-en-v1.5"
+    api_model: str = "qwen/qwen3-embedding-0.6b"
+    api_fallback: bool = True           # Fall back to API if local fails
+    cache_embeddings: bool = True
+    lazy_load: bool = True              # Download models on first use
+
+
+class ExtractionConfig(BaseModel):
+    """Entity extraction configuration."""
+    enabled: bool = True
+    provider: str = "gliner2"           # "gliner2", "spacy", "api"
+    gliner2_model: str = "fastino/gliner2-base-v1"
+    spacy_model: str = "en_core_web_sm"
+    interval_seconds: int = 60
+    batch_size: int = 20
+    api_fallback: bool = False          # Use LLM for complex extractions
+    api_model: str = ""                 # Uses LLM classifier model if empty
+
+
+class SummaryConfig(BaseModel):
+    """Summary node configuration."""
+    staleness_threshold: int = 10       # Events before refresh
+    max_refresh_batch: int = 20         # Max nodes to refresh per cycle
+    model: str = ""                     # Uses LLM classifier model if empty
+
+
+class LearningConfig(BaseModel):
+    """Learning and preferences configuration."""
+    enabled: bool = True
+    decay_days: int = 14                # Half-life for learning relevance
+    max_learnings: int = 200             # Max active learnings
+    relevance_decay_rate: float = 0.05   # 5% per day
+
+
+class ContextConfig(BaseModel):
+    """Context assembly configuration."""
+    total_budget: int = 4000            # Total token budget for memory context
+    always_include_preferences: bool = True
+
+
+class PrivacyConfig(BaseModel):
+    """Privacy and security configuration."""
+    auto_redact_pii: bool = True
+    auto_redact_credentials: bool = True
+    excluded_patterns: list[str] = Field(default_factory=lambda: [
+        "password", "api_key", "secret", "token", "credential"
+    ])
+
+
+class MemoryConfig(BaseModel):
+    """Memory system configuration."""
+    enabled: bool = True
+    db_path: str = "memory/memory.db"   # Relative to workspace
+    
+    background: BackgroundConfig = Field(default_factory=BackgroundConfig)
+    embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    extraction: ExtractionConfig = Field(default_factory=ExtractionConfig)
+    summary: SummaryConfig = Field(default_factory=SummaryConfig)
+    learning: LearningConfig = Field(default_factory=LearningConfig)
+    context: ContextConfig = Field(default_factory=ContextConfig)
+    privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
+
+
 class Config(BaseSettings):
     """Root configuration for nanobot."""
     agents: AgentsConfig = Field(default_factory=AgentsConfig)
@@ -305,6 +378,7 @@ class Config(BaseSettings):
     gateway: GatewayConfig = Field(default_factory=GatewayConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     routing: RoutingConfig = Field(default_factory=RoutingConfig)
+    memory: MemoryConfig = Field(default_factory=MemoryConfig)
     
     @property
     def workspace_path(self) -> Path:

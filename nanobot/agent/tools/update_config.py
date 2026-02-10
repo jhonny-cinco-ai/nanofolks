@@ -469,15 +469,27 @@ Examples:
             
             elif field_type == 'array':
                 if isinstance(value, list):
+                    # Ensure all items are strings
+                    item_type = schema.get('item_type', 'string')
+                    if item_type == 'string':
+                        return [str(item) for item in value]
                     return value
                 if isinstance(value, str):
                     # Parse comma-separated or JSON array
                     try:
                         import json
-                        return json.loads(value)
+                        parsed = json.loads(value)
+                        if isinstance(parsed, list):
+                            item_type = schema.get('item_type', 'string')
+                            if item_type == 'string':
+                                return [str(item) for item in parsed]
+                            return parsed
+                        # Single value parsed as non-list
+                        return [str(parsed)]
                     except:
                         return [item.strip() for item in value.split(',') if item.strip()]
-                return [value]
+                # Single non-string value (e.g., int)
+                return [str(value)]
             
             elif field_type == 'enum':
                 options = schema.get('options', [])
@@ -523,29 +535,30 @@ Examples:
         
         Args:
             config: Config object to update
-            parts: Path parts
+            parts: Path parts (can be camelCase or snake_case)
             value: New value
             operation: 'set', 'append', or 'remove'
             
         Returns:
             True if successful
         """
-        from nanobot.config.loader import convert_to_camel
+        from nanobot.config.loader import camel_to_snake
         
-        # Convert parts to camelCase for attribute access
-        camel_parts = [convert_to_camel(p) for p in parts]
+        # Convert parts to snake_case for Python attribute access
+        # Pydantic models use snake_case for attribute names (e.g., api_key, not apiKey)
+        snake_parts = [camel_to_snake(p) for p in parts]
         
         try:
             # Navigate to the parent object
             current = config
-            for part in camel_parts[:-1]:
+            for part in snake_parts[:-1]:
                 if hasattr(current, part):
                     current = getattr(current, part)
                 else:
                     return False
             
             # Get the final attribute name
-            final_part = camel_parts[-1]
+            final_part = snake_parts[-1]
             
             if operation == 'set':
                 if hasattr(current, final_part):

@@ -31,9 +31,10 @@ def configure_cli():
         border_style="blue"
     ))
     
-    # Check current config status
-    tool = UpdateConfigTool()
-    summary = tool.get_config_summary()
+    # Check current config status with spinner
+    with console.status("[cyan]Loading configuration...[/cyan]", spinner="dots"):
+        tool = UpdateConfigTool()
+        summary = tool.get_config_summary()
     
     # Show current status
     _show_status(summary)
@@ -113,6 +114,46 @@ def _show_status(summary: dict):
     console.print()
 
 
+def _get_channels_status(summary: dict) -> str:
+    """Get status indicator for channels."""
+    enabled_channels = [
+        name for name, info in summary.get('channels', {}).items()
+        if info.get('enabled', False)
+    ]
+    return "[green]✓[/green]" if enabled_channels else "[dim]○[/dim]"
+
+
+def _get_agents_status(summary: dict) -> str:
+    """Get status indicator for agent settings."""
+    # Use summary data to avoid reloading broken config
+    # Show ✓ if model is set (done during provider setup)
+    has_any_provider = any(
+        p.get('has_key', False) for p in summary.get('providers', {}).values()
+    )
+    return "[green]✓[/green]" if has_any_provider else "[dim]○[/dim]"
+
+
+def _get_routing_status(summary: dict) -> str:
+    """Get status indicator for routing."""
+    # This is passed in summary from get_config_summary
+    # We need to check if routing was enabled
+    # For now, check if any provider is configured (proxy for onboard completion)
+    has_any_provider = any(
+        p.get('has_key', False) for p in summary.get('providers', {}).values()
+    )
+    return "[green]✓[/green]" if has_any_provider else "[dim]○[/dim]"
+
+
+def _get_tools_status(summary: dict) -> str:
+    """Get status indicator for tools."""
+    # Check if any channel is enabled (proxy for advanced setup)
+    has_any_channel = any(
+        info.get('enabled', False) 
+        for info in summary.get('channels', {}).values()
+    )
+    return "[green]✓[/green]" if has_any_channel else "[dim]○[/dim]"
+
+
 def _show_main_menu(summary: dict) -> str:
     """Show main menu and get user choice."""
     has_required = summary['has_required_config']
@@ -125,17 +166,24 @@ def _show_main_menu(summary: dict) -> str:
     
     options = []
     
+    # Check each section's status
+    providers_status = "[green]✓[/green]" if has_required else "[dim]○[/dim]"
+    channels_status = _get_channels_status(summary)
+    agents_status = _get_agents_status(summary)
+    routing_status = _get_routing_status(summary)
+    tools_status = _get_tools_status(summary)
+    
     if not has_required:
         console.print("[red]⚠ At least one LLM provider is required to start[/red]\n")
-        options.append(("1", "providers", "🤖 Model Providers [red](Required)[/red]"))
+        options.append(("1", "providers", f"🤖 Model Providers {providers_status} [red](Required)[/red]"))
     else:
-        options.append(("1", "providers", "🤖 Model Providers"))
+        options.append(("1", "providers", f"🤖 Model Providers {providers_status}"))
     
     options.extend([
-        ("2", "channels", "💬 Chat Channels"),
-        ("3", "agents", "⚙️ Agent Settings"),
-        ("4", "routing", "🧠 Smart Routing"),
-        ("5", "tools", "🛠️ Tool Settings"),
+        ("2", "channels", f"💬 Chat Channels {channels_status}"),
+        ("3", "agents", f"⚙️ Agent Settings {agents_status}"),
+        ("4", "routing", f"🧠 Smart Routing {routing_status}"),
+        ("5", "tools", f"🛠️ Tool Settings {tools_status}"),
         ("6", "status", "📊 View Full Status"),
         ("7", "exit", "✓ Done" if has_required else "⏭ Skip for now"),
     ])
@@ -218,8 +266,18 @@ def _configure_single_provider(name: str, schema: dict):
             if field_info.get('help'):
                 console.print(f"\n[dim]{field_info['help']}[/dim]")
     
-    # Get API key
+    # Show options
     console.print()
+    console.print("  [1] Enter API key")
+    console.print("  [0] Back")
+    console.print()
+    
+    choice = Prompt.ask("Select", choices=["0", "1"], default="1")
+    
+    if choice == "0":
+        return
+    
+    # Get API key
     api_key = Prompt.ask(
         f"Enter {name} API key",
         password=False  # Show input so user can see what they're typing
@@ -239,11 +297,12 @@ def _configure_single_provider(name: str, schema: dict):
         console.print("[yellow]Cancelled[/yellow]")
         return
     
-    # Update config (execute is async, so we need to run it)
-    result = asyncio.run(tool.execute(
-        path=f"providers.{name}.apiKey",
-        value=api_key
-    ))
+    # Update config with spinner
+    with console.status(f"[cyan]Saving {name} configuration...[/cyan]", spinner="dots"):
+        result = asyncio.run(tool.execute(
+            path=f"providers.{name}.apiKey",
+            value=api_key
+        ))
     
     if "Error" in result:
         console.print(f"[red]{result}[/red]")
@@ -335,7 +394,17 @@ def _configure_single_channel(name: str, schema: dict):
         return
     
     # Enable channel
-    console.print("\nTo enable this channel, I need some information:\n")
+    console.print("\nTo enable this channel, I need some information:")
+    console.print("  [1] Continue with setup")
+    console.print("  [0] Back")
+    console.print()
+    
+    choice = Prompt.ask("Select", choices=["0", "1"], default="1")
+    
+    if choice == "0":
+        return
+    
+    console.print()
     
     # Collect required fields
     if 'fields' in schema:
@@ -359,7 +428,8 @@ def _configure_single_channel(name: str, schema: dict):
     
     # Enable the channel
     if Confirm.ask("Enable this channel?", default=True):
-        result = asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=True))
+        with console.status(f"[cyan]Enabling {name} channel...[/cyan]", spinner="dots"):
+            result = asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=True))
         if "Error" not in result:
             console.print(f"[green]✓ {name.title()} channel enabled![/green]")
         console.print(f"[dim]Start the gateway to activate: nanobot gateway[/dim]")
@@ -524,29 +594,71 @@ def _configure_tools():
         border_style="blue"
     ))
     
-    console.print("\n[dim]Security Settings:[/dim]")
+    # Show menu
+    console.print("\n[dim]What would you like to configure?[/dim]")
+    console.print("  [1] Security Settings (Evolutionary mode)")
+    console.print("  [2] Web Search API Key")
+    console.print("  [0] Back")
+    console.print()
     
-    # Evolutionary mode
-    config = load_config()
-    is_evolutionary = config.tools.evolutionary
+    choice = Prompt.ask("Select", choices=["0", "1", "2"], default="1")
     
-    console.print(f"\nEvolutionary mode: {'[green]Enabled[/green]' if is_evolutionary else '[dim]Disabled[/dim]'}")
-    console.print("[dim]Allows bot to modify its own source code[/dim]")
+    if choice == "0":
+        return
     
-    if Confirm.ask(
-        f"{'Disable' if is_evolutionary else 'Enable'} evolutionary mode?",
-        default=False
-    ):
-        result = asyncio.run(tool.execute(
-            path="tools.evolutionary",
-            value=not is_evolutionary
-        ))
-        console.print(f"[green]{result}[/green]")
+    if choice == "1":
+        console.print("\n[dim]Security Settings:[/dim]")
         
-        if not is_evolutionary:  # Just enabled
-            console.print("\n[yellow]⚠ Security Warning:[/yellow]")
-            console.print("Evolutionary mode allows the bot to modify files outside")
-            console.print("the workspace. Make sure allowedPaths is configured correctly.")
+        # Evolutionary mode
+        config = load_config()
+        is_evolutionary = config.tools.evolutionary
+        
+        console.print(f"\nEvolutionary mode: {'[green]Enabled[/green]' if is_evolutionary else '[dim]Disabled[/dim]'}")
+        console.print("[dim]Allows bot to modify its own source code[/dim]")
+        
+        if Confirm.ask(
+            f"{'Disable' if is_evolutionary else 'Enable'} evolutionary mode?",
+            default=False
+        ):
+            with console.status("[cyan]Updating security settings...[/cyan]", spinner="dots"):
+                result = asyncio.run(tool.execute(
+                    path="tools.evolutionary",
+                    value=not is_evolutionary
+                ))
+            console.print(f"[green]{result}[/green]")
+            
+            if not is_evolutionary:  # Just enabled
+                console.print("\n[yellow]⚠ Security Warning:[/yellow]")
+                console.print("Evolutionary mode allows the bot to modify files outside")
+                console.print("the workspace. Make sure allowedPaths is configured correctly.")
+    
+    elif choice == "2":
+        # Web Search API Key
+        console.print("\n[dim]Web Search Configuration:[/dim]")
+        
+        config = load_config()
+        has_key = bool(config.tools.web.search.api_key)
+        
+        console.print(f"\nBrave Search API: {'[green]✓ Configured[/green]' if has_key else '[dim]○ Not configured[/dim]'}")
+        console.print("[dim]Required for web search functionality[/dim]")
+        console.print("[dim]Get API key from: https://api.search.brave.com/app/keys[/dim]")
+        
+        if Confirm.ask("\nConfigure Brave Search API key?", default=not has_key):
+            api_key = Prompt.ask("Enter Brave Search API key", password=True)
+            
+            if api_key:
+                with console.status("[cyan]Saving web search configuration...[/cyan]", spinner="dots"):
+                    result = asyncio.run(tool.execute(
+                        path="tools.web.search.apiKey",
+                        value=api_key
+                    ))
+                if "Error" not in result:
+                    console.print(f"[green]{result}[/green]")
+                    console.print("[dim]Web search is now enabled[/dim]")
+                else:
+                    console.print(f"[red]{result}[/red]")
+            else:
+                console.print("[yellow]⚠ No API key provided, skipping[/yellow]")
 
 
 def _show_detailed_status():

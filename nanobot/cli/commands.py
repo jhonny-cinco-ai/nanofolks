@@ -246,7 +246,7 @@ def onboard():
     console.print("\n[bold]Next Step: API Configuration[/bold]")
     console.print("[dim]Your workspace is ready. Now let's set up API keys to start chatting.[/dim]\n")
     
-    if typer.confirm("[bold]Ready to run the configuration wizard?[/bold]"):
+    if typer.confirm("Ready to run the configuration wizard?"):
         configure_cli()
     else:
         console.print("\n[yellow]⚠️  nanobot won't work without API keys.[/yellow]")

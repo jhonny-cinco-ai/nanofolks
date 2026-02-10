@@ -734,11 +734,16 @@ def _show_detailed_status():
     table.add_column("API Key", style="green")
     table.add_column("Status", style="yellow")
     
+    all_providers = [
+        'openrouter', 'anthropic', 'openai', 'groq', 'deepseek', 
+        'moonshot', 'gemini', 'zhipu', 'dashscope', 'aihubmix', 'vllm'
+    ]
+    
     # Check if using OpenRouter (model format: provider/model-name)
     if '/' in default_model:
         # Using OpenRouter or similar gateway
         model_provider = default_model.split('/')[0]
-        for provider_name in ['openrouter', 'anthropic', 'openai', 'groq', 'deepseek', 'moonshot']:
+        for provider_name in all_providers:
             provider = getattr(config.providers, provider_name, None)
             has_key = bool(provider and provider.api_key)
             
@@ -756,7 +761,7 @@ def _show_detailed_status():
             )
     else:
         # Direct provider usage
-        for provider_name in ['openrouter', 'anthropic', 'openai', 'groq', 'deepseek', 'moonshot']:
+        for provider_name in all_providers:
             provider = getattr(config.providers, provider_name, None)
             has_key = bool(provider and provider.api_key)
             is_active = provider_name in default_model.lower() and has_key

@@ -268,6 +268,8 @@ def _run_onboard_wizard():
         "7": ("gemini", "Gemini - Google AI models"),
         "8": ("zhipu", "Zhipu - ChatGLM models (Chinese)"),
         "9": ("dashscope", "DashScope - Qwen models (Alibaba/Chinese)"),
+        "10": ("aihubmix", "AiHubMix - API Gateway"),
+        "11": ("vllm", "vLLM - Local models"),
     }
     
     for key, (name, desc) in providers.items():

@@ -246,44 +246,45 @@ def onboard():
     
     setup_table.add_row("✓", "Memory database", f"{workspace}/memory/memory.db")
     
-    # Pre-download memory models (optional but recommended)
+    # Pre-download memory models (automatic, mandatory)
     console.print("\n[cyan]🧠 Memory & Learning System[/cyan]")
-    console.print("[dim]Downloading AI models for local memory processing...[/dim]")
-    console.print("  • Embedding model (~67MB) - for semantic search")
-    console.print("  • Extraction model (~80MB) - for entity recognition\n")
+    console.print("[dim]Downloading required AI models (~150MB total)...[/dim]\n")
     
-    if typer.confirm("Download memory models now? (Recommended)", default=True):
-        from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.progress import Progress, BarColumn, TextColumn, DownloadColumn, TransferSpeedColumn
+    
+    with Progress(
+        TextColumn("[bold blue]{task.description}"),
+        BarColumn(bar_width=40),
+        "[progress.percentage]{task.percentage:>3.0f}%",
+        "•",
+        DownloadColumn(binary_units=True),
+        "•",
+        TransferSpeedColumn(),
+        console=console,
+    ) as progress:
+        # Download embedding model
+        task1 = progress.add_task("📦 Embedding model (67MB)...", total=67_000_000)
+        try:
+            from fastembed import TextEmbedding
+            # This triggers download
+            _ = TextEmbedding("BAAI/bge-small-en-v1.5")
+            progress.update(task1, completed=67_000_000)
+        except Exception as e:
+            progress.update(task1, completed=0, description=f"[yellow]⚠️  {e}[/yellow]")
+            console.print(f"[yellow]Warning: Could not download embedding model: {e}[/yellow]")
         
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console,
-        ) as progress:
-            # Download embedding model
-            task1 = progress.add_task("📦 Downloading embedding model...", total=None)
-            try:
-                from fastembed import TextEmbedding
-                # This triggers download
-                _ = TextEmbedding("BAAI/bge-small-en-v1.5")
-                progress.update(task1, description="[green]✓ Embedding model ready[/green]")
-            except Exception as e:
-                progress.update(task1, description=f"[yellow]⚠️  Embedding model: {e}[/yellow]")
-            
-            # Download extraction model
-            task2 = progress.add_task("📦 Downloading extraction model...", total=None)
-            try:
-                from gliner2 import GLiNER2Extractor
-                # This triggers download
-                _ = GLiNER2Extractor("fastino/gliner2-base-v1")
-                progress.update(task2, description="[green]✓ Extraction model ready[/green]")
-            except Exception as e:
-                progress.update(task2, description=f"[yellow]⚠️  Extraction model: {e}[/yellow]")
-        
-        setup_table.add_row("✓", "Memory models", "Downloaded")
-    else:
-        console.print("[yellow]⚠️  Models will download on first use (may cause delays)[/yellow]")
-        setup_table.add_row("○", "Memory models", "Lazy load")
+        # Download extraction model
+        task2 = progress.add_task("📦 Extraction model (80MB)...", total=80_000_000)
+        try:
+            from gliner2 import GLiNER2Extractor
+            # This triggers download
+            _ = GLiNER2Extractor("fastino/gliner2-base-v1")
+            progress.update(task2, completed=80_000_000)
+        except Exception as e:
+            progress.update(task2, completed=0, description=f"[yellow]⚠️  {e}[/yellow]")
+            console.print(f"[yellow]Warning: Could not download extraction model: {e}[/yellow]")
+    
+    setup_table.add_row("✓", "Memory models", "Ready")
     
     console.print(setup_table)
     

@@ -98,21 +98,20 @@ pip install nanobot-ai
 > [!TIP]
 > Get API keys: [OpenRouter](https://openrouter.ai/keys) (Global) · [DashScope](https://dashscope.console.aliyun.com) (Qwen) · [Brave Search](https://brave.com/search/api/) (optional, for web search)
 
-**1. Initialize**
+**1. Initialize & Configure** ⭐ NEW
 
 ```bash
 nanobot onboard
 ```
 
-**2. Configure Interactively** ⭐ NEW
+This creates your workspace and **automatically launches the interactive configuration wizard**. No manual JSON editing required!
 
+**Already onboarded?** Run the config wizard anytime:
 ```bash
 nanobot configure
 ```
 
-This launches an interactive wizard to set up your API keys, models, and channels. No manual JSON editing required!
-
-Or manually edit `~/.nanobot/config.json`:
+**Prefer manual editing?** Edit `~/.nanobot/config.json` directly:
 ```json
 {
   "providers": {
@@ -814,7 +813,7 @@ Allow the bot to self-improve by modifying its own source code while maintaining
 
 | Command | Description |
 |---------|-------------|
-| `nanobot onboard` | Initialize config & workspace |
+| `nanobot onboard` | Initialize config, workspace & run config wizard |
 | `nanobot configure` | ⭐ Interactive configuration wizard |
 | `nanobot agent -m "..."` | Chat with the agent |
 | `nanobot agent` | Interactive chat mode |

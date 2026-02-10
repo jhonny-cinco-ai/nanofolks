@@ -31,9 +31,10 @@ def configure_cli():
         border_style="blue"
     ))
     
-    # Check current config status
-    tool = UpdateConfigTool()
-    summary = tool.get_config_summary()
+    # Check current config status with spinner
+    with console.status("[cyan]Loading configuration...[/cyan]", spinner="dots"):
+        tool = UpdateConfigTool()
+        summary = tool.get_config_summary()
     
     # Show current status
     _show_status(summary)
@@ -302,11 +303,12 @@ def _configure_single_provider(name: str, schema: dict):
         console.print("[yellow]Cancelled[/yellow]")
         return
     
-    # Update config (execute is async, so we need to run it)
-    result = asyncio.run(tool.execute(
-        path=f"providers.{name}.apiKey",
-        value=api_key
-    ))
+    # Update config with spinner
+    with console.status(f"[cyan]Saving {name} configuration...[/cyan]", spinner="dots"):
+        result = asyncio.run(tool.execute(
+            path=f"providers.{name}.apiKey",
+            value=api_key
+        ))
     
     if "Error" in result:
         console.print(f"[red]{result}[/red]")
@@ -432,7 +434,8 @@ def _configure_single_channel(name: str, schema: dict):
     
     # Enable the channel
     if Confirm.ask("Enable this channel?", default=True):
-        result = asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=True))
+        with console.status(f"[cyan]Enabling {name} channel...[/cyan]", spinner="dots"):
+            result = asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=True))
         if "Error" not in result:
             console.print(f"[green]✓ {name.title()} channel enabled![/green]")
         console.print(f"[dim]Start the gateway to activate: nanobot gateway[/dim]")
@@ -623,10 +626,11 @@ def _configure_tools():
             f"{'Disable' if is_evolutionary else 'Enable'} evolutionary mode?",
             default=False
         ):
-            result = asyncio.run(tool.execute(
-                path="tools.evolutionary",
-                value=not is_evolutionary
-            ))
+            with console.status("[cyan]Updating security settings...[/cyan]", spinner="dots"):
+                result = asyncio.run(tool.execute(
+                    path="tools.evolutionary",
+                    value=not is_evolutionary
+                ))
             console.print(f"[green]{result}[/green]")
             
             if not is_evolutionary:  # Just enabled
@@ -649,10 +653,11 @@ def _configure_tools():
             api_key = Prompt.ask("Enter Brave Search API key", password=True)
             
             if api_key:
-                result = asyncio.run(tool.execute(
-                    path="tools.web.search.apiKey",
-                    value=api_key
-                ))
+                with console.status("[cyan]Saving web search configuration...[/cyan]", spinner="dots"):
+                    result = asyncio.run(tool.execute(
+                        path="tools.web.search.apiKey",
+                        value=api_key
+                    ))
                 if "Error" not in result:
                     console.print(f"[green]{result}[/green]")
                     console.print("[dim]Web search is now enabled[/dim]")

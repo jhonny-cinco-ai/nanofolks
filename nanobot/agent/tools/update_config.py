@@ -176,7 +176,7 @@ class UpdateConfigTool(Tool):
                     'difficulty': 'Easy',
                     'fields': {
                         'enabled': {'type': 'boolean', 'default': False},
-                        'token': {'type': 'string', 'help': 'Get from @BotFather on Telegram'},
+                        'token': {'type': 'string', 'help': 'Bot token from @BotFather (format: 123456:ABC-DEF...). Steps: 1) Message @BotFather 2) Type /newbot 3) Copy the token'},
                         'allowFrom': {'type': 'array', 'item_type': 'string', 'help': 'List of allowed Telegram user IDs'},
                     },
                 },

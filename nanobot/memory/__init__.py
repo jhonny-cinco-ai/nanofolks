@@ -20,6 +20,16 @@ from nanobot.memory.embeddings import (
     unpack_embedding,
     cosine_similarity,
 )
+from nanobot.memory.background import (
+    ActivityTracker,
+    BackgroundProcessor,
+)
+from nanobot.memory.extraction import (
+    Gliner2Extractor,
+    SpacyExtractor,
+    ExtractionResult,
+    extract_entities,
+)
 
 __all__ = [
     "Event",
@@ -34,4 +44,10 @@ __all__ = [
     "pack_embedding",
     "unpack_embedding",
     "cosine_similarity",
+    "ActivityTracker",
+    "BackgroundProcessor",
+    "Gliner2Extractor",
+    "SpacyExtractor",
+    "ExtractionResult",
+    "extract_entities",
 ]

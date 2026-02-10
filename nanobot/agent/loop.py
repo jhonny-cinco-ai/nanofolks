@@ -92,10 +92,28 @@ class AgentLoop:
         # Initialize memory system if enabled
         self.memory_config = memory_config
         self.memory_store = None
+        self.activity_tracker = None
+        self.background_processor = None
+        
         if memory_config and memory_config.enabled:
             from nanobot.memory.store import MemoryStore
+            from nanobot.memory.background import ActivityTracker, BackgroundProcessor
+            
             self.memory_store = MemoryStore(memory_config, workspace)
-            logger.info("Memory system enabled")
+            
+            # Initialize activity tracker for background processing
+            self.activity_tracker = ActivityTracker(
+                quiet_threshold_seconds=memory_config.background.quiet_threshold_seconds
+            )
+            
+            # Initialize background processor
+            self.background_processor = BackgroundProcessor(
+                memory_store=self.memory_store,
+                activity_tracker=self.activity_tracker,
+                interval_seconds=memory_config.background.interval_seconds,
+            )
+            
+            logger.info("Memory system enabled with background processing")
         
         self.subagents = SubagentManager(
             provider=provider,
@@ -172,6 +190,10 @@ class AgentLoop:
         self._running = True
         logger.info("Agent loop started")
         
+        # Start background processor if memory is enabled
+        if self.background_processor:
+            await self.background_processor.start()
+        
         while self._running:
             try:
                 # Wait for next message
@@ -196,9 +218,14 @@ class AgentLoop:
             except asyncio.TimeoutError:
                 continue
     
-    def stop(self) -> None:
+    async def stop(self) -> None:
         """Stop the agent loop."""
         self._running = False
+        
+        # Stop background processor if running
+        if self.background_processor:
+            await self.background_processor.stop()
+        
         logger.info("Agent loop stopping")
     
     async def _select_model(self, msg: InboundMessage, session: Session) -> str:
@@ -271,6 +298,10 @@ class AgentLoop:
             secret_types = self.sanitizer.get_secret_types(msg.content)
             logger.warning(f"Detected potential secrets in message: {', '.join(secret_types)}")
             logger.warning("Secrets have been masked before sending to LLM")
+        
+        # Mark user activity for background processing
+        if self.activity_tracker:
+            self.activity_tracker.mark_activity()
         
         # Get or create session
         session = self.sessions.get_or_create(msg.session_key)

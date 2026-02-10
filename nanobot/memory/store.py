@@ -533,6 +533,198 @@ class MemoryStore:
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:limit]
     
+    # =========================================================================
+    # Entity Operations
+    # =========================================================================
+    
+    def save_entity(self, entity: Entity) -> str:
+        """
+        Save an entity to the database.
+        
+        Args:
+            entity: The entity to save
+            
+        Returns:
+            The entity ID
+        """
+        conn = self._get_connection()
+        
+        # Serialize embeddings
+        name_embedding_bytes = None
+        if entity.name_embedding:
+            name_embedding_bytes = struct.pack(f'{len(entity.name_embedding)}f', *entity.name_embedding)
+        
+        desc_embedding_bytes = None
+        if entity.description_embedding:
+            desc_embedding_bytes = struct.pack(f'{len(entity.description_embedding)}f', *entity.description_embedding)
+        
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO entities (
+                id, name, entity_type, aliases, description,
+                name_embedding, description_embedding,
+                source_event_ids, event_count, first_seen, last_seen
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                entity.id,
+                entity.name,
+                entity.entity_type,
+                json.dumps(entity.aliases),
+                entity.description,
+                name_embedding_bytes,
+                desc_embedding_bytes,
+                json.dumps(entity.source_event_ids),
+                entity.event_count,
+                entity.first_seen.timestamp() if entity.first_seen else None,
+                entity.last_seen.timestamp() if entity.last_seen else None,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Entity saved: {entity.id}")
+        return entity.id
+    
+    def get_entity(self, entity_id: str) -> Optional[Entity]:
+        """Retrieve an entity by ID."""
+        conn = self._get_connection()
+        row = conn.execute(
+            "SELECT * FROM entities WHERE id = ?",
+            (entity_id,)
+        ).fetchone()
+        
+        if not row:
+            return None
+        
+        return self._row_to_entity(row)
+    
+    def find_entity_by_name(self, name: str) -> Optional[Entity]:
+        """
+        Find an entity by name (case-insensitive).
+        
+        Args:
+            name: Name to search for
+            
+        Returns:
+            Entity if found, None otherwise
+        """
+        conn = self._get_connection()
+        
+        # Search by name or aliases
+        row = conn.execute(
+            """
+            SELECT * FROM entities 
+            WHERE LOWER(name) = LOWER(?) 
+               OR LOWER(aliases) LIKE LOWER(?)
+            LIMIT 1
+            """,
+            (name, f'%"{name}"%')
+        ).fetchone()
+        
+        if not row:
+            return None
+        
+        return self._row_to_entity(row)
+    
+    def update_entity(self, entity: Entity):
+        """
+        Update an existing entity.
+        
+        Args:
+            entity: Entity with updated values
+        """
+        conn = self._get_connection()
+        
+        # Serialize embeddings
+        name_embedding_bytes = None
+        if entity.name_embedding:
+            name_embedding_bytes = struct.pack(f'{len(entity.name_embedding)}f', *entity.name_embedding)
+        
+        desc_embedding_bytes = None
+        if entity.description_embedding:
+            desc_embedding_bytes = struct.pack(f'{len(entity.description_embedding)}f', *entity.description_embedding)
+        
+        conn.execute(
+            """
+            UPDATE entities SET
+                name = ?,
+                entity_type = ?,
+                aliases = ?,
+                description = ?,
+                name_embedding = ?,
+                description_embedding = ?,
+                source_event_ids = ?,
+                event_count = ?,
+                last_seen = ?
+            WHERE id = ?
+            """,
+            (
+                entity.name,
+                entity.entity_type,
+                json.dumps(entity.aliases),
+                entity.description,
+                name_embedding_bytes,
+                desc_embedding_bytes,
+                json.dumps(entity.source_event_ids),
+                entity.event_count,
+                entity.last_seen.timestamp() if entity.last_seen else None,
+                entity.id,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Entity updated: {entity.id}")
+    
+    def get_entities_by_type(
+        self,
+        entity_type: str,
+        limit: int = 100
+    ) -> list[Entity]:
+        """
+        Get entities of a specific type.
+        
+        Args:
+            entity_type: Type of entities to retrieve
+            limit: Maximum number of results
+            
+        Returns:
+            List of entities
+        """
+        conn = self._get_connection()
+        rows = conn.execute(
+            """
+            SELECT * FROM entities 
+            WHERE entity_type = ? 
+            ORDER BY event_count DESC
+            LIMIT ?
+            """,
+            (entity_type, limit)
+        ).fetchall()
+        
+        return [self._row_to_entity(row) for row in rows]
+    
+    def get_all_entities(self, limit: int = 1000) -> list[Entity]:
+        """
+        Get all entities.
+        
+        Args:
+            limit: Maximum number of results
+            
+        Returns:
+            List of entities
+        """
+        conn = self._get_connection()
+        rows = conn.execute(
+            """
+            SELECT * FROM entities 
+            ORDER BY event_count DESC
+            LIMIT ?
+            """,
+            (limit,)
+        ).fetchall()
+        
+        return [self._row_to_entity(row) for row in rows]
+    
     def _row_to_entity(self, row: sqlite3.Row) -> Entity:
         """Convert a database row to an Entity object."""
         # Deserialize name embedding

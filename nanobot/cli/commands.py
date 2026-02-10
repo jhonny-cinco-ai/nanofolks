@@ -334,7 +334,10 @@ def _run_onboard_wizard():
   • Reasoning → Advanced reasoning models
 
 This saves costs while maintaining quality.
-    """)
+
+[yellow]Note:[/yellow] Smart routing is experimental and continuously improving.
+If disabled, your bot will use [bold]{}[/bold] for all queries.
+    """.format(primary_model))
     
     enable_routing = Confirm.ask("Enable smart routing?", default=True)
     
@@ -344,13 +347,56 @@ This saves costs while maintaining quality.
         if "Error" not in result:
             console.print("[green]✓ Smart routing enabled[/green]")
             
-            # Show suggested tier configuration
-            console.print("\n[dim]Suggested tier configuration for {provider}:[/dim]".format(provider=provider_name.title()))
-            console.print("  Simple:    {model}".format(model=provider_schema.get('models', ['deepseek/deepseek-chat-v3-0324'])[0] if provider_schema.get('models') else 'deepseek/deepseek-chat-v3-0324'))
-            console.print("  Medium:    openai/gpt-4.1-mini")
-            console.print("  Complex:   anthropic/claude-sonnet-4.5")
-            console.print("  Reasoning: openai/o3")
-            console.print("  Coding:    moonshotai/kimi-k2.5")
+            # Show suggested tier configuration with validation
+            console.print("\n[dim]Suggested tier configuration:[/dim]")
+            
+            # Define suggested models based on selected provider
+            # For gateway providers like OpenRouter, use their model format
+            if provider_name == 'openrouter':
+                # OpenRouter supports all models through their gateway
+                suggested_models = {
+                    'simple': 'openrouter/deepseek/deepseek-chat-v3-0324',
+                    'medium': 'openrouter/openai/gpt-4.1-mini',
+                    'complex': 'openrouter/anthropic/claude-3-5-sonnet',
+                    'reasoning': 'openrouter/openai/o3-mini',
+                    'coding': 'openrouter/moonshotai/kimi-k2.5',
+                }
+            elif provider_name == 'aihubmix':
+                # AiHubMix uses OpenAI-compatible format
+                suggested_models = {
+                    'simple': 'deepseek/deepseek-chat-v3-0324',
+                    'medium': 'gpt-4.1-mini',
+                    'complex': 'claude-3-5-sonnet-20241022',
+                    'reasoning': 'o3-mini',
+                    'coding': 'kimi-k2.5',
+                }
+            else:
+                # For direct providers, use models from their schema or defaults
+                default_simple = provider_schema.get('models', [f'{provider_name}/default'])[0] if provider_schema.get('models') else f'{provider_name}/default'
+                suggested_models = {
+                    'simple': default_simple,
+                    'medium': f'{provider_name}/medium-model',
+                    'complex': f'{provider_name}/complex-model',
+                    'reasoning': f'{provider_name}/reasoning-model',
+                    'coding': f'{provider_name}/coding-model',
+                }
+            
+            # Validate each suggested model
+            validation_warnings = []
+            for tier, model in suggested_models.items():
+                validation = tool.validate_model_for_routing(model)
+                status = "✓" if validation['provider_configured'] else "○"
+                console.print(f"  {status} {tier.capitalize():9} {model}")
+                if validation['warning']:
+                    validation_warnings.append(f"  • {validation['warning']}")
+            
+            if validation_warnings:
+                console.print("\n[yellow]⚠ Provider Configuration Needed:[/yellow]")
+                for warning in validation_warnings:
+                    console.print(warning)
+                console.print("\n[dim]These models will only work once you add the required API keys.[/dim]")
+                console.print("[dim]Run 'nanobot configure' to add more providers.[/dim]")
+            
             console.print("\n[dim]You can customize these later in: nanobot configure[/dim]\n")
     else:
         console.print("[dim]Smart routing disabled. Your bot will use the primary model for all queries.[/dim]\n")

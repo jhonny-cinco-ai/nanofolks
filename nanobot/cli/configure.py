@@ -65,6 +65,9 @@ def configure_cli():
         elif choice == "tools":
             _configure_tools()
         
+        elif choice == "gateway":
+            _configure_gateway()
+        
         elif choice == "status":
             _show_detailed_status()
         
@@ -146,12 +149,29 @@ def _get_routing_status(summary: dict) -> str:
 
 def _get_tools_status(summary: dict) -> str:
     """Get status indicator for tools."""
-    # Check if any channel is enabled (proxy for advanced setup)
-    has_any_channel = any(
-        info.get('enabled', False) 
-        for info in summary.get('channels', {}).values()
-    )
-    return "[green]✓[/green]" if has_any_channel else "[dim]○[/dim]"
+    from nanobot.config.loader import load_config
+    config = load_config()
+    
+    # Check if any tool settings are customized
+    has_evolutionary = config.tools.evolutionary
+    has_web_search = bool(config.tools.web.search.api_key)
+    has_custom_paths = bool(config.tools.allowed_paths)
+    
+    is_configured = has_evolutionary or has_web_search or has_custom_paths
+    return "[green]✓[/green]" if is_configured else "[dim]○[/dim]"
+
+
+def _get_gateway_status(summary: dict) -> str:
+    """Get status indicator for gateway."""
+    from nanobot.config.loader import load_config
+    config = load_config()
+    
+    # Check if gateway settings differ from defaults
+    is_custom_host = config.gateway.host != "0.0.0.0"
+    is_custom_port = config.gateway.port != 18790
+    
+    is_configured = is_custom_host or is_custom_port
+    return "[green]✓[/green]" if is_configured else "[dim]○[/dim]"
 
 
 def _show_main_menu(summary: dict) -> str:
@@ -172,6 +192,7 @@ def _show_main_menu(summary: dict) -> str:
     agents_status = _get_agents_status(summary)
     routing_status = _get_routing_status(summary)
     tools_status = _get_tools_status(summary)
+    gateway_status = _get_gateway_status(summary)
     
     if not has_required:
         console.print("[red]⚠ At least one LLM provider is required to start[/red]\n")
@@ -184,8 +205,9 @@ def _show_main_menu(summary: dict) -> str:
         ("3", "agents", f"⚙️ Agent Settings {agents_status}"),
         ("4", "routing", f"🧠 Smart Routing {routing_status}"),
         ("5", "tools", f"🛠️ Tool Settings {tools_status}"),
-        ("6", "status", "📊 View Full Status"),
-        ("7", "exit", "✓ Done" if has_required else "⏭ Skip for now"),
+        ("6", "gateway", f"🌐 Gateway {gateway_status}"),
+        ("7", "status", "📊 View Full Status"),
+        ("8", "exit", "✓ Done" if has_required else "⏭ Skip for now"),
     ])
     
     for num, key, label in options:
@@ -195,13 +217,11 @@ def _show_main_menu(summary: dict) -> str:
     
     # Get choice
     choice_map = {num: key for num, key, _ in options}
-    default = "1" if not has_required else "6"
     
     while True:
         choice = Prompt.ask(
             "Select option",
-            choices=list(choice_map.keys()),
-            default=default
+            choices=list(choice_map.keys())
         )
         if choice in choice_map:
             return choice_map[choice]
@@ -370,53 +390,132 @@ def _configure_channels(summary: dict):
 
 
 def _configure_single_channel(name: str, schema: dict):
-    """Configure a single channel."""
-    console.print(Panel(
-        f"[bold]{name.title()} Configuration[/bold]",
-        border_style="blue"
-    ))
-    
+    """Configure a single channel with submenu."""
     tool = UpdateConfigTool()
     
-    # Show setup notes
-    if 'setup_note' in schema:
-        console.print(f"\n[yellow]⚠ {schema['setup_note']}[/yellow]")
-    
-    # Show current status
-    current = tool.get_config_summary()['channels'].get(name, {})
-    is_enabled = current.get('enabled', False)
-    
-    if is_enabled:
-        console.print(f"\n[green]✓ Channel is currently enabled[/green]")
-        if Confirm.ask("Disable this channel?", default=False):
-            asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=False))
-            console.print("[green]✓ Channel disabled[/green]")
-        return
-    
-    # Enable channel
-    console.print("\nTo enable this channel, I need some information:")
-    console.print("  [1] Continue with setup")
-    console.print("  [0] Back")
-    console.print()
-    
-    choice = Prompt.ask("Select", choices=["0", "1"], default="1")
-    
-    if choice == "0":
-        return
-    
-    console.print()
-    
-    # Collect required fields
-    if 'fields' in schema:
-        for field_name, field_info in schema['fields'].items():
-            if field_info.get('type') == 'boolean':
-                continue  # Skip boolean fields for now
+    while True:
+        config = load_config()
+        channel = getattr(config.channels, name, None)
+        is_enabled = getattr(channel, 'enabled', False) if channel else False
+        
+        console.print(Panel(
+            f"[bold]{name.title()} Configuration[/bold]",
+            border_style="blue"
+        ))
+        
+        # Show setup notes
+        if 'setup_note' in schema:
+            console.print(f"\n[yellow]⚠ {schema['setup_note']}[/yellow]")
+        
+        # Show current status
+        console.print(f"\nStatus: {'[green]Enabled[/green]' if is_enabled else '[dim]Disabled[/dim]'}")
+        
+        # Show current configuration values
+        if 'fields' in schema and channel:
+            console.print("\n[bold]Current Configuration:[/bold]")
+            for field_name, field_info in schema['fields'].items():
+                if field_info.get('type') == 'boolean':
+                    continue
+                field_value = getattr(channel, field_name, '')
+                if field_value:
+                    # Mask sensitive values
+                    if 'password' in field_name.lower() or 'secret' in field_name.lower() or 'token' in field_name.lower():
+                        display_value = field_value[:4] + '****' if len(field_value) > 4 else '****'
+                    else:
+                        display_value = field_value
+                    console.print(f"  {field_name}: [cyan]{display_value}[/cyan]")
+        
+        # Build menu options
+        console.print("\n[dim]What would you like to do?[/dim]")
+        
+        menu_options = []
+        option_num = 1
+        
+        # Toggle enable/disable
+        toggle_text = "Disable" if is_enabled else "Enable"
+        console.print(f"  [{option_num}] {toggle_text} channel")
+        menu_options.append(('toggle', None))
+        option_num += 1
+        
+        # Field configuration options (only show if not enabled, or always show for editing)
+        if 'fields' in schema:
+            for field_name, field_info in schema['fields'].items():
+                if field_info.get('type') == 'boolean':
+                    continue
+                field_label = field_name.replace('_', ' ').title()
+                console.print(f"  [{option_num}] Configure {field_label}")
+                menu_options.append(('field', field_name, field_info))
+                option_num += 1
+        
+        # Back option
+        console.print(f"  [0] Back")
+        console.print()
+        
+        # Get user choice
+        choices = [str(i) for i in range(option_num)]
+        choice = Prompt.ask("Select", choices=choices, default="0")
+        
+        if choice == "0":
+            break
+        
+        choice_idx = int(choice) - 1
+        if choice_idx < 0 or choice_idx >= len(menu_options):
+            continue
+        
+        action = menu_options[choice_idx]
+        
+        if action[0] == 'toggle':
+            # Toggle channel enabled state
+            new_value = not is_enabled
+            if new_value:
+                # Enabling - check if required fields are set
+                missing_fields = []
+                if 'fields' in schema and channel:
+                    for field_name, field_info in schema['fields'].items():
+                        if field_info.get('type') == 'boolean':
+                            continue
+                        if field_info.get('required', False):
+                            field_value = getattr(channel, field_name, '')
+                            if not field_value:
+                                missing_fields.append(field_name)
+                
+                if missing_fields:
+                    console.print(f"\n[yellow]⚠ Cannot enable: Missing required fields: {', '.join(missing_fields)}[/yellow]")
+                    console.print("[dim]Please configure all required fields first.[/dim]")
+                    continue
+                
+                # Enable the channel
+                with console.status(f"[cyan]Enabling {name} channel...[/cyan]", spinner="dots"):
+                    result = asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=True))
+                if "Error" not in result:
+                    console.print(f"[green]✓ {name.title()} channel enabled![/green]")
+                    console.print(f"[dim]Start the gateway to activate: nanobot gateway[/dim]")
+                    
+                    # Check if voice transcription should be enabled (for Telegram/WhatsApp)
+                    if name in ['telegram', 'whatsapp']:
+                        _check_and_offer_groq_setup()
+            else:
+                # Disable the channel
+                with console.status(f"[cyan]Disabling {name} channel...[/cyan]", spinner="dots"):
+                    result = asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=False))
+                if "Error" not in result:
+                    console.print(f"[green]✓ {name.title()} channel disabled![/green]")
+        
+        elif action[0] == 'field':
+            # Configure a specific field
+            field_name = action[1]
+            field_info = action[2]
             
             help_text = field_info.get('help', '')
             if help_text:
-                console.print(f"[dim]{help_text}[/dim]")
+                console.print(f"\n[dim]{help_text}[/dim]")
             
-            value = Prompt.ask(f"Enter {field_name}")
+            # Show current value
+            current_value = getattr(channel, field_name, '') if channel else ''
+            if current_value:
+                console.print(f"[dim]Current value: {current_value}[/dim]")
+            
+            value = Prompt.ask(f"Enter new value for {field_name}", default=current_value if current_value else '')
             
             if value:
                 result = asyncio.run(tool.execute(
@@ -425,18 +524,8 @@ def _configure_single_channel(name: str, schema: dict):
                 ))
                 if "Error" in result:
                     console.print(f"[red]{result}[/red]")
-    
-    # Enable the channel
-    if Confirm.ask("Enable this channel?", default=True):
-        with console.status(f"[cyan]Enabling {name} channel...[/cyan]", spinner="dots"):
-            result = asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=True))
-        if "Error" not in result:
-            console.print(f"[green]✓ {name.title()} channel enabled![/green]")
-        console.print(f"[dim]Start the gateway to activate: nanobot gateway[/dim]")
-        
-        # Check if voice transcription should be enabled (for Telegram/WhatsApp)
-        if name in ['telegram', 'whatsapp']:
-            _check_and_offer_groq_setup()
+                else:
+                    console.print(f"[green]✓ Updated {field_name}[/green]")
 
 
 def _check_and_offer_groq_setup():
@@ -573,12 +662,17 @@ def _configure_routing():
         
         console.print(tiers_table)
         
+        # Show classifier model info
+        console.print(f"\n[dim]LLM Classifier Model: {config.routing.llm_classifier.model}[/dim]")
+        console.print(f"[dim]Used for ambiguous queries when client classifier is unsure[/dim]")
+        
         # Ask if user wants to customize
         console.print("\n[1] Customize tier models")
         console.print("[2] Adjust confidence thresholds")
+        console.print("[3] Change classifier model")
         console.print("[0] Back")
         
-        choice = Prompt.ask("Select", choices=["0", "1", "2"], default="0")
+        choice = Prompt.ask("Select", choices=["0", "1", "2", "3"], default="0")
         
         if choice == "1":
             console.print("\n[bold]Customize Model Tiers:[/bold]")
@@ -598,19 +692,44 @@ def _configure_routing():
                 
                 new_model = Prompt.ask("Enter model name (or press Enter to keep current)", default="")
                 if new_model:
-                    result = asyncio.run(tool.execute(
-                        path=f"routing.tiers.{selected_tier}.model",
-                        value=new_model
-                    ))
-                    console.print(f"[green]{result}[/green]")
+                    # Validate the model
+                    validation = tool.validate_model_for_routing(new_model)
+                    proceed = True
+                    if validation['warning']:
+                        console.print(f"[yellow]⚠ {validation['warning']}[/yellow]")
+                        if validation['suggestion']:
+                            console.print(f"[dim]{validation['suggestion']}[/dim]")
+                        proceed = Confirm.ask("Continue anyway?", default=False)
+                    
+                    if proceed:
+                        result = asyncio.run(tool.execute(
+                            path=f"routing.tiers.{selected_tier}.model",
+                            value=new_model
+                        ))
+                        console.print(f"[green]{result}[/green]")
+                    else:
+                        console.print("[dim]Cancelled.[/dim]")
                 
                 secondary = Prompt.ask("Enter secondary/fallback model (optional)", default="")
                 if secondary:
-                    result = asyncio.run(tool.execute(
-                        path=f"routing.tiers.{selected_tier}.secondaryModel",
-                        value=secondary
-                    ))
-                    console.print(f"[green]{result}[/green]")
+                    # Validate secondary model too
+                    validation = tool.validate_model_for_routing(secondary)
+                    if validation['warning']:
+                        console.print(f"[yellow]⚠ {validation['warning']}[/yellow]")
+                        if not Confirm.ask("Continue with this fallback model?", default=True):
+                            console.print("[dim]Skipping secondary model.[/dim]")
+                        else:
+                            result = asyncio.run(tool.execute(
+                                path=f"routing.tiers.{selected_tier}.secondaryModel",
+                                value=secondary
+                            ))
+                            console.print(f"[green]{result}[/green]")
+                    else:
+                        result = asyncio.run(tool.execute(
+                            path=f"routing.tiers.{selected_tier}.secondaryModel",
+                            value=secondary
+                        ))
+                        console.print(f"[green]{result}[/green]")
         
         elif choice == "2":
             console.print("\n[bold]Confidence Thresholds:[/bold]")
@@ -626,6 +745,32 @@ def _configure_routing():
                     value=float(new_confidence)
                 ))
                 console.print(f"[green]{result}[/green]")
+        
+        elif choice == "3":
+            # Change LLM classifier model
+            console.print("\n[bold]LLM Classifier Model:[/bold]")
+            console.print("This model is used to classify ambiguous queries when the client-side classifier is unsure.")
+            console.print(f"Current: [cyan]{config.routing.llm_classifier.model}[/cyan]")
+            
+            new_model = Prompt.ask("Enter new classifier model (or press Enter to keep)", default="")
+            if new_model:
+                # Validate the model
+                validation = tool.validate_model_for_routing(new_model)
+                proceed = True
+                if validation['warning']:
+                    console.print(f"[yellow]⚠ {validation['warning']}[/yellow]")
+                    if validation['suggestion']:
+                        console.print(f"[dim]{validation['suggestion']}[/dim]")
+                    proceed = Confirm.ask("Continue anyway?", default=False)
+                
+                if proceed:
+                    result = asyncio.run(tool.execute(
+                        path="routing.llmClassifier.model",
+                        value=new_model
+                    ))
+                    console.print(f"[green]{result}[/green]")
+                else:
+                    console.print("[dim]Cancelled.[/dim]")
 
 
 def _configure_tools():
@@ -651,91 +796,182 @@ def _configure_tools():
             return
         
         if choice == "1":
-            console.print("\n[dim]Security Settings:[/dim]")
-            
-            # Evolutionary mode
-            config = load_config()
-            is_evolutionary = config.tools.evolutionary
-            
-            console.print(f"\nEvolutionary mode: {'[green]Enabled[/green]' if is_evolutionary else '[dim]Disabled[/dim]'}")
-            console.print("[dim]Allows bot to modify its own source code[/dim]")
-            
-            if Confirm.ask(
-                f"{'Disable' if is_evolutionary else 'Enable'} evolutionary mode?",
-                default=False
-            ):
-                with console.status("[cyan]Updating security settings...[/cyan]", spinner="dots"):
-                    result = asyncio.run(tool.execute(
-                        path="tools.evolutionary",
-                        value=not is_evolutionary
-                    ))
-                console.print(f"[green]{result}[/green]")
+            # Security Settings submenu loop
+            while True:
+                config = load_config()
+                is_evolutionary = config.tools.evolutionary
                 
-            if not is_evolutionary:  # Just enabled
-                console.print("\n[yellow]⚠ Security Warning:[/yellow]")
-                console.print("Evolutionary mode allows the bot to modify files outside")
-                console.print("the workspace. Make sure allowedPaths is configured correctly.")
-            
-            # Show path configuration if enabled
-            if config.tools.evolutionary or not is_evolutionary: # Enabled or just enabled
-                config = load_config() # Reload to get fresh state
+                console.print(Panel(
+                    "[bold]Security Settings[/bold]",
+                    border_style="blue"
+                ))
                 
-                console.print("\n[bold]Path Configuration:[/bold]")
-                console.print(f"[dim]Allowed Paths (whitelist):[/dim]")
-                for path in config.tools.allowed_paths:
-                    console.print(f"  • {path}")
-                if not config.tools.allowed_paths:
-                    console.print("  [dim](None - restricted to workspace)[/dim]")
+                # Show current status
+                console.print(f"\nEvolutionary mode: {'[green]Enabled[/green]' if is_evolutionary else '[dim]Disabled[/dim]'}")
+                console.print("[dim]Allows bot to modify files outside the workspace[/dim]")
                 
-                console.print(f"\n[dim]Protected Paths (blacklist):[/dim]")
-                for path in config.tools.protected_paths:
-                    console.print(f"  • {path}")
-                
-                console.print("\n[1] Add allowed path")
-                console.print("[2] Remove allowed path")
-                console.print("[0] Done")
-                
-                while True:
-                    path_choice = Prompt.ask("\nModify paths", choices=["0", "1", "2"], default="0")
-                    if path_choice == "0":
-                        break
+                if is_evolutionary:
+                    console.print("\n[bold]Path Configuration:[/bold]")
+                    console.print(f"[dim]Allowed Paths (whitelist):[/dim]")
+                    for path in config.tools.allowed_paths:
+                        console.print(f"  • {path}")
+                    if not config.tools.allowed_paths:
+                        console.print("  [dim](None - restricted to workspace)[/dim]")
                     
-                    if path_choice == "1":
-                        new_path = Prompt.ask("Enter absolute path to allow")
-                        if new_path:
-                            current_paths = config.tools.allowed_paths
-                            if new_path not in current_paths:
-                                updated_paths = current_paths + [new_path]
-                                with console.status("[cyan]Adding path...[/cyan]", spinner="dots"):
-                                    asyncio.run(tool.execute(
-                                        path="tools.allowedPaths",
-                                        value=updated_paths
-                                    ))
-                                console.print(f"[green]✓ Added {new_path}[/green]")
-                                config = load_config() # Refresh
-                            else:
-                                console.print("[yellow]Path already allowed[/yellow]")
+                    console.print(f"\n[dim]Protected Paths (blacklist):[/dim]")
+                    for path in config.tools.protected_paths:
+                        console.print(f"  • {path}")
+                
+                # Show menu options
+                console.print("\n[dim]What would you like to do?[/dim]")
+                toggle_text = "Disable" if is_evolutionary else "Enable"
+                console.print(f"  [1] {toggle_text} evolutionary mode")
+                if is_evolutionary:
+                    console.print("  [2] Add allowed path")
+                    console.print("  [3] Remove allowed path")
+                    console.print("  [4] Add protected path")
+                    console.print("  [5] Remove protected path")
+                console.print("  [0] Back")
+                console.print()
+                
+                # Determine available choices based on state
+                available_choices = ["0", "1"]
+                if is_evolutionary:
+                    available_choices.extend(["2", "3", "4", "5"])
+                
+                menu_choice = Prompt.ask("Select", choices=available_choices, default="0")
+                
+                if menu_choice == "0":
+                    break
+                
+                if menu_choice == "1":
+                    # Toggle evolutionary mode
+                    new_value = not is_evolutionary
                     
-                    elif path_choice == "2":
-                        if not config.tools.allowed_paths:
-                            console.print("[yellow]No paths to remove[/yellow]")
-                            continue
-                            
-                        console.print("\nSelect path to remove:")
-                        for i, path in enumerate(config.tools.allowed_paths, 1):
-                            console.print(f"  [{i}] {path}")
-                        
-                        rm_idx = Prompt.ask("Select number", choices=[str(i) for i in range(1, len(config.tools.allowed_paths)+1)])
-                        path_to_remove = config.tools.allowed_paths[int(rm_idx)-1]
-                        
-                        updated_paths = [p for p in config.tools.allowed_paths if p != path_to_remove]
-                        with console.status("[cyan]Removing path...[/cyan]", spinner="dots"):
-                            asyncio.run(tool.execute(
-                                path="tools.allowedPaths",
-                                value=updated_paths
+                    if new_value:
+                        # About to enable - show warning first
+                        console.print("\n[yellow]⚠ Security Warning:[/yellow]")
+                        console.print("Evolutionary mode allows the bot to modify files outside")
+                        console.print("the workspace. Only enable if you understand the risks.")
+                        console.print("\nDefault allowed paths will be set:")
+                        console.print("  • /projects/nanobot-turbo")
+                        console.print("  • ~/.nanobot")
+                    
+                    if Confirm.ask(
+                        f"{'Disable' if is_evolutionary else 'Enable'} evolutionary mode?",
+                        default=False
+                    ):
+                        with console.status("[cyan]Updating security settings...[/cyan]", spinner="dots"):
+                            result = asyncio.run(tool.execute(
+                                path="tools.evolutionary",
+                                value=new_value
                             ))
-                        console.print(f"[green]✓ Removed {path_to_remove}[/green]")
-                        config = load_config() # Refresh
+                            
+                            # If enabling, also set default allowed paths
+                            if new_value:
+                                asyncio.run(tool.execute(
+                                    path="tools.allowedPaths",
+                                    value=["/projects/nanobot-turbo", "~/.nanobot"]
+                                ))
+                        
+                        console.print(f"[green]{result}[/green]")
+                        if new_value:
+                            console.print("[green]✓ Default allowed paths configured[/green]")
+                
+                elif menu_choice == "2" and is_evolutionary:
+                    # Add allowed path
+                    console.print("\n  [1] Enter path to allow")
+                    console.print("  [0] Cancel")
+                    
+                    add_choice = Prompt.ask("Select", choices=["0", "1"], default="0")
+                    if add_choice == "0":
+                        continue
+                    
+                    new_path = Prompt.ask("Enter absolute path to allow")
+                    if new_path:
+                        current_paths = config.tools.allowed_paths
+                        if new_path not in current_paths:
+                            updated_paths = current_paths + [new_path]
+                            with console.status("[cyan]Adding path...[/cyan]", spinner="dots"):
+                                asyncio.run(tool.execute(
+                                    path="tools.allowedPaths",
+                                    value=updated_paths
+                                ))
+                            console.print(f"[green]✓ Added {new_path}[/green]")
+                        else:
+                            console.print("[yellow]Path already allowed[/yellow]")
+                
+                elif menu_choice == "3" and is_evolutionary:
+                    # Remove allowed path
+                    if not config.tools.allowed_paths:
+                        console.print("[yellow]No paths to remove[/yellow]")
+                        continue
+                    
+                    console.print("\nSelect path to remove:")
+                    for i, path in enumerate(config.tools.allowed_paths, 1):
+                        console.print(f"  [{i}] {path}")
+                    console.print("  [0] Cancel")
+                    
+                    rm_idx = Prompt.ask("Select number", choices=["0"] + [str(i) for i in range(1, len(config.tools.allowed_paths)+1)], default="0")
+                    if rm_idx == "0":
+                        continue
+                    
+                    path_to_remove = config.tools.allowed_paths[int(rm_idx)-1]
+                    
+                    updated_paths = [p for p in config.tools.allowed_paths if p != path_to_remove]
+                    with console.status("[cyan]Removing path...[/cyan]", spinner="dots"):
+                        asyncio.run(tool.execute(
+                            path="tools.allowedPaths",
+                            value=updated_paths
+                        ))
+                    console.print(f"[green]✓ Removed {path_to_remove}[/green]")
+                
+                elif menu_choice == "4" and is_evolutionary:
+                    # Add protected path
+                    console.print("\n  [1] Enter path to protect (blacklist)")
+                    console.print("  [0] Cancel")
+                    
+                    add_choice = Prompt.ask("Select", choices=["0", "1"], default="0")
+                    if add_choice == "0":
+                        continue
+                    
+                    new_path = Prompt.ask("Enter absolute path to protect (blacklist)")
+                    if new_path:
+                        current_paths = config.tools.protected_paths
+                        if new_path not in current_paths:
+                            updated_paths = current_paths + [new_path]
+                            with console.status("[cyan]Adding protected path...[/cyan]", spinner="dots"):
+                                asyncio.run(tool.execute(
+                                    path="tools.protectedPaths",
+                                    value=updated_paths
+                                ))
+                            console.print(f"[green]✓ Added {new_path} to protected paths[/green]")
+                        else:
+                            console.print("[yellow]Path already protected[/yellow]")
+                
+                elif menu_choice == "5" and is_evolutionary:
+                    # Remove protected path
+                    if not config.tools.protected_paths:
+                        console.print("[yellow]No protected paths to remove[/yellow]")
+                        continue
+                    
+                    console.print("\nSelect protected path to remove:")
+                    for i, path in enumerate(config.tools.protected_paths, 1):
+                        console.print(f"  [{i}] {path}")
+                    console.print("  [0] Cancel")
+                    
+                    rm_idx = Prompt.ask("Select number", choices=["0"] + [str(i) for i in range(1, len(config.tools.protected_paths)+1)], default="0")
+                    if rm_idx == "0":
+                        continue
+                    path_to_remove = config.tools.protected_paths[int(rm_idx)-1]
+                    
+                    updated_paths = [p for p in config.tools.protected_paths if p != path_to_remove]
+                    with console.status("[cyan]Removing protected path...[/cyan]", spinner="dots"):
+                        asyncio.run(tool.execute(
+                            path="tools.protectedPaths",
+                            value=updated_paths
+                        ))
+                    console.print(f"[green]✓ Removed {path_to_remove} from protected paths[/green]")
         
         elif choice == "2":
             # Web Search API Key
@@ -772,6 +1008,62 @@ def _configure_tools():
                     console.print("[yellow]⚠ No API key provided, skipping[/yellow]")
 
 
+def _configure_gateway():
+    """Configure gateway server settings."""
+    tool = UpdateConfigTool()
+    
+    while True:
+        config = load_config()
+        
+        console.print(Panel(
+            "[bold]Gateway Configuration[/bold]",
+            border_style="blue"
+        ))
+        
+        # Show current settings
+        console.print(f"\n[bold]Current Settings:[/bold]")
+        console.print(f"  Host: [cyan]{config.gateway.host}[/cyan]")
+        console.print(f"  Port: [cyan]{config.gateway.port}[/cyan]")
+        console.print(f"\n[dim]The gateway server listens for incoming requests from chat channels.[/dim]")
+        
+        # Show menu
+        console.print("\n[dim]What would you like to do?[/dim]")
+        console.print("  [1] Change host")
+        console.print("  [2] Change port")
+        console.print("  [0] Back")
+        console.print()
+        
+        choice = Prompt.ask("Select", choices=["0", "1", "2"], default="0")
+        
+        if choice == "0":
+            break
+        
+        elif choice == "1":
+            new_host = Prompt.ask("Enter new host (e.g., 0.0.0.0, 127.0.0.1, localhost)", default=config.gateway.host)
+            if new_host and new_host != config.gateway.host:
+                with console.status("[cyan]Updating host...[/cyan]", spinner="dots"):
+                    result = asyncio.run(tool.execute(
+                        path="gateway.host",
+                        value=new_host
+                    ))
+                console.print(f"[green]{result}[/green]")
+        
+        elif choice == "2":
+            new_port = Prompt.ask("Enter new port", default=str(config.gateway.port))
+            if new_port:
+                try:
+                    port_int = int(new_port)
+                    if port_int != config.gateway.port:
+                        with console.status("[cyan]Updating port...[/cyan]", spinner="dots"):
+                            result = asyncio.run(tool.execute(
+                                path="gateway.port",
+                                value=port_int
+                            ))
+                        console.print(f"[green]{result}[/green]")
+                except ValueError:
+                    console.print("[red]Invalid port number[/red]")
+
+
 def _show_detailed_status():
     """Show detailed configuration status."""
     config = load_config()
@@ -784,15 +1076,30 @@ def _show_detailed_status():
     
     # Config file location
     console.print(f"\n[dim]Config file:[/dim] {config_path}")
-    console.print(f"[dim]Exists:[/dim] {'[green]Yes[/green]' if config_path.exists() else '[red]No[/red]'}")
+    console.print(f"[dim]Exists:[/dim] {'[green]Yes[/green]' if config_path.exists() else '[red]No[/red]'}\n")
     
-    # Get default model info
+    # ═══════════════════════════════════════════════════════════
+    # AGENT SETTINGS
+    # ═══════════════════════════════════════════════════════════
+    console.print("[bold cyan]Agent Settings[/bold cyan]")
+    if config.routing.enabled:
+        console.print(f"  Default Model: [dim]{config.agents.defaults.model}[/dim] [yellow](overridden by Smart Routing)[/yellow]")
+    else:
+        console.print(f"  Default Model: [green]{config.agents.defaults.model}[/green]")
+    console.print(f"  Temperature: {config.agents.defaults.temperature}")
+    console.print(f"  Max Tokens: {config.agents.defaults.max_tokens}")
+    console.print(f"  Max Tool Iterations: {config.agents.defaults.max_tool_iterations}")
+    console.print(f"  Workspace: {config.agents.defaults.workspace}\n")
+    
+    # ═══════════════════════════════════════════════════════════
+    # MODEL PROVIDERS
+    # ═══════════════════════════════════════════════════════════
+    console.print("[bold cyan]Model Providers[/bold cyan]")
     default_model = config.agents.defaults.model
     
-    # Providers table - show which provider is being used for the default model
-    table = Table(title="Model Providers", box=box.ROUNDED)
+    table = Table(box=box.SIMPLE_HEAD)
     table.add_column("Provider", style="cyan")
-    table.add_column("API Key", style="green")
+    table.add_column("API Key", style="green", justify="center")
     table.add_column("Status", style="yellow")
     
     all_providers = [
@@ -800,73 +1107,157 @@ def _show_detailed_status():
         'moonshot', 'gemini', 'zhipu', 'dashscope', 'aihubmix', 'vllm'
     ]
     
-    # Check if using OpenRouter (model format: provider/model-name)
+    # Determine active provider
+    active_provider = None
     if '/' in default_model:
-        # Using OpenRouter or similar gateway
-        model_provider = default_model.split('/')[0]
-        for provider_name in all_providers:
-            provider = getattr(config.providers, provider_name, None)
-            has_key = bool(provider and provider.api_key)
-            
-            if provider_name == 'openrouter' and has_key:
-                status = f"[bold]Active (via {model_provider})[/bold]"
-            elif has_key:
-                status = "[dim]Backup[/dim]"
-            else:
-                status = ""
-            
-            table.add_row(
-                provider_name.title(),
-                "[green]✓[/green]" if has_key else "[dim]✗[/dim]",
-                status
-            )
+        # Gateway usage
+        model_parts = default_model.split('/')
+        if len(model_parts) >= 2:
+            active_provider = model_parts[0].lower()
     else:
         # Direct provider usage
+        model_lower = default_model.lower()
         for provider_name in all_providers:
-            provider = getattr(config.providers, provider_name, None)
-            has_key = bool(provider and provider.api_key)
-            is_active = provider_name in default_model.lower() and has_key
-            
-            table.add_row(
-                provider_name.title(),
-                "[green]✓[/green]" if has_key else "[dim]✗[/dim]",
-                "[bold]Active[/bold]" if is_active else ""
-            )
+            if provider_name in model_lower:
+                active_provider = provider_name
+                break
+    
+    for provider_name in all_providers:
+        provider = getattr(config.providers, provider_name, None)
+        has_key = bool(provider and provider.api_key)
+        
+        if has_key and provider_name == active_provider:
+            status = "[bold green]← Active[/bold green]"
+        elif has_key:
+            status = "[dim]Available[/dim]"
+        else:
+            status = ""
+        
+        table.add_row(
+            provider_name.title(),
+            "[green]✓[/green]" if has_key else "[dim]✗[/dim]",
+            status
+        )
     
     console.print(table)
-    
-    # Default model info
-    console.print(f"\n[dim]Default Model:[/dim] {default_model}")
-    console.print(f"[dim]Temperature:[/dim] {config.agents.defaults.temperature}")
-    console.print(f"[dim]Max Tokens:[/dim] {config.agents.defaults.max_tokens}")
-    
-    # Channels table
     console.print()
-    table = Table(title="Channels", box=box.ROUNDED)
-    table.add_column("Channel", style="cyan")
-    table.add_column("Status", style="green")
+    
+    # ═══════════════════════════════════════════════════════════
+    # SMART ROUTING
+    # ═══════════════════════════════════════════════════════════
+    console.print("[bold cyan]Smart Routing[/bold cyan]")
+    if config.routing.enabled:
+        console.print(f"  Status: [green]Enabled[/green]")
+        console.print("\n  [dim]Tier Configuration:[/dim]")
+        
+        tiers_table = Table(box=box.SIMPLE)
+        tiers_table.add_column("Tier", style="cyan")
+        tiers_table.add_column("Model", style="green")
+        tiers_table.add_column("Cost/Mtok", style="yellow")
+        
+        tiers = [
+            ("Simple", config.routing.tiers.simple),
+            ("Medium", config.routing.tiers.medium),
+            ("Complex", config.routing.tiers.complex),
+            ("Reasoning", config.routing.tiers.reasoning),
+            ("Coding", config.routing.tiers.coding),
+        ]
+        
+        for tier_name, tier_config in tiers:
+            tiers_table.add_row(
+                tier_name,
+                tier_config.model,
+                f"${tier_config.cost_per_mtok:.2f}"
+            )
+        
+        console.print(tiers_table)
+        console.print(f"\n  Client Classifier Confidence: {config.routing.client_classifier.min_confidence}")
+    else:
+        console.print(f"  Status: [dim]Disabled[/dim]")
+    console.print()
+    
+    # ═══════════════════════════════════════════════════════════
+    # GATEWAY SERVER
+    # ═══════════════════════════════════════════════════════════
+    console.print("[bold cyan]Gateway Server[/bold cyan]")
+    console.print(f"  Host: [cyan]{config.gateway.host}[/cyan]")
+    console.print(f"  Port: [cyan]{config.gateway.port}[/cyan]")
+    console.print(f"  URL: http://{config.gateway.host}:{config.gateway.port}\n")
+    
+    # ═══════════════════════════════════════════════════════════
+    # CHAT CHANNELS
+    # ═══════════════════════════════════════════════════════════
+    console.print("[bold cyan]Chat Channels[/bold cyan]")
+    
+    channels_table = Table(box=box.SIMPLE_HEAD)
+    channels_table.add_column("Channel", style="cyan")
+    channels_table.add_column("Status", style="green")
+    channels_table.add_column("Details", style="dim")
     
     for channel_name in ['telegram', 'discord', 'whatsapp', 'slack', 'email']:
         channel = getattr(config.channels, channel_name, None)
         enabled = bool(channel and getattr(channel, 'enabled', False))
         
-        table.add_row(
+        # Build details string
+        details = ""
+        if channel and enabled:
+            detail_parts = []
+            
+            # Check for key/token fields
+            token_fields = ['token', 'bot_token', 'botToken', 'app_token', 'appToken']
+            for field in token_fields:
+                if hasattr(channel, field):
+                    value = getattr(channel, field)
+                    if value:
+                        detail_parts.append("Auth configured")
+                        break
+            
+            # Check for allow list
+            if hasattr(channel, 'allow_from') and channel.allow_from:
+                detail_parts.append(f"{len(channel.allow_from)} allowed")
+            
+            details = ", ".join(detail_parts) if detail_parts else ""
+        
+        channels_table.add_row(
             channel_name.title(),
-            "[green]Enabled[/green]" if enabled else "[dim]Disabled[/dim]"
+            "[green]Enabled[/green]" if enabled else "[dim]Disabled[/dim]",
+            details
         )
     
-    console.print(table)
-    
-    # Routing status
+    console.print(channels_table)
     console.print()
-    console.print(f"[dim]Smart Routing:[/dim] {'[green]Enabled[/green]' if config.routing.enabled else '[dim]Disabled[/dim]'}")
     
-    # Tools status
-    console.print(f"[dim]Web Search:[/dim] {'[green]Configured[/green]' if config.tools.web.search.api_key else '[dim]Not configured[/dim]'}")
-    console.print(f"[dim]Evolutionary Mode:[/dim] {'[green]Enabled[/green]' if config.tools.evolutionary else '[dim]Disabled[/dim]'}")
+    # ═══════════════════════════════════════════════════════════
+    # TOOL SETTINGS
+    # ═══════════════════════════════════════════════════════════
+    console.print("[bold cyan]Tool Settings[/bold cyan]")
+    
+    # Web Search
+    has_web_search = bool(config.tools.web.search.api_key)
+    console.print(f"  Web Search: {'[green]Configured[/green]' if has_web_search else '[dim]Not configured[/dim]'}")
+    if has_web_search:
+        console.print(f"    Max Results: {config.tools.web.search.max_results}")
+    
+    # Evolutionary Mode
+    console.print(f"\n  Evolutionary Mode: {'[green]Enabled[/green]' if config.tools.evolutionary else '[dim]Disabled[/dim]'}")
+    if config.tools.evolutionary:
+        console.print(f"    Allowed Paths: {len(config.tools.allowed_paths)} paths")
+        for path in config.tools.allowed_paths[:3]:  # Show first 3
+            console.print(f"      • {path}")
+        if len(config.tools.allowed_paths) > 3:
+            console.print(f"      ... and {len(config.tools.allowed_paths) - 3} more")
+        
+        console.print(f"\n    Protected Paths: {len(config.tools.protected_paths)} paths")
+        for path in config.tools.protected_paths[:3]:  # Show first 3
+            console.print(f"      • {path}")
+        if len(config.tools.protected_paths) > 3:
+            console.print(f"      ... and {len(config.tools.protected_paths) - 3} more")
+    
+    console.print(f"\n  Restrict to Workspace: {'[green]Yes[/green]' if config.tools.restrict_to_workspace else '[dim]No[/dim]'}")
     
     # Exit with consistent UX
-    console.print("\n  [0] Back")
+    console.print("\n[dim]Press Enter or select:[/dim]")
+    console.print("  [0] Back")
     choice = Prompt.ask("Select", choices=["0"], default="0")
     return
 

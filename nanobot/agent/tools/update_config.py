@@ -177,7 +177,7 @@ class UpdateConfigTool(Tool):
                     'fields': {
                         'enabled': {'type': 'boolean', 'default': False},
                         'token': {'type': 'string', 'help': 'Bot token from @BotFather (format: 123456:ABC-DEF...). Steps: 1) Message @BotFather 2) Type /newbot 3) Copy the token'},
-                        'allowFrom': {'type': 'array', 'item_type': 'string', 'help': 'List of allowed Telegram user IDs'},
+                        'allowFrom': {'type': 'array', 'item_type': 'string', 'help': 'Allowed user IDs or usernames (comma-separated, e.g.: user1, user2, 123456789)'},
                     },
                 },
                 'discord': {
@@ -185,7 +185,7 @@ class UpdateConfigTool(Tool):
                     'fields': {
                         'enabled': {'type': 'boolean', 'default': False},
                         'token': {'type': 'string', 'help': 'Get from Discord Developer Portal'},
-                        'allowFrom': {'type': 'array', 'item_type': 'string'},
+                        'allowFrom': {'type': 'array', 'item_type': 'string', 'help': 'Allowed Discord user IDs (comma-separated)'},
                     },
                 },
                 'whatsapp': {
@@ -194,7 +194,7 @@ class UpdateConfigTool(Tool):
                     'fields': {
                         'enabled': {'type': 'boolean', 'default': False},
                         'bridgeUrl': {'type': 'url', 'default': 'ws://localhost:3001'},
-                        'allowFrom': {'type': 'array', 'item_type': 'string'},
+                        'allowFrom': {'type': 'array', 'item_type': 'string', 'help': 'Allowed phone numbers (comma-separated, e.g.: +1234567890, +0987654321)'},
                     },
                 },
                 'slack': {
@@ -218,6 +218,7 @@ class UpdateConfigTool(Tool):
                         'smtpUsername': {'type': 'string'},
                         'smtpPassword': {'type': 'string'},
                         'fromAddress': {'type': 'string'},
+                        'allowFrom': {'type': 'array', 'item_type': 'string', 'help': 'Allowed sender email addresses (comma-separated, e.g.: user@example.com, admin@domain.com)'},
                     },
                 },
             }
@@ -598,6 +599,139 @@ Examples:
         }
         
         return required
+    
+    def validate_model_for_routing(self, model: str) -> dict:
+        """
+        Validate if a model is compatible with configured providers.
+        
+        Args:
+            model: Model string (e.g., "anthropic/claude-3-opus" or "gpt-4o")
+            
+        Returns:
+            Dict with validation results:
+            - valid: bool - Whether model format is valid
+            - provider: str - Detected provider name
+            - provider_configured: bool - Whether provider has API key
+            - warning: str - Warning message if provider not configured
+            - suggestion: str - Suggested alternative if available
+        """
+        config = load_config()
+        result = {
+            'valid': True,
+            'provider': None,
+            'provider_configured': False,
+            'warning': None,
+            'suggestion': None
+        }
+        
+        if not model or not isinstance(model, str):
+            result['valid'] = False
+            result['warning'] = "Model name cannot be empty"
+            return result
+        
+        # Parse provider from model string
+        # Format can be: "provider/model" or just "model"
+        provider_name = None
+        
+        if '/' in model:
+            # Extract provider from "provider/model" format
+            provider_name = model.split('/')[0].lower()
+            
+            # Map common aliases
+            provider_aliases = {
+                'anthropic': 'anthropic',
+                'claude': 'anthropic',
+                'openai': 'openai',
+                'gpt': 'openai',
+                'deepseek': 'deepseek',
+                'groq': 'groq',
+                'moonshotai': 'moonshot',
+                'moonshot': 'moonshot',
+                'kimi': 'moonshot',
+                'gemini': 'gemini',
+                'zhipu': 'zhipu',
+                'dashscope': 'dashscope',
+                'qwen': 'dashscope',
+                'aihubmix': 'aihubmix',
+                'openrouter': 'openrouter',
+                'vllm': 'vllm',
+            }
+            provider_name = provider_aliases.get(provider_name, provider_name)
+        else:
+            # Try to detect provider from model name patterns
+            model_lower = model.lower()
+            if 'claude' in model_lower:
+                provider_name = 'anthropic'
+            elif 'gpt' in model_lower or model_lower.startswith('o1') or model_lower.startswith('o3'):
+                provider_name = 'openai'
+            elif 'deepseek' in model_lower:
+                provider_name = 'deepseek'
+            elif 'llama' in model_lower or 'mixtral' in model_lower:
+                provider_name = 'groq'
+            elif 'kimi' in model_lower:
+                provider_name = 'moonshot'
+            elif 'gemini' in model_lower:
+                provider_name = 'gemini'
+        
+        result['provider'] = provider_name
+        
+        if not provider_name:
+            # Can't determine provider - assume it's valid but warn
+            result['warning'] = f"Could not determine provider for model '{model}'. Ensure you have the correct provider configured."
+            return result
+        
+        # Check if provider is configured
+        provider_config = getattr(config.providers, provider_name, None)
+        if provider_config and provider_config.api_key:
+            result['provider_configured'] = True
+        else:
+            result['provider_configured'] = False
+            
+            # Get list of configured providers for suggestion
+            configured = [
+                name for name in self.SCHEMA['providers']['providers'].keys()
+                if getattr(getattr(config.providers, name, None), 'api_key', None)
+            ]
+            
+            # Special handling for gateway providers
+            is_gateway = provider_name in ['openrouter', 'aihubmix']
+            
+            if configured:
+                if is_gateway:
+                    result['warning'] = (
+                        f"Model '{model}' requires {provider_name.title()} gateway, "
+                        f"but no API key is configured."
+                    )
+                    result['suggestion'] = (
+                        f"{provider_name.title()} can route to all major AI models. "
+                        f"Run 'nanobot configure' to add your {provider_name.title()} API key."
+                    )
+                else:
+                    result['warning'] = (
+                        f"Model '{model}' requires {provider_name.title()} provider, "
+                        f"but no API key is configured."
+                    )
+                    result['suggestion'] = (
+                        f"Configured providers: {', '.join(configured)}. "
+                        f"Run 'nanobot configure' to add {provider_name.title()}."
+                    )
+            else:
+                if is_gateway:
+                    result['warning'] = (
+                        f"Model '{model}' requires {provider_name.title()} gateway."
+                    )
+                    result['suggestion'] = (
+                        f"{provider_name.title()} provides access to multiple AI models through a single API. "
+                        f"Run 'nanobot onboard' to configure your first provider."
+                    )
+                else:
+                    result['warning'] = (
+                        f"Model '{model}' requires {provider_name.title()} provider, "
+                        f"but no providers are configured yet."
+                    )
+                    result['suggestion'] = "Run 'nanobot onboard' to configure your first provider."
+        
+        return result
     
     def get_config_summary(self) -> dict:
         """Get a summary of current configuration."""

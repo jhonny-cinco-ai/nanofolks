@@ -426,15 +426,27 @@ Examples:
             
             elif field_type == 'array':
                 if isinstance(value, list):
+                    # Ensure all items are strings
+                    item_type = schema.get('item_type', 'string')
+                    if item_type == 'string':
+                        return [str(item) for item in value]
                     return value
                 if isinstance(value, str):
                     # Parse comma-separated or JSON array
                     try:
                         import json
-                        return json.loads(value)
+                        parsed = json.loads(value)
+                        if isinstance(parsed, list):
+                            item_type = schema.get('item_type', 'string')
+                            if item_type == 'string':
+                                return [str(item) for item in parsed]
+                            return parsed
+                        # Single value parsed as non-list
+                        return [str(parsed)]
                     except:
                         return [item.strip() for item in value.split(',') if item.strip()]
-                return [value]
+                # Single non-string value (e.g., int)
+                return [str(value)]
             
             elif field_type == 'enum':
                 options = schema.get('options', [])

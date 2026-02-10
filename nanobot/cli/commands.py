@@ -217,7 +217,7 @@ def onboard():
     
     # Offer to run configuration immediately
     console.print("\n[green]Now let's configure your API keys to get started.[/green]")
-    if typer.confirm("Would you like to run the configuration wizard now?"):
+    if typer.confirm("Ready to run the configuration wizard?"):
         from nanobot.cli.configure import configure_cli
         configure_cli()
     else:

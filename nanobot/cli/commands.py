@@ -245,12 +245,12 @@ def onboard():
 
 def _run_onboard_wizard():
     """Run the step-by-step onboarding wizard."""
-    import asyncio
-    from rich.prompt import Prompt, Confirm
-    from nanobot.agent.tools.update_config import UpdateConfigTool
-    
-    # Show spinner while initializing
-    with console.status("[cyan]Loading configuration tools...[/cyan]", spinner="dots"):
+    # Show spinner immediately while imports load
+    with console.status("[cyan]Preparing setup wizard...[/cyan]", spinner="dots"):
+        import asyncio
+        from rich.prompt import Prompt, Confirm
+        from nanobot.agent.tools.update_config import UpdateConfigTool
+        
         tool = UpdateConfigTool()
     
     console.print("\n[bold cyan]Let's get you set up![/bold cyan]")

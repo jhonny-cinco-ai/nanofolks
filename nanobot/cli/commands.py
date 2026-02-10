@@ -246,6 +246,45 @@ def onboard():
     
     setup_table.add_row("✓", "Memory database", f"{workspace}/memory/memory.db")
     
+    # Pre-download memory models (optional but recommended)
+    console.print("\n[cyan]🧠 Memory & Learning System[/cyan]")
+    console.print("[dim]Downloading AI models for local memory processing...[/dim]")
+    console.print("  • Embedding model (~67MB) - for semantic search")
+    console.print("  • Extraction model (~80MB) - for entity recognition\n")
+    
+    if typer.confirm("Download memory models now? (Recommended)", default=True):
+        from rich.progress import Progress, SpinnerColumn, TextColumn
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            # Download embedding model
+            task1 = progress.add_task("📦 Downloading embedding model...", total=None)
+            try:
+                from fastembed import TextEmbedding
+                # This triggers download
+                _ = TextEmbedding("BAAI/bge-small-en-v1.5")
+                progress.update(task1, description="[green]✓ Embedding model ready[/green]")
+            except Exception as e:
+                progress.update(task1, description=f"[yellow]⚠️  Embedding model: {e}[/yellow]")
+            
+            # Download extraction model
+            task2 = progress.add_task("📦 Downloading extraction model...", total=None)
+            try:
+                from gliner2 import GLiNER2Extractor
+                # This triggers download
+                _ = GLiNER2Extractor("fastino/gliner2-base-v1")
+                progress.update(task2, description="[green]✓ Extraction model ready[/green]")
+            except Exception as e:
+                progress.update(task2, description=f"[yellow]⚠️  Extraction model: {e}[/yellow]")
+        
+        setup_table.add_row("✓", "Memory models", "Downloaded")
+    else:
+        console.print("[yellow]⚠️  Models will download on first use (may cause delays)[/yellow]")
+        setup_table.add_row("○", "Memory models", "Lazy load")
+    
     console.print(setup_table)
     
     console.print(Panel.fit(

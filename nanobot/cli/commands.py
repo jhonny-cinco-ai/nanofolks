@@ -252,7 +252,7 @@ def onboard():
     if typer.confirm("Ready to run the configuration wizard?"):
         configure_cli()
     else:
-        console.print("\n[yellow]⚠️  nanobot won't work without API keys.[/yellow]")
+        console.print("\n[yellow]Come back soon! nanobot won't work without API keys.[/yellow]")
         console.print("[dim]When you're ready, run: [/dim][cyan]nanobot configure[/cyan]")
 
 

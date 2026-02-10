@@ -213,18 +213,16 @@ def onboard():
     # Create default bootstrap files
     _create_workspace_templates(workspace)
     
-    console.print(f"\n{__logo__} nanobot is ready!")
+    console.print(f"\n{__logo__} Basic workspace initialized!")
     
     # Offer to run configuration immediately
-    console.print("\n[yellow]Configuration needed![/yellow] API keys are required to use nanobot.")
-    if typer.confirm("Would you like to configure nanobot now?"):
+    console.print("\n[green]Now let's configure your API keys to get started.[/green]")
+    if typer.confirm("Would you like to run the configuration wizard now?"):
         from nanobot.cli.configure import configure_cli
         configure_cli()
     else:
-        console.print("\nNext steps:")
-        console.print("  1. Run [cyan]nanobot configure[/cyan] to set up API keys")
-        console.print("  2. Chat: [cyan]nanobot agent -m \"Hello!\"[/cyan]")
-        console.print("\n[dim]Want Telegram/WhatsApp? See: https://github.com/HKUDS/nanobot#-chat-apps[/dim]")
+        console.print("\n[yellow]⚠️ nanobot won't work without API keys.[/yellow]")
+        console.print("When you're ready, run: [cyan]nanobot configure[/cyan]")
 
 
 @app.command()

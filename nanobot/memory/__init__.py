@@ -13,13 +13,15 @@ from nanobot.memory.models import (
     SummaryNode,
     Learning,
 )
+from nanobot.memory.store import MemoryStore
 
 __all__ = [
     "Event",
-    "Entity", 
+    "Entity",
     "Edge",
     "Fact",
     "Topic",
     "SummaryNode",
     "Learning",
+    "MemoryStore",
 ]

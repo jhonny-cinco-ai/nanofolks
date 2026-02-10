@@ -671,10 +671,71 @@ def _configure_tools():
                     ))
                 console.print(f"[green]{result}[/green]")
                 
-                if not is_evolutionary:  # Just enabled
-                    console.print("\n[yellow]⚠ Security Warning:[/yellow]")
-                    console.print("Evolutionary mode allows the bot to modify files outside")
-                    console.print("the workspace. Make sure allowedPaths is configured correctly.")
+            if not is_evolutionary:  # Just enabled
+                console.print("\n[yellow]⚠ Security Warning:[/yellow]")
+                console.print("Evolutionary mode allows the bot to modify files outside")
+                console.print("the workspace. Make sure allowedPaths is configured correctly.")
+            
+            # Show path configuration if enabled
+            if config.tools.evolutionary or not is_evolutionary: # Enabled or just enabled
+                config = load_config() # Reload to get fresh state
+                
+                console.print("\n[bold]Path Configuration:[/bold]")
+                console.print(f"[dim]Allowed Paths (whitelist):[/dim]")
+                for path in config.tools.allowed_paths:
+                    console.print(f"  • {path}")
+                if not config.tools.allowed_paths:
+                    console.print("  [dim](None - restricted to workspace)[/dim]")
+                
+                console.print(f"\n[dim]Protected Paths (blacklist):[/dim]")
+                for path in config.tools.protected_paths:
+                    console.print(f"  • {path}")
+                
+                console.print("\n[1] Add allowed path")
+                console.print("[2] Remove allowed path")
+                console.print("[0] Done")
+                
+                while True:
+                    path_choice = Prompt.ask("\nModify paths", choices=["0", "1", "2"], default="0")
+                    if path_choice == "0":
+                        break
+                    
+                    if path_choice == "1":
+                        new_path = Prompt.ask("Enter absolute path to allow")
+                        if new_path:
+                            current_paths = config.tools.allowed_paths
+                            if new_path not in current_paths:
+                                updated_paths = current_paths + [new_path]
+                                with console.status("[cyan]Adding path...[/cyan]", spinner="dots"):
+                                    asyncio.run(tool.execute(
+                                        path="tools.allowedPaths",
+                                        value=updated_paths
+                                    ))
+                                console.print(f"[green]✓ Added {new_path}[/green]")
+                                config = load_config() # Refresh
+                            else:
+                                console.print("[yellow]Path already allowed[/yellow]")
+                    
+                    elif path_choice == "2":
+                        if not config.tools.allowed_paths:
+                            console.print("[yellow]No paths to remove[/yellow]")
+                            continue
+                            
+                        console.print("\nSelect path to remove:")
+                        for i, path in enumerate(config.tools.allowed_paths, 1):
+                            console.print(f"  [{i}] {path}")
+                        
+                        rm_idx = Prompt.ask("Select number", choices=[str(i) for i in range(1, len(config.tools.allowed_paths)+1)])
+                        path_to_remove = config.tools.allowed_paths[int(rm_idx)-1]
+                        
+                        updated_paths = [p for p in config.tools.allowed_paths if p != path_to_remove]
+                        with console.status("[cyan]Removing path...[/cyan]", spinner="dots"):
+                            asyncio.run(tool.execute(
+                                path="tools.allowedPaths",
+                                value=updated_paths
+                            ))
+                        console.print(f"[green]✓ Removed {path_to_remove}[/green]")
+                        config = load_config() # Refresh
         
         elif choice == "2":
             # Web Search API Key

@@ -4,6 +4,7 @@ This module provides an interactive configuration interface using
 typer and rich for a nice user experience.
 """
 
+import asyncio
 import typer
 from pathlib import Path
 from typing import Optional
@@ -238,11 +239,11 @@ def _configure_single_provider(name: str, schema: dict):
         console.print("[yellow]Cancelled[/yellow]")
         return
     
-    # Update config
-    result = tool.execute(
+    # Update config (execute is async, so we need to run it)
+    result = asyncio.run(tool.execute(
         path=f"providers.{name}.apiKey",
         value=api_key
-    )
+    ))
     
     if "Error" in result:
         console.print(f"[red]{result}[/red]")
@@ -263,11 +264,12 @@ def _configure_single_provider(name: str, schema: dict):
             
             if model_choice != "0":
                 model = schema['models'][int(model_choice) - 1]
-                result = tool.execute(
+                result = asyncio.run(tool.execute(
                     path="agents.defaults.model",
                     value=model
-                )
-                console.print(f"[green]✓ Set default model to {model}[/green]")
+                ))
+                if "Error" not in result:
+                    console.print(f"[green]✓ Set default model to {model}[/green]")
 
 
 def _configure_channels(summary: dict):
@@ -328,7 +330,7 @@ def _configure_single_channel(name: str, schema: dict):
     if is_enabled:
         console.print(f"\n[green]✓ Channel is currently enabled[/green]")
         if Confirm.ask("Disable this channel?", default=False):
-            tool.execute(path=f"channels.{name}.enabled", value=False)
+            asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=False))
             console.print("[green]✓ Channel disabled[/green]")
         return
     
@@ -348,17 +350,18 @@ def _configure_single_channel(name: str, schema: dict):
             value = Prompt.ask(f"Enter {field_name}")
             
             if value:
-                result = tool.execute(
+                result = asyncio.run(tool.execute(
                     path=f"channels.{name}.{field_name}",
                     value=value
-                )
+                ))
                 if "Error" in result:
                     console.print(f"[red]{result}[/red]")
     
     # Enable the channel
     if Confirm.ask("Enable this channel?", default=True):
-        result = tool.execute(path=f"channels.{name}.enabled", value=True)
-        console.print(f"[green]✓ {name.title()} channel enabled![/green]")
+        result = asyncio.run(tool.execute(path=f"channels.{name}.enabled", value=True))
+        if "Error" not in result:
+            console.print(f"[green]✓ {name.title()} channel enabled![/green]")
         console.print(f"[dim]Start the gateway to activate: nanobot gateway[/dim]")
 
 
@@ -391,17 +394,17 @@ def _configure_agents():
     if choice == "1":
         model = Prompt.ask("Enter model name (e.g., anthropic/claude-opus-4-5)")
         if model:
-            result = tool.execute(path="agents.defaults.model", value=model)
+            result = asyncio.run(tool.execute(path="agents.defaults.model", value=model))
             console.print(f"[green]{result}[/green]")
     
     elif choice == "2":
         tokens = Prompt.ask("Enter max tokens", default="8192")
-        result = tool.execute(path="agents.defaults.max_tokens", value=int(tokens))
+        result = asyncio.run(tool.execute(path="agents.defaults.max_tokens", value=int(tokens)))
         console.print(f"[green]{result}[/green]")
     
     elif choice == "3":
         temp = Prompt.ask("Enter temperature (0.0-2.0)", default="0.7")
-        result = tool.execute(path="agents.defaults.temperature", value=float(temp))
+        result = asyncio.run(tool.execute(path="agents.defaults.temperature", value=float(temp)))
         console.print(f"[green]{result}[/green]")
 
 
@@ -424,7 +427,7 @@ def _configure_routing():
     
     if not is_enabled:
         if Confirm.ask("Enable smart routing?", default=True):
-            result = tool.execute(path="routing.enabled", value=True)
+            result = asyncio.run(tool.execute(path="routing.enabled", value=True))
             console.print(f"[green]{result}[/green]")
             is_enabled = True
     
@@ -482,18 +485,18 @@ def _configure_routing():
                 
                 new_model = Prompt.ask("Enter model name (or press Enter to keep current)", default="")
                 if new_model:
-                    result = tool.execute(
+                    result = asyncio.run(tool.execute(
                         path=f"routing.tiers.{selected_tier}.model",
                         value=new_model
-                    )
+                    ))
                     console.print(f"[green]{result}[/green]")
                 
                 secondary = Prompt.ask("Enter secondary/fallback model (optional)", default="")
                 if secondary:
-                    result = tool.execute(
+                    result = asyncio.run(tool.execute(
                         path=f"routing.tiers.{selected_tier}.secondaryModel",
                         value=secondary
-                    )
+                    ))
                     console.print(f"[green]{result}[/green]")
         
         elif choice == "2":
@@ -505,10 +508,10 @@ def _configure_routing():
                 default=""
             )
             if new_confidence:
-                result = tool.execute(
+                result = asyncio.run(tool.execute(
                     path="routing.clientClassifier.minConfidence",
                     value=float(new_confidence)
-                )
+                ))
                 console.print(f"[green]{result}[/green]")
 
 
@@ -534,10 +537,10 @@ def _configure_tools():
         f"{'Disable' if is_evolutionary else 'Enable'} evolutionary mode?",
         default=False
     ):
-        result = tool.execute(
+        result = asyncio.run(tool.execute(
             path="tools.evolutionary",
             value=not is_evolutionary
-        )
+        ))
         console.print(f"[green]{result}[/green]")
         
         if not is_evolutionary:  # Just enabled

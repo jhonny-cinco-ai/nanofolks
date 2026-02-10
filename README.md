@@ -104,9 +104,16 @@ pip install nanobot-ai
 nanobot onboard
 ```
 
-This creates your workspace and **automatically launches the interactive configuration wizard**. No manual JSON editing required!
+This runs a **step-by-step onboarding wizard** that guides you through:
+- Selecting your AI model provider
+- Setting your default model  
+- Enabling smart routing (optional)
+- Configuring voice transcription for Telegram/WhatsApp
+- Setting up advanced features
 
-**Already onboarded?** Run the config wizard anytime:
+No manual JSON editing required!
+
+**Already onboarded?** Use the **interactive menu** for advanced configuration:
 ```bash
 nanobot configure
 ```
@@ -681,65 +688,63 @@ See [ROUTING.md](ROUTING.md) for detailed configuration and customization.
 
 ### Interactive Configuration Wizard ⭐ NEW
 
-**No more manual JSON editing!** Use the interactive wizard to configure nanobot:
+**Two ways to configure nanobot:**
+
+#### **1. Step-by-Step Onboarding** (First-time setup)
+
+Perfect for new users - guides you through essential configuration:
+
+```bash
+nanobot onboard
+```
+
+**Setup Flow:**
+1. **🤖 Model Provider** — Choose from 6 providers (OpenRouter, Anthropic, OpenAI, Groq, DeepSeek, etc.)
+2. **🎯 Primary Model** — Select your default AI model
+3. **🧠 Smart Routing** — Enable automatic model selection by query complexity
+4. **🔬 Evolutionary Mode** — Optional self-improvement capabilities
+
+**Features:**
+- ✅ Progress tracking with visual indicators
+- 🔐 Secure API key input with preview
+- 🎙️ **Voice transcription setup** — Auto-offers Groq for Telegram/WhatsApp voice messages
+- 📋 Suggested tier configurations based on your provider
+- 🚪 Easy exit points with "Back" options
+
+#### **2. Interactive Menu** (Advanced configuration)
+
+For power users who want fine-grained control:
 
 ```bash
 nanobot configure
 ```
 
-**Features:**
-- 🎯 **Visual status indicators** — See what's configured/missing at a glance
-- 🔐 **Secure API key input** — Keys visible as you type (no blind typing!)
-- ✅ **Validation** — Tests API keys before saving
-- 📊 **Provider selection** — Choose from 11+ LLM providers
-- 💬 **Channel setup** — Configure Telegram, Discord, WhatsApp, etc.
-- 🧠 **Smart routing** — Customize tier models and costs
-- ⚙️ **All settings** — Agents, tools, gateway, security
-
-**Wizard Menu:**
+**Menu Options:**
 ```
 🤖 nanobot Configuration Wizard
 
-[1] 🤖 Model Providers (Required)
-[2] 💬 Chat Channels
-[3] ⚙️  Agent Settings
-[4] 🧠 Smart Routing
-[5] 🛠️  Tool Settings
+Current Status:
+  LLM Providers    ✓ openrouter
+  Channels         ○ None enabled
+
+[1] 🤖 Model Providers ✓
+[2] 💬 Chat Channels ○
+[3] ⚙️  Agent Settings ○
+[4] 🧠 Smart Routing ✓
+[5] 🛠️  Tool Settings ○
 [6] 📊 View Full Status
 [7] ✓  Done
 ```
 
-**Example Session:**
-```bash
-$ nanobot configure
-
-Step 1/3: Select Model Provider
-
-Available providers:
-  [1] OpenRouter (recommended - multi-model)
-  [2] Anthropic
-  [3] OpenAI
-  ...
-
-Select [1-4]: 1
-
-Step 2/3: API Configuration
-
-Enter your OpenRouter API key: sk-or-xxxxxx...
-Preview: sk-or-xxx...xxxx
-Test connection... ✓ Valid
-
-Step 3/3: Default Model
-
-Available models:
-  [1] anthropic/claude-opus-4-5
-  [2] openai/gpt-4o
-  ...
-
-Select default [1-3]: 1
-
-✓ Configuration saved!
-```
+**Features:**
+- 🎯 **Visual status indicators** — See what's configured (✓) vs optional (○)
+- 🔐 **Secure API key input** — Keys visible as you type with preview
+- 💬 **Channel setup** — Configure Telegram, Discord, WhatsApp, Slack, Email
+   - Auto-detects voice transcription needs
+   - Offers Groq setup for voice messages
+- 🧠 **Smart routing** — Customize tier models and confidence thresholds
+- ⚙️ **All settings** — Agents, tools, gateway, security
+- 🚪 **Back buttons** — Exit any submenu without completing
 
 ### Security 🔐
 

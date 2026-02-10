@@ -251,7 +251,7 @@ class AutoCalibrationConfig(BaseModel):
 
 class RoutingConfig(BaseModel):
     """Configuration for smart routing."""
-    enabled: bool = True
+    enabled: bool = False  # Disabled by default - user must explicitly enable
     tiers: RoutingTiersConfig = Field(default_factory=RoutingTiersConfig)
     client_classifier: ClientClassifierConfig = Field(default_factory=ClientClassifierConfig)
     llm_classifier: LLMClassifierConfig = Field(default_factory=LLMClassifierConfig)

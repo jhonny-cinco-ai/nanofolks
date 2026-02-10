@@ -15,7 +15,6 @@ from rich.prompt import Prompt, Confirm
 from rich import box
 
 from nanobot.config.loader import load_config, save_config, get_config_path
-from nanobot.config.schema import RoutingTiersConfig
 from nanobot.agent.tools.update_config import UpdateConfigTool
 
 
@@ -144,18 +143,8 @@ def _get_routing_status() -> str:
     """Get status indicator for routing."""
     try:
         config = load_config()
-        # Check if user has customized any tier models or settings
-        # (Routing enabled is default, so we check for actual customization)
-        default_tiers = RoutingTiersConfig()
-        has_custom = (
-            config.routing.tiers.simple.model != default_tiers.simple.model or
-            config.routing.tiers.medium.model != default_tiers.medium.model or
-            config.routing.tiers.complex.model != default_tiers.complex.model or
-            config.routing.tiers.reasoning.model != default_tiers.reasoning.model or
-            config.routing.tiers.coding.model != default_tiers.coding.model or
-            config.routing.client_classifier.min_confidence != 0.85
-        )
-        return "[green]✓[/green]" if has_custom else "[dim]○[/dim]"
+        # Routing is disabled by default, user must explicitly enable
+        return "[green]✓[/green]" if config.routing.enabled else "[dim]○[/dim]"
     except:
         return "[dim]○[/dim]"
 

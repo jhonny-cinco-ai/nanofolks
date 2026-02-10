@@ -716,32 +716,62 @@ def _show_detailed_status():
     
     # Config file location
     console.print(f"\n[dim]Config file:[/dim] {config_path}")
-    console.print(f"[dim]Exists:[/dim] {'[green]Yes[/green]' if config_path.exists() else '[red]No[/red]'}\n")
+    console.print(f"[dim]Exists:[/dim] {'[green]Yes[/green]' if config_path.exists() else '[red]No[/red]'}")
     
-    # Providers table
-    table = Table(title="Providers", box=box.ROUNDED)
+    # Get default model info
+    default_model = config.agents.defaults.model
+    
+    # Providers table - show which provider is being used for the default model
+    table = Table(title="Model Providers", box=box.ROUNDED)
     table.add_column("Provider", style="cyan")
     table.add_column("API Key", style="green")
-    table.add_column("Default", style="yellow")
+    table.add_column("Status", style="yellow")
     
-    for provider_name in ['openrouter', 'anthropic', 'openai', 'groq', 'deepseek', 'moonshot']:
-        provider = getattr(config.providers, provider_name, None)
-        has_key = bool(provider and provider.api_key)
-        is_default = provider_name in config.agents.defaults.model.lower()
-        
-        table.add_row(
-            provider_name.title(),
-            "[green]✓[/green]" if has_key else "[dim]✗[/dim]",
-            "[bold]✓[/bold]" if is_default else ""
-        )
+    # Check if using OpenRouter (model format: provider/model-name)
+    if '/' in default_model:
+        # Using OpenRouter or similar gateway
+        model_provider = default_model.split('/')[0]
+        for provider_name in ['openrouter', 'anthropic', 'openai', 'groq', 'deepseek', 'moonshot']:
+            provider = getattr(config.providers, provider_name, None)
+            has_key = bool(provider and provider.api_key)
+            
+            if provider_name == 'openrouter' and has_key:
+                status = f"[bold]Active (via {model_provider})[/bold]"
+            elif has_key:
+                status = "[dim]Backup[/dim]"
+            else:
+                status = ""
+            
+            table.add_row(
+                provider_name.title(),
+                "[green]✓[/green]" if has_key else "[dim]✗[/dim]",
+                status
+            )
+    else:
+        # Direct provider usage
+        for provider_name in ['openrouter', 'anthropic', 'openai', 'groq', 'deepseek', 'moonshot']:
+            provider = getattr(config.providers, provider_name, None)
+            has_key = bool(provider and provider.api_key)
+            is_active = provider_name in default_model.lower() and has_key
+            
+            table.add_row(
+                provider_name.title(),
+                "[green]✓[/green]" if has_key else "[dim]✗[/dim]",
+                "[bold]Active[/bold]" if is_active else ""
+            )
     
     console.print(table)
+    
+    # Default model info
+    console.print(f"\n[dim]Default Model:[/dim] {default_model}")
+    console.print(f"[dim]Temperature:[/dim] {config.agents.defaults.temperature}")
+    console.print(f"[dim]Max Tokens:[/dim] {config.agents.defaults.max_tokens}")
     
     # Channels table
     console.print()
     table = Table(title="Channels", box=box.ROUNDED)
     table.add_column("Channel", style="cyan")
-    table.add_column("Enabled", style="green")
+    table.add_column("Status", style="green")
     
     for channel_name in ['telegram', 'discord', 'whatsapp', 'slack', 'email']:
         channel = getattr(config.channels, channel_name, None)
@@ -749,13 +779,23 @@ def _show_detailed_status():
         
         table.add_row(
             channel_name.title(),
-            "[green]✓[/green]" if enabled else "[dim]✗[/dim]"
+            "[green]Enabled[/green]" if enabled else "[dim]Disabled[/dim]"
         )
     
     console.print(table)
     
-    console.print("\n[dim]Press Enter to continue...[/dim]")
-    input()
+    # Routing status
+    console.print()
+    console.print(f"[dim]Smart Routing:[/dim] {'[green]Enabled[/green]' if config.routing.enabled else '[dim]Disabled[/dim]'}")
+    
+    # Tools status
+    console.print(f"[dim]Web Search:[/dim] {'[green]Configured[/green]' if config.tools.web.search.api_key else '[dim]Not configured[/dim]'}")
+    console.print(f"[dim]Evolutionary Mode:[/dim] {'[green]Enabled[/green]' if config.tools.evolutionary else '[dim]Disabled[/dim]'}")
+    
+    # Exit with consistent UX
+    console.print("\n  [0] Back")
+    choice = Prompt.ask("Select", choices=["0"], default="0")
+    return
 
 
 # Typer app for CLI integration

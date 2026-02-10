@@ -339,6 +339,116 @@ Every 60 seconds:
   7. Mark events as extraction_status = "complete"
 ```
 
+### Implementation Recommendations for Phase 3
+
+This section provides practical guidance for implementing Phase 3's background task infrastructure, balancing simplicity with future extensibility.
+
+#### Initial Implementation Strategy
+
+**Consolidate into `extraction.py` initially:**
+Rather than creating separate files for `activity_tracker.py`, `task_queue.py`, `worker_pool.py`, etc., implement all background task components directly in `extraction.py` for Phase 3. This reduces cognitive load and keeps related logic together.
+
+**Start with minimal features:**
+- `ActivityTracker`: Simple timestamp tracking (last_message_time, is_user_active())
+- `ExtractionScheduler`: Basic asyncio loop with `asyncio.sleep(interval_seconds)`
+- Single-worker execution: One async task that processes batches sequentially
+- Skip for Phase 3: Priority queues, metrics, multi-worker pools, deduplication
+
+**Add complexity incrementally:**
+- Phase 3: Basic ActivityTracker + single extraction loop
+- Phase 4+: Add metrics, priority queues, and multi-worker pools if extraction becomes a bottleneck
+
+#### File Organization
+
+**Phase 3 (single file approach):**
+```
+nanobot/memory/extraction.py
+├── ActivityTracker class          # ~30 lines
+├── ExtractionScheduler class      # ~60 lines  
+├── run_extraction_batch()         # Core extraction logic
+└── _resolve_entity(), _store_fact() # Helper functions
+```
+
+**Phase 4+ (refactor when needed):**
+Split into separate modules only if `extraction.py` exceeds ~400 lines or if worker pool complexity grows:
+```
+nanobot/memory/tasks.py            # BackgroundTaskManager, TaskQueue, WorkerPool
+nanobot/memory/extraction.py       # Keep extraction-specific logic here
+```
+
+#### Configuration Merge
+
+Merge background task settings into the existing `ExtractionConfig` rather than creating a separate `TaskConfig`:
+
+```python
+class ExtractionConfig(BaseModel):
+    enabled: bool = True
+    interval_seconds: int = 60
+    batch_size: int = 20
+    spacy_model: str = "en_core_web_sm"
+    api_fallback: bool = False
+    api_model: str = ""
+    activity_backoff: bool = True
+    
+    # Background task settings (merged from TaskConfig)
+    max_workers: int = 1           # Start with 1 for Phase 3
+    inactivity_threshold_seconds: int = 30
+    retry_delay_seconds: int = 60  # Simple linear backoff for Phase 3
+```
+
+Benefits:
+- Single source of truth for all extraction/background settings
+- Simpler configuration schema and documentation
+- Easier to refactor later if needed
+
+#### Integration Checklist
+
+**1. AgentLoop.start():**
+```python
+async def start(self):
+    if self.config.memory.enabled and self.config.memory.extraction.enabled:
+        self.extraction_scheduler = ExtractionScheduler(
+            store=self.memory_store,
+            activity_tracker=self.activity_tracker,
+            config=self.config.memory.extraction
+        )
+        await self.extraction_scheduler.start()
+```
+
+**2. AgentLoop._process_message():**
+```python
+async def _process_message(self, message: Message):
+    if self.config.memory.enabled:
+        self.activity_tracker.mark_activity()
+    # ... rest of message processing
+```
+
+**3. Extraction pipeline error handling:**
+```python
+async def run_extraction_batch(store, config):
+    try:
+        events = store.get_pending_events(limit=config.batch_size)
+        for event in events:
+            try:
+                await extract_from_event(event, store)
+                store.mark_extracted(event.id, status="complete")
+            except Exception as e:
+                logger.warning(f"Extraction failed for event {event.id}: {e}")
+                store.mark_extracted(event.id, status="failed", error=str(e))
+    except Exception as e:
+        logger.error(f"Extraction batch failed: {e}")
+        # Don't propagate - background tasks shouldn't crash the agent
+```
+
+**4. Summary refresh trigger (Phase 4 prep):**
+Add a callback mechanism or simply call a stub function after extraction completes:
+```python
+async def run_extraction_batch(store, config):
+    # ... extraction logic ...
+    # Phase 4: Trigger summary staleness check here
+    await maybe_refresh_summaries(store)
+```
+
 ### Phase 4: Hierarchical Summaries
 **Estimated effort: 4-6 days**
 

@@ -264,6 +264,10 @@ def _run_onboard_wizard():
         "3": ("openai", "OpenAI - GPT models"),
         "4": ("groq", "Groq - Fast inference + Voice transcription (Whisper)"),
         "5": ("deepseek", "DeepSeek - Chinese models"),
+        "6": ("moonshot", "Moonshot - Kimi models (Chinese)"),
+        "7": ("gemini", "Gemini - Google AI models"),
+        "8": ("zhipu", "Zhipu - ChatGLM models (Chinese)"),
+        "9": ("dashscope", "DashScope - Qwen models (Alibaba/Chinese)"),
     }
     
     for key, (name, desc) in providers.items():

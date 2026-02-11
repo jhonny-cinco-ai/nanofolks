@@ -143,7 +143,24 @@ class AgentLoop:
                 embedding_provider=embedding_provider,
             )
             
-            logger.info("Memory system enabled with background processing, context assembly, and retrieval")
+            # Initialize learning manager (Phase 6)
+            from nanobot.memory.learning import create_learning_manager
+            from nanobot.memory.preferences import create_preferences_aggregator
+            
+            self.learning_manager = create_learning_manager(
+                self.memory_store,
+                embedding_provider=embedding_provider,
+                decay_days=memory_config.learning.decay_days,
+                decay_rate=memory_config.learning.relevance_decay_rate,
+            )
+            
+            # Initialize preferences aggregator
+            self.preferences_aggregator = create_preferences_aggregator(
+                self.memory_store,
+                self.summary_manager,
+            )
+            
+            logger.info("Memory system enabled with learning, context assembly, and retrieval")
         
         self.subagents = SubagentManager(
             provider=provider,
@@ -375,6 +392,32 @@ class AgentLoop:
                 session_key=msg.session_key,
             )
             self.memory_store.save_event(event)
+            
+            # Phase 6: Detect feedback from previous conversation
+            if self.learning_manager and session.messages:
+                try:
+                    # Get last assistant message for context
+                    last_assistant_msgs = [m for m in session.messages if m.get("role") == "assistant"]
+                    if last_assistant_msgs:
+                        context = last_assistant_msgs[-1].get("content", "")
+                        
+                        # Detect feedback in user message
+                        learning = await self.learning_manager.process_message(
+                            message=sanitized_content,
+                            context=context,
+                        )
+                        
+                        if learning:
+                            logger.info(f"Detected feedback: {learning.content[:50]}...")
+                            
+                            # Increment preferences staleness
+                            if self.preferences_aggregator:
+                                self.preferences_aggregator.increment_staleness()
+                                
+                                # Refresh preferences if needed
+                                await self.preferences_aggregator.refresh_if_needed()
+                except Exception as e:
+                    logger.error(f"Failed to process feedback: {e}")
         
         # Build memory context if memory system is enabled
         memory_context = ""

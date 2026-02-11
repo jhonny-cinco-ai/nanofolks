@@ -212,25 +212,61 @@ class BackgroundProcessor:
     
     async def _refresh_summaries(self) -> int:
         """
-        Refresh stale summary nodes.
+        Refresh stale summary nodes (Phase 4 & 6).
         
         Returns:
             Number of summaries refreshed
         """
-        # TODO: Implement summary refresh
-        # This will be done in Phase 4
-        return 0
+        from nanobot.memory.summaries import SummaryTreeManager
+        
+        try:
+            # Create temporary summary manager
+            summary_manager = SummaryTreeManager(
+                store=self.memory_store,
+                staleness_threshold=10,
+                max_refresh_batch=20,
+            )
+            
+            # Refresh stale summaries
+            stats = summary_manager.refresh_all_stale()
+            
+            if stats["refreshed"] > 0:
+                logger.info(f"Summaries refreshed: {stats['refreshed']} nodes")
+            
+            return stats["refreshed"]
+            
+        except Exception as e:
+            logger.error(f"Failed to refresh summaries: {e}")
+            return 0
     
     async def _decay_learnings(self) -> int:
         """
-        Apply decay to learning relevance scores.
+        Apply decay to learning relevance scores (Phase 6).
         
         Returns:
             Number of learnings decayed
         """
-        # TODO: Implement learning decay
-        # This will be done in Phase 5
-        return 0
+        from nanobot.memory.learning import LearningManager
+        
+        try:
+            # Create temporary learning manager
+            learning_manager = LearningManager(
+                store=self.memory_store,
+                decay_days=14,
+                decay_rate=0.05,
+            )
+            
+            # Apply decay
+            stats = learning_manager.apply_decay()
+            
+            if stats["decayed"] > 0 or stats["removed"] > 0:
+                logger.info(f"Learning decay applied: {stats['decayed']} decayed, {stats['removed']} removed")
+            
+            return stats["decayed"] + stats["removed"]
+            
+        except Exception as e:
+            logger.error(f"Failed to apply learning decay: {e}")
+            return 0
 
 
 # Placeholder extraction function (will be implemented in extractors module)

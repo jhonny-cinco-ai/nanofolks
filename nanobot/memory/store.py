@@ -1286,3 +1286,224 @@ class MemoryStore:
         conn.execute("VACUUM;")
         conn.commit()
         logger.info("Database vacuumed")
+    
+    # =========================================================================
+    # Learning Operations (Phase 6: Learning + User Preferences)
+    # =========================================================================
+    
+    def create_learning(self, learning: Learning) -> str:
+        """
+        Create a new learning in the database.
+        
+        Args:
+            learning: Learning to create
+            
+        Returns:
+            Learning ID
+        """
+        conn = self._get_connection()
+        
+        conn.execute(
+            """
+            INSERT INTO learnings (
+                id, content, source, sentiment, confidence, tool_name,
+                recommendation, superseded_by, content_embedding,
+                created_at, updated_at, relevance_score, times_accessed, last_accessed
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                learning.id,
+                learning.content,
+                learning.source,
+                learning.sentiment,
+                learning.confidence,
+                learning.tool_name,
+                learning.recommendation,
+                learning.superseded_by,
+                learning.content_embedding,
+                learning.created_at.timestamp() if learning.created_at else None,
+                learning.updated_at.timestamp() if learning.updated_at else None,
+                learning.relevance_score,
+                learning.times_accessed,
+                learning.last_accessed.timestamp() if learning.last_accessed else None,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Learning created: {learning.id}")
+        return learning.id
+    
+    def get_learning(self, learning_id: str) -> Optional[Learning]:
+        """
+        Get a learning by ID.
+        
+        Args:
+            learning_id: Learning ID
+            
+        Returns:
+            Learning if found, None otherwise
+        """
+        conn = self._get_connection()
+        
+        row = conn.execute(
+            "SELECT * FROM learnings WHERE id = ?",
+            (learning_id,)
+        ).fetchone()
+        
+        if row:
+            return self._row_to_learning(row)
+        return None
+    
+    def get_all_learnings(self, active_only: bool = True) -> list[Learning]:
+        """
+        Get all learnings, optionally filtering out superseded ones.
+        
+        Args:
+            active_only: If True, only return non-superseded learnings
+            
+        Returns:
+            List of learnings
+        """
+        conn = self._get_connection()
+        
+        if active_only:
+            rows = conn.execute(
+                "SELECT * FROM learnings WHERE superseded_by IS NULL ORDER BY relevance_score DESC"
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM learnings ORDER BY created_at DESC").fetchall()
+        
+        return [self._row_to_learning(row) for row in rows]
+    
+    def update_learning(self, learning: Learning):
+        """
+        Update an existing learning.
+        
+        Args:
+            learning: Learning with updated values
+        """
+        conn = self._get_connection()
+        
+        conn.execute(
+            """
+            UPDATE learnings SET
+                content = ?,
+                sentiment = ?,
+                confidence = ?,
+                recommendation = ?,
+                superseded_by = ?,
+                relevance_score = ?,
+                times_accessed = ?,
+                last_accessed = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                learning.content,
+                learning.sentiment,
+                learning.confidence,
+                learning.recommendation,
+                learning.superseded_by,
+                learning.relevance_score,
+                learning.times_accessed,
+                learning.last_accessed.timestamp() if learning.last_accessed else None,
+                datetime.now().timestamp(),
+                learning.id,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Learning updated: {learning.id}")
+    
+    def delete_learning(self, learning_id: str) -> bool:
+        """
+        Delete a learning from the database.
+        
+        Args:
+            learning_id: ID of learning to delete
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        conn = self._get_connection()
+        
+        cursor = conn.execute(
+            "DELETE FROM learnings WHERE id = ?",
+            (learning_id,)
+        )
+        conn.commit()
+        
+        deleted = cursor.rowcount > 0
+        if deleted:
+            logger.debug(f"Learning deleted: {learning_id}")
+        
+        return deleted
+    
+    def get_learnings_by_source(self, source: str, limit: int = 100) -> list[Learning]:
+        """
+        Get learnings by source type.
+        
+        Args:
+            source: Source type (e.g., "user_feedback", "self_evaluation")
+            limit: Maximum results
+            
+        Returns:
+            List of learnings
+        """
+        conn = self._get_connection()
+        
+        rows = conn.execute(
+            """
+            SELECT * FROM learnings 
+            WHERE source = ? AND superseded_by IS NULL
+            ORDER BY relevance_score DESC, created_at DESC
+            LIMIT ?
+            """,
+            (source, limit)
+        ).fetchall()
+        
+        return [self._row_to_learning(row) for row in rows]
+    
+    def get_high_relevance_learnings(self, min_score: float = 0.7, limit: int = 50) -> list[Learning]:
+        """
+        Get learnings with high relevance scores.
+        
+        Args:
+            min_score: Minimum relevance score
+            limit: Maximum results
+            
+        Returns:
+            List of high-relevance learnings
+        """
+        conn = self._get_connection()
+        
+        rows = conn.execute(
+            """
+            SELECT * FROM learnings 
+            WHERE relevance_score >= ? AND superseded_by IS NULL
+            ORDER BY relevance_score DESC
+            LIMIT ?
+            """,
+            (min_score, limit)
+        ).fetchall()
+        
+        return [self._row_to_learning(row) for row in rows]
+    
+    def _row_to_learning(self, row: sqlite3.Row) -> Learning:
+        """Convert a database row to a Learning object."""
+        return Learning(
+            id=row['id'],
+            content=row['content'],
+            source=row['source'],
+            sentiment=row['sentiment'],
+            confidence=row['confidence'],
+            tool_name=row['tool_name'],
+            recommendation=row['recommendation'],
+            superseded_by=row['superseded_by'],
+            content_embedding=row['content_embedding'],
+            created_at=datetime.fromtimestamp(row['created_at']) if row['created_at'] else None,
+            updated_at=datetime.fromtimestamp(row['updated_at']) if row['updated_at'] else None,
+            relevance_score=row['relevance_score'] or 1.0,
+            times_accessed=row['times_accessed'] or 0,
+            last_accessed=datetime.fromtimestamp(row['last_accessed']) if row['last_accessed'] else None,
+        )

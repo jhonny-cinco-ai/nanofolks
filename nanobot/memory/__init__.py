@@ -46,6 +46,15 @@ from nanobot.memory.retrieval import (
     MemoryRetrieval,
     create_retrieval,
 )
+from nanobot.memory.learning import (
+    LearningManager,
+    FeedbackDetector,
+    create_learning_manager,
+)
+from nanobot.memory.preferences import (
+    PreferencesAggregator,
+    create_preferences_aggregator,
+)
 
 __all__ = [
     "Event",
@@ -74,4 +83,9 @@ __all__ = [
     "create_context_assembler",
     "MemoryRetrieval",
     "create_retrieval",
+    "LearningManager",
+    "FeedbackDetector",
+    "create_learning_manager",
+    "PreferencesAggregator",
+    "create_preferences_aggregator",
 ]

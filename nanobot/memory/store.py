@@ -1133,6 +1133,153 @@ class MemoryStore:
         
         return stats
     
+    # =========================================================================
+    # Summary Node Operations (for Hierarchical Summaries - Phase 4)
+    # =========================================================================
+    
+    def create_summary_node(self, node: SummaryNode) -> str:
+        """
+        Create a new summary node in the database.
+        
+        Args:
+            node: SummaryNode to create
+            
+        Returns:
+            Node ID
+        """
+        conn = self._get_connection()
+        
+        conn.execute(
+            """
+            INSERT INTO summary_nodes (
+                id, node_type, key, parent_id, summary, summary_embedding,
+                events_since_update, last_updated
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                node.id,
+                node.node_type,
+                node.key,
+                node.parent_id,
+                node.summary,
+                None,  # summary_embedding (not implemented yet)
+                node.events_since_update,
+                node.last_updated.timestamp() if node.last_updated else None,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Summary node created: {node.id}")
+        return node.id
+    
+    def get_summary_node(self, node_id: str) -> Optional[SummaryNode]:
+        """
+        Get a summary node by ID.
+        
+        Args:
+            node_id: Node ID
+            
+        Returns:
+            SummaryNode if found, None otherwise
+        """
+        conn = self._get_connection()
+        
+        row = conn.execute(
+            "SELECT * FROM summary_nodes WHERE id = ?",
+            (node_id,)
+        ).fetchone()
+        
+        if row:
+            return self._row_to_summary_node(row)
+        return None
+    
+    def get_all_summary_nodes(self) -> list[SummaryNode]:
+        """
+        Get all summary nodes.
+        
+        Returns:
+            List of all summary nodes
+        """
+        conn = self._get_connection()
+        
+        rows = conn.execute("SELECT * FROM summary_nodes").fetchall()
+        return [self._row_to_summary_node(row) for row in rows]
+    
+    def update_summary_node(self, node: SummaryNode):
+        """
+        Update an existing summary node.
+        
+        Args:
+            node: SummaryNode with updated values
+        """
+        conn = self._get_connection()
+        
+        conn.execute(
+            """
+            UPDATE summary_nodes SET
+                summary = ?,
+                events_since_update = ?,
+                last_updated = ?
+            WHERE id = ?
+            """,
+            (
+                node.summary,
+                node.events_since_update,
+                node.last_updated.timestamp() if node.last_updated else None,
+                node.id,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Summary node updated: {node.id}")
+    
+    def _row_to_summary_node(self, row: sqlite3.Row) -> SummaryNode:
+        """Convert a database row to a SummaryNode object."""
+        return SummaryNode(
+            id=row['id'],
+            node_type=row['node_type'],
+            key=row['key'],
+            parent_id=row['parent_id'],
+            summary=row['summary'] or "",
+            summary_embedding=row['summary_embedding'],
+            events_since_update=row['events_since_update'] or 0,
+            last_updated=datetime.fromtimestamp(row['last_updated']) if row['last_updated'] else None,
+        )
+    
+    def get_events_for_channel(self, channel: str, limit: int = 50) -> list[Event]:
+        """Get events for a specific channel."""
+        conn = self._get_connection()
+        
+        rows = conn.execute(
+            """
+            SELECT * FROM events 
+            WHERE channel = ? 
+            ORDER BY timestamp DESC 
+            LIMIT ?
+            """,
+            (channel, limit)
+        ).fetchall()
+        
+        return [self._row_to_event(row) for row in rows]
+    
+    def get_entities_for_channel(self, channel: str, limit: int = 20) -> list[Entity]:
+        """Get entities mentioned in a specific channel."""
+        conn = self._get_connection()
+        
+        # Get entities that have events from this channel
+        rows = conn.execute(
+            """
+            SELECT DISTINCT e.* FROM entities e
+            JOIN events ev ON ev.content LIKE '%' || e.name || '%'
+            WHERE ev.channel = ?
+            ORDER BY e.event_count DESC
+            LIMIT ?
+            """,
+            (channel, limit)
+        ).fetchall()
+        
+        return [self._row_to_entity(row) for row in rows]
+    
     def vacuum(self):
         """Optimize database (reclaim space, defragment)."""
         conn = self._get_connection()

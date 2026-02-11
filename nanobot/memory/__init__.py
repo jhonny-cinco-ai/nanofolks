@@ -33,6 +33,10 @@ from nanobot.memory.graph import (
     KnowledgeGraphManager,
     create_entity_resolver,
 )
+from nanobot.memory.summaries import (
+    SummaryTreeManager,
+    create_summary_manager,
+)
 
 __all__ = [
     "Event",
@@ -54,4 +58,6 @@ __all__ = [
     "extract_entities",
     "KnowledgeGraphManager",
     "create_entity_resolver",
+    "SummaryTreeManager",
+    "create_summary_manager",
 ]

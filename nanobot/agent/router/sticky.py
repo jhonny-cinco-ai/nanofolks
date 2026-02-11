@@ -97,9 +97,13 @@ class StickyRouter:
         # regardless of conversation context (cost optimization)
         # Examples: "thanks" (0.90), "good morning" (0.95), "test message" (0.95)
         # These never need expensive models - saves 90% cost vs keeping COMPLEX
+        # IMPORTANT: Don't update session metadata - these are "interruptions" that
+        # shouldn't reset the conversation tier for follow-up messages
         if decision.tier == RoutingTier.SIMPLE and decision.confidence >= 0.90:
-            session.metadata["routing_tier"] = RoutingTier.SIMPLE.value
+            # Keep the original tier in metadata for context continuity
+            # but force this message to use SIMPLE
             decision.metadata["sticky_override"] = "always_simple"
+            decision.metadata["session_tier_preserved"] = session.metadata.get("routing_tier", "unknown")
             return decision
         
         # Get recent conversation context

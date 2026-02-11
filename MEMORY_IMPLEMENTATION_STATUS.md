@@ -2,20 +2,21 @@
 
 **Last Updated:** February 11, 2026  
 **Proposal Version:** MEMORY_PROPOSAL_V2.md  
-**Implementation Progress:** 3 of 7 phases complete
+**Implementation Progress:** 4 of 7 phases complete
 
 ---
 
 ## Executive Summary
 
-The memory system is **significantly implemented** and **functional for knowledge graph operations**. Phases 1-3 are complete (95%), and Phases 4-7 have specific gaps. The system now works for:
+The memory system is **significantly implemented** and **functional for knowledge graph + summarization**. Phases 1-4 are complete (100%), and Phases 5-7 have specific gaps. The system now works for:
 - ✅ Event logging and storage (Phase 1)
 - ✅ Semantic search with embeddings (Phase 2)
-- ✅ **Knowledge graph with entity resolution** (Phase 3 - NEW!)
+- ✅ Knowledge graph with entity resolution (Phase 3)
+- ✅ **Hierarchical summaries for context assembly** (Phase 4 - NEW!)
 
-**Missing:** Context assembly (Phase 5) to connect memory to agent. Learning (Phase 6) is nice to have but not critical.
+**Missing:** Context assembly (Phase 5) to connect memory to agent. This is the **critical next step** - without it, the bot cannot access its memories.
 
-**MVP Status:** ⚠️ USABLE with Knowledge Graph - Ready for Phase 4 (Summaries)
+**MVP Status:** ⚠️ Memory system complete but **DISCONNECTED** - Ready for Phase 5 (Context Assembly)
 
 ---
 
@@ -347,10 +348,10 @@ The memory system has a **solid foundation** with Phases 1-4 complete (100%). It
 Now ready to proceed to **Phase 5 (Context Assembly)** which connects memory to the agent loop.
 
 To reach the full vision, we still need:
-- **Hierarchical summaries** (Phase 4) for efficient context assembly
-- **Context assembly** (Phase 5) to connect memory to agent
+- **Context assembly** (Phase 5) to connect memory to agent ⭐ **CRITICAL**
 - **CLI commands** (Phase 7) for user management
+- **Learning** (Phase 6) to improve from feedback (optional)
 
-**Estimated effort to complete MVP:** 2-3 weeks (Phases 4, 6, 7)
+**Estimated effort to complete MVP:** 2-3 weeks (Phases 5 and 7)
 
-The system is **ready for Phase 4** and can be tested with the knowledge graph features immediately.
+The system is **ready for Phase 5** and can be tested with the complete memory pipeline (events → entities → summaries) immediately.

@@ -260,141 +260,24 @@ class Gliner2Extractor:
             return "general"
 
 
-class SpacyExtractor:
-    """
-    spaCy-based entity extractor (fallback).
-    
-    Lighter weight option when GLiNER2 is not available.
-    Only extracts basic entities (no relations).
-    """
-    
-    def __init__(self, config: ExtractionConfig):
-        """
-        Initialize the spaCy extractor.
-        
-        Args:
-            config: Extraction configuration
-        """
-        self.config = config
-        self._nlp = None
-        
-        logger.info(f"SpacyExtractor initialized (model: {config.spacy_model})")
-    
-    def _ensure_model(self):
-        """Lazy load the spaCy model."""
-        if self._nlp is None:
-            try:
-                import spacy
-                
-                logger.info(f"Loading spaCy model: {self.config.spacy_model}")
-                self._nlp = spacy.load(self.config.spacy_model)
-                logger.info("spaCy model loaded successfully")
-            except ImportError:
-                logger.error("spacy package not installed. Install with: pip install spacy")
-                raise
-            except OSError:
-                logger.error(f"spaCy model {self.config.spacy_model} not found. Download with: python -m spacy download {self.config.spacy_model}")
-                raise
-    
-    async def extract(self, event: Event) -> ExtractionResult:
-        """
-        Extract entities from an event using spaCy.
-        
-        Args:
-            event: Event to extract from
-            
-        Returns:
-            ExtractionResult with entities only (no edges)
-        """
-        self._ensure_model()
-        
-        text = event.content
-        if not text or len(text.strip()) < 3:
-            return ExtractionResult(entities=[], edges=[], facts=[])
-        
-        try:
-            doc = self._nlp(text)
-            
-            entities = []
-            for ent in doc.ents:
-                entity = self._convert_entity(ent, event)
-                if entity:
-                    entities.append(entity)
-            
-            # spaCy doesn't extract relations in the standard pipeline
-            # so we return empty edges and facts
-            return ExtractionResult(entities=entities, edges=[], facts=[])
-            
-        except Exception as e:
-            logger.error(f"spaCy extraction failed: {e}")
-            return ExtractionResult(entities=[], edges=[], facts=[])
-    
-    def _convert_entity(self, spacy_entity, event: Event) -> Optional[Entity]:
-        """Convert spaCy entity to our Entity model."""
-        import uuid
-        from datetime import datetime
-        
-        name = spacy_entity.text.strip()
-        if not name:
-            return None
-        
-        # Map spaCy entity types to our types
-        entity_type = self._normalize_entity_type(spacy_entity.label_)
-        
-        return Entity(
-            id=str(uuid.uuid4()),
-            name=name,
-            entity_type=entity_type,
-            aliases=[name.lower()],
-            description="",
-            source_event_ids=[event.id],
-            event_count=1,
-            first_seen=datetime.now(),
-            last_seen=datetime.now(),
-        )
-    
-    def _normalize_entity_type(self, spacy_type: str) -> str:
-        """Normalize spaCy entity type to our categories."""
-        spacy_type = spacy_type.upper()
-        
-        # Map spaCy NER types
-        type_mapping = {
-            "PERSON": "person",
-            "ORG": "organization",
-            "GPE": "location",  # Geopolitical entity
-            "LOC": "location",
-            "PRODUCT": "concept",
-            "WORK_OF_ART": "concept",
-            "LAW": "concept",
-            "LANGUAGE": "concept",
-            "DATE": "concept",
-            "TIME": "concept",
-        }
-        
-        return type_mapping.get(spacy_type, "concept")
-
-
 async def extract_entities(event: Event, config: ExtractionConfig) -> ExtractionResult:
     """
-    Extract entities from an event using configured extractor.
+    Extract entities from an event using GLiNER2.
     
-    This is the main entry point for extraction. It uses the
-    configured provider (gliner2 or spacy) to extract entities.
+    This is the main entry point for extraction. Uses GLiNER2 for
+    state-of-the-art NER, relationship extraction, and fact extraction.
     
     Args:
         event: Event to extract from
-        config: Extraction configuration
+        config: Extraction configuration (provider must be "gliner2")
         
     Returns:
         ExtractionResult with extracted entities, edges, and facts
     """
-    if config.provider == "gliner2":
-        extractor = Gliner2Extractor(config)
-    elif config.provider == "spacy":
-        extractor = SpacyExtractor(config)
-    else:
-        logger.error(f"Unknown extraction provider: {config.provider}")
-        return ExtractionResult(entities=[], edges=[], facts=[])
+    if config.provider != "gliner2":
+        logger.warning(f"Unsupported extraction provider: {config.provider}. Using GLiNER2.")
+    
+    extractor = Gliner2Extractor(config)
     
     try:
         return await extractor.extract(event)

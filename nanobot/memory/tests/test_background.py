@@ -240,7 +240,7 @@ class TestExtractionIntegration:
             session_key="cli:default",
         )
         
-        config = ExtractionConfig(provider="spacy")
+        config = ExtractionConfig(provider="gliner2")
         result = await extract_entities(event, config)
         
         assert isinstance(result, ExtractionResult)
@@ -266,7 +266,7 @@ class TestBackgroundExtraction:
             config = MemoryConfig(
                 enabled=True,
                 db_path="memory/test.db",
-                extraction=ExtractionConfig(provider="spacy")
+                extraction=ExtractionConfig(provider="gliner2")
             )
             store = MemoryStore(config, workspace)
             

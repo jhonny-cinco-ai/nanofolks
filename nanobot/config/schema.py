@@ -317,9 +317,8 @@ class EmbeddingConfig(BaseModel):
 class ExtractionConfig(BaseModel):
     """Entity extraction configuration."""
     enabled: bool = True
-    provider: str = "gliner2"           # "gliner2", "spacy", "api"
+    provider: str = "gliner2"           # "gliner2" (only option now)
     gliner2_model: str = "fastino/gliner2-base-v1"
-    spacy_model: str = "en_core_web_sm"
     interval_seconds: int = 60
     batch_size: int = 20
     api_fallback: bool = False          # Use LLM for complex extractions

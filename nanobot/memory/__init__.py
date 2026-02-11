@@ -26,7 +26,6 @@ from nanobot.memory.background import (
 )
 from nanobot.memory.extraction import (
     Gliner2Extractor,
-    SpacyExtractor,
     ExtractionResult,
     extract_entities,
 )
@@ -51,7 +50,6 @@ __all__ = [
     "ActivityTracker",
     "BackgroundProcessor",
     "Gliner2Extractor",
-    "SpacyExtractor",
     "ExtractionResult",
     "extract_entities",
     "KnowledgeGraphManager",

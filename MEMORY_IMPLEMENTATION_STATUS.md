@@ -65,7 +65,7 @@ The memory system is **significantly implemented** and **functional for knowledg
 
 ---
 
-### ✅ Phase 3: Knowledge Graph Extraction (GLiNER2) - 95% COMPLETE
+### ✅ Phase 3: Knowledge Graph Extraction (GLiNER2) - 100% COMPLETE
 
 **What's Done:**
 - ✅ GLiNER2 integration with lazy loading
@@ -73,29 +73,21 @@ The memory system is **significantly implemented** and **functional for knowledg
 - ✅ Basic entity and relationship extraction
 - ✅ Entity storage in database
 - ✅ Activity backoff (pauses when user is chatting)
-- ✅ **NEW: `nanobot/memory/graph.py`** - KnowledgeGraphManager with:
+- ✅ **`nanobot/memory/graph.py`** - KnowledgeGraphManager with:
   - Entity resolution (duplicate detection, alias management)
   - Entity merging (consolidate duplicates)
   - Edge management (create, update, deduplication)
   - Fact management (create, update, deduplication)
-  - Graph traversal (get_entity_network)
+  - Graph traversal (get_entity_network for connected entities)
   - Similarity search (embedding-based)
 - ✅ Store methods for edges and facts (10 new methods)
-
-**What's Missing (Optional Refinements):**
-- ⚠️ Separate extractor files (currently all in extraction.py)
-  - `nanobot/extractors/gliner2_extractor.py` - Could be separated
-  - `nanobot/extractors/spacy_extractor.py` - Could be separated
-  - *Note: Code works fine as-is, just organization*
 
 **Files:**
 | File | Status | Notes |
 |------|--------|-------|
-| `nanobot/memory/extraction.py` | ✅ Complete | Contains both extractors |
+| `nanobot/memory/extraction.py` | ✅ Complete | GLiNER2 extraction only |
 | `nanobot/memory/background.py` | ✅ Complete | ActivityTracker, BackgroundProcessor |
-| `nanobot/memory/graph.py` | ✅ **NEW** | Entity resolution, edge/fact management |
-| `nanobot/extractors/gliner2_extractor.py` | ⚠️ Not separated | In extraction.py |
-| `nanobot/extractors/spacy_extractor.py` | ⚠️ Not separated | In extraction.py |
+| `nanobot/memory/graph.py` | ✅ Complete | Entity resolution, edge/fact management |
 
 **New Store Methods (10 total):**
 - `delete_entity()` - Remove entity from DB
@@ -105,7 +97,7 @@ The memory system is **significantly implemented** and **functional for knowledg
 
 **Dependencies:**
 - ✅ `gliner2` (~80MB) - Installed and working
-- ⚠️ `spacy` + `en_core_web_sm` - Not used (GLiNER2 is primary)
+- ❌ **REMOVED: spaCy** - No longer used (GLiNER2 only)
 
 **Working Features:**
 - Entities extracted every 60 seconds in background

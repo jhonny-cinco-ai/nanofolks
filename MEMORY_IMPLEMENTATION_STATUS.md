@@ -2,15 +2,20 @@
 
 **Last Updated:** February 11, 2026  
 **Proposal Version:** MEMORY_PROPOSAL_V2.md  
-**Implementation Progress:** 2.5 of 7 phases complete
+**Implementation Progress:** 3 of 7 phases complete
 
 ---
 
 ## Executive Summary
 
-The memory system is **partially implemented** and **functional for basic operations**. Phases 1-2 are complete, Phase 3 is 60% done, and Phases 4-7 have significant gaps. The system works for event logging, entity tracking, and semantic search, but lacks hierarchical summaries, learning, and context assembly.
+The memory system is **significantly implemented** and **functional for knowledge graph operations**. Phases 1-3 are complete (95%), and Phases 4-7 have specific gaps. The system now works for:
+- ✅ Event logging and storage (Phase 1)
+- ✅ Semantic search with embeddings (Phase 2)
+- ✅ **Knowledge graph with entity resolution** (Phase 3 - NEW!)
 
-**MVP Status:** ⚠️ USABLE but INCOMPLETE
+**Missing:** Hierarchical summaries (Phase 4), learning (Phase 5), and context assembly (Phase 6).
+
+**MVP Status:** ⚠️ USABLE with Knowledge Graph - Ready for Phase 4 (Summaries)
 
 ---
 
@@ -60,7 +65,7 @@ The memory system is **partially implemented** and **functional for basic operat
 
 ---
 
-### ⚠️ Phase 3: Knowledge Graph Extraction (GLiNER2) - 60% COMPLETE
+### ✅ Phase 3: Knowledge Graph Extraction (GLiNER2) - 95% COMPLETE
 
 **What's Done:**
 - ✅ GLiNER2 integration with lazy loading
@@ -68,21 +73,35 @@ The memory system is **partially implemented** and **functional for basic operat
 - ✅ Basic entity and relationship extraction
 - ✅ Entity storage in database
 - ✅ Activity backoff (pauses when user is chatting)
+- ✅ **NEW: `nanobot/memory/graph.py`** - KnowledgeGraphManager with:
+  - Entity resolution (duplicate detection, alias management)
+  - Entity merging (consolidate duplicates)
+  - Edge management (create, update, deduplication)
+  - Fact management (create, update, deduplication)
+  - Graph traversal (get_entity_network)
+  - Similarity search (embedding-based)
+- ✅ Store methods for edges and facts (10 new methods)
 
-**What's Missing:**
-- ❌ `nanobot/memory/graph.py` - Advanced entity resolution, edge management, fact deduplication
-- ❌ Separate extractor files (currently all in extraction.py)
-- ⚠️ Full fact extraction and deduplication
-- ⚠️ Schema-based extraction
+**What's Missing (Optional Refinements):**
+- ⚠️ Separate extractor files (currently all in extraction.py)
+  - `nanobot/extractors/gliner2_extractor.py` - Could be separated
+  - `nanobot/extractors/spacy_extractor.py` - Could be separated
+  - *Note: Code works fine as-is, just organization*
 
 **Files:**
 | File | Status | Notes |
 |------|--------|-------|
 | `nanobot/memory/extraction.py` | ✅ Complete | Contains both extractors |
 | `nanobot/memory/background.py` | ✅ Complete | ActivityTracker, BackgroundProcessor |
-| `nanobot/memory/graph.py` | ❌ Missing | Entity resolution, fact deduplication |
-| `nanobot/extractors/gliner2_extractor.py` | ❌ Missing | In extraction.py instead |
-| `nanobot/extractors/spacy_extractor.py` | ⚠️ Stub | Directory exists, empty implementation |
+| `nanobot/memory/graph.py` | ✅ **NEW** | Entity resolution, edge/fact management |
+| `nanobot/extractors/gliner2_extractor.py` | ⚠️ Not separated | In extraction.py |
+| `nanobot/extractors/spacy_extractor.py` | ⚠️ Not separated | In extraction.py |
+
+**New Store Methods (10 total):**
+- `delete_entity()` - Remove entity from DB
+- `create_edge()`, `get_edge()`, `get_edges_for_entity()`, `update_edge()` - Edge CRUD
+- `create_fact()`, `get_facts_for_entity()`, `get_facts_for_subject()`, `update_fact()` - Fact CRUD
+- `search_similar_entities()` - Embedding-based similarity search
 
 **Dependencies:**
 - ✅ `gliner2` (~80MB) - Installed and working
@@ -91,6 +110,9 @@ The memory system is **partially implemented** and **functional for basic operat
 **Working Features:**
 - Entities extracted every 60 seconds in background
 - Relationships stored as edges
+- **Entity resolution prevents duplicates** ("John" vs "john" vs "J. Smith")
+- **Fact deduplication** (avoids storing same fact multiple times)
+- **Graph queries** (get network of connected entities)
 - Events marked with extraction_status
 
 ---
@@ -306,13 +328,18 @@ Location: `tests/memory/`
 
 ## Conclusion
 
-The memory system has a **solid foundation** with Phases 1-2 complete and Phase 3 partially done. It's **functional for basic operations** like event logging, entity tracking, and semantic search.
+The memory system has a **solid foundation** with Phases 1-3 complete (95%). It's **functional for knowledge graph operations** including:
+- ✅ Event logging and storage
+- ✅ Semantic search with embeddings
+- ✅ **Knowledge graph with entity resolution** (NEW - Phase 3 complete!)
 
-However, to reach the full vision of the proposal, we need:
-- **Hierarchical summaries** (Phase 4) for efficient context
+Now ready to proceed to **Phase 4 (Hierarchical Summaries)** which builds on the knowledge graph.
+
+To reach the full vision, we still need:
+- **Hierarchical summaries** (Phase 4) for efficient context assembly
 - **Context assembly** (Phase 6) to connect memory to agent
 - **CLI commands** (Phase 7) for user management
 
 **Estimated effort to complete MVP:** 2-3 weeks (Phases 4, 6, 7)
 
-The system is **ready for testing and gradual rollout** in its current state, but users will get the full "memory experience" only after Phases 4-7 are complete.
+The system is **ready for Phase 4** and can be tested with the knowledge graph features immediately.

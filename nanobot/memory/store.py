@@ -725,6 +725,349 @@ class MemoryStore:
         
         return [self._row_to_entity(row) for row in rows]
     
+    def delete_entity(self, entity_id: str) -> bool:
+        """
+        Delete an entity from the database.
+        
+        Args:
+            entity_id: ID of entity to delete
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        conn = self._get_connection()
+        
+        cursor = conn.execute(
+            "DELETE FROM entities WHERE id = ?",
+            (entity_id,)
+        )
+        conn.commit()
+        
+        deleted = cursor.rowcount > 0
+        if deleted:
+            logger.debug(f"Entity deleted: {entity_id}")
+        
+        return deleted
+    
+    # =========================================================================
+    # Edge Operations (for Knowledge Graph)
+    # =========================================================================
+    
+    def create_edge(self, edge: Edge) -> str:
+        """
+        Create a new edge in the database.
+        
+        Args:
+            edge: Edge to create
+            
+        Returns:
+            Edge ID
+        """
+        conn = self._get_connection()
+        
+        conn.execute(
+            """
+            INSERT INTO edges (
+                id, source_entity_id, target_entity_id, relation_type,
+                strength, confidence, evidence_count, metadata,
+                first_seen, last_updated
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                edge.id,
+                edge.source_entity_id,
+                edge.target_entity_id,
+                edge.relation_type,
+                edge.strength,
+                edge.confidence,
+                edge.evidence_count,
+                json.dumps(edge.metadata) if edge.metadata else None,
+                edge.first_seen.timestamp() if edge.first_seen else None,
+                edge.last_updated.timestamp() if edge.last_updated else None,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Edge created: {edge.id}")
+        return edge.id
+    
+    def get_edge(
+        self,
+        source_id: str,
+        target_id: str,
+        relation_type: str
+    ) -> Optional[Edge]:
+        """
+        Get a specific edge between two entities.
+        
+        Args:
+            source_id: Source entity ID
+            target_id: Target entity ID
+            relation_type: Type of relationship
+            
+        Returns:
+            Edge if found, None otherwise
+        """
+        conn = self._get_connection()
+        
+        row = conn.execute(
+            """
+            SELECT * FROM edges
+            WHERE source_entity_id = ? AND target_entity_id = ? AND relation_type = ?
+            """,
+            (source_id, target_id, relation_type)
+        ).fetchone()
+        
+        if row:
+            return self._row_to_edge(row)
+        return None
+    
+    def get_edges_for_entity(
+        self,
+        entity_id: str,
+        min_strength: float = 0.0
+    ) -> list[Edge]:
+        """
+        Get all edges connected to an entity.
+        
+        Args:
+            entity_id: Entity ID
+            min_strength: Minimum edge strength to include
+            
+        Returns:
+            List of edges
+        """
+        conn = self._get_connection()
+        
+        rows = conn.execute(
+            """
+            SELECT * FROM edges
+            WHERE (source_entity_id = ? OR target_entity_id = ?)
+            AND strength >= ?
+            ORDER BY strength DESC
+            """,
+            (entity_id, entity_id, min_strength)
+        ).fetchall()
+        
+        return [self._row_to_edge(row) for row in rows]
+    
+    def update_edge(self, edge: Edge):
+        """
+        Update an existing edge.
+        
+        Args:
+            edge: Edge with updated values
+        """
+        conn = self._get_connection()
+        
+        conn.execute(
+            """
+            UPDATE edges SET
+                strength = ?,
+                confidence = ?,
+                evidence_count = ?,
+                metadata = ?,
+                last_updated = ?
+            WHERE id = ?
+            """,
+            (
+                edge.strength,
+                edge.confidence,
+                edge.evidence_count,
+                json.dumps(edge.metadata) if edge.metadata else None,
+                edge.last_updated.timestamp() if edge.last_updated else None,
+                edge.id,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Edge updated: {edge.id}")
+    
+    def _row_to_edge(self, row: sqlite3.Row) -> Edge:
+        """Convert a database row to an Edge object."""
+        metadata = {}
+        if row['metadata']:
+            metadata = json.loads(row['metadata'])
+        
+        return Edge(
+            id=row['id'],
+            source_entity_id=row['source_entity_id'],
+            target_entity_id=row['target_entity_id'],
+            relation_type=row['relation_type'],
+            strength=row['strength'],
+            confidence=row['confidence'],
+            evidence_count=row['evidence_count'],
+            metadata=metadata,
+            first_seen=datetime.fromtimestamp(row['first_seen']) if row['first_seen'] else None,
+            last_updated=datetime.fromtimestamp(row['last_updated']) if row['last_updated'] else None,
+        )
+    
+    # =========================================================================
+    # Fact Operations (for Knowledge Graph)
+    # =========================================================================
+    
+    def create_fact(self, fact: Fact) -> str:
+        """
+        Create a new fact in the database.
+        
+        Args:
+            fact: Fact to create
+            
+        Returns:
+            Fact ID
+        """
+        conn = self._get_connection()
+        
+        conn.execute(
+            """
+            INSERT INTO facts (
+                id, subject_id, predicate, object_value,
+                confidence, source_event_ids, first_seen, last_seen
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                fact.id,
+                fact.subject_id,
+                fact.predicate,
+                fact.object_value,
+                fact.confidence,
+                json.dumps(fact.source_event_ids),
+                fact.first_seen.timestamp() if fact.first_seen else None,
+                fact.last_seen.timestamp() if fact.last_seen else None,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Fact created: {fact.id}")
+        return fact.id
+    
+    def get_facts_for_entity(self, entity_id: str) -> list[Fact]:
+        """
+        Get all facts about an entity (as subject or object).
+        
+        Args:
+            entity_id: Entity ID
+            
+        Returns:
+            List of facts
+        """
+        conn = self._get_connection()
+        
+        rows = conn.execute(
+            """
+            SELECT * FROM facts
+            WHERE subject_id = ? OR object_id = ?
+            ORDER BY confidence DESC
+            """,
+            (entity_id, entity_id)
+        ).fetchall()
+        
+        return [self._row_to_fact(row) for row in rows]
+    
+    def get_facts_for_subject(self, subject_id: str) -> list[Fact]:
+        """
+        Get all facts where entity is the subject.
+        
+        Args:
+            subject_id: Subject entity ID
+            
+        Returns:
+            List of facts
+        """
+        conn = self._get_connection()
+        
+        rows = conn.execute(
+            """
+            SELECT * FROM facts
+            WHERE subject_id = ?
+            ORDER BY confidence DESC
+            """,
+            (subject_id,)
+        ).fetchall()
+        
+        return [self._row_to_fact(row) for row in rows]
+    
+    def update_fact(self, fact: Fact):
+        """
+        Update an existing fact.
+        
+        Args:
+            fact: Fact with updated values
+        """
+        conn = self._get_connection()
+        
+        conn.execute(
+            """
+            UPDATE facts SET
+                object_value = ?,
+                confidence = ?,
+                evidence_count = ?,
+                last_seen = ?
+            WHERE id = ?
+            """,
+            (
+                fact.object_value,
+                fact.confidence,
+                fact.evidence_count,
+                fact.last_seen.timestamp() if fact.last_seen else None,
+                fact.id,
+            )
+        )
+        conn.commit()
+        
+        logger.debug(f"Fact updated: {fact.id}")
+    
+    def _row_to_fact(self, row: sqlite3.Row) -> Fact:
+        """Convert a database row to a Fact object."""
+        source_ids = []
+        if row['source_event_ids']:
+            source_ids = json.loads(row['source_event_ids'])
+        
+        return Fact(
+            id=row['id'],
+            subject_id=row['subject_id'],
+            predicate=row['predicate'],
+            object_value=row['object_value'],
+            confidence=row['confidence'],
+            source_event_ids=source_ids,
+            first_seen=datetime.fromtimestamp(row['first_seen']) if row['first_seen'] else None,
+            last_seen=datetime.fromtimestamp(row['last_seen']) if row['last_seen'] else None,
+        )
+    
+    def search_similar_entities(
+        self,
+        embedding: list[float],
+        limit: int = 10,
+        threshold: float = 0.7
+    ) -> list[Entity]:
+        """
+        Search for entities with similar embeddings.
+        
+        Args:
+            embedding: Query embedding vector
+            limit: Maximum results
+            threshold: Minimum similarity (0-1)
+            
+        Returns:
+            List of similar entities
+        """
+        # Get all entities with embeddings
+        entities = self.get_entities_by_type("person", limit=1000)  # Get all types
+        
+        # Calculate cosine similarity for each
+        from nanobot.memory.embeddings import cosine_similarity
+        
+        similarities = []
+        for entity in entities:
+            if entity.name_embedding:
+                sim = cosine_similarity(embedding, entity.name_embedding)
+                if sim >= threshold:
+                    similarities.append((entity, sim))
+        
+        # Sort by similarity and return top results
+        similarities.sort(key=lambda x: x[1], reverse=True)
+        return [e for e, _ in similarities[:limit]]
+    
     def _row_to_entity(self, row: sqlite3.Row) -> Entity:
         """Convert a database row to an Entity object."""
         # Deserialize name embedding

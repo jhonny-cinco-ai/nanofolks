@@ -30,6 +30,10 @@ from nanobot.memory.extraction import (
     ExtractionResult,
     extract_entities,
 )
+from nanobot.memory.graph import (
+    KnowledgeGraphManager,
+    create_entity_resolver,
+)
 
 __all__ = [
     "Event",
@@ -50,4 +54,6 @@ __all__ = [
     "SpacyExtractor",
     "ExtractionResult",
     "extract_entities",
+    "KnowledgeGraphManager",
+    "create_entity_resolver",
 ]

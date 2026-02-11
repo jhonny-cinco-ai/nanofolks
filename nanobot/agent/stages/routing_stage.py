@@ -69,6 +69,11 @@ class RoutingStage:
         # Initialize components
         self._init_classifier()
         self._init_calibration()
+        
+        # OPTIMIZATION: Throttle calibration checks to reduce overhead
+        # Check every N requests instead of every single request
+        self._calibration_check_counter = 0
+        self._calibration_check_interval = 100  # Check every 100 requests
     
     def _init_classifier(self) -> None:
         """Initialize the classification components."""
@@ -137,8 +142,12 @@ class RoutingStage:
         if self.calibration:
             self._record_for_calibration(ctx, decision)
         
-        # Check if calibration needed
-        if self.calibration and self.calibration.should_calibrate():
+        # Check if calibration needed (throttled to reduce overhead)
+        # Only check every N requests instead of every single request
+        self._calibration_check_counter += 1
+        if (self._calibration_check_counter % self._calibration_check_interval == 0 and
+            self.calibration and 
+            self.calibration.should_calibrate()):
             self._run_calibration()
         
         return ctx

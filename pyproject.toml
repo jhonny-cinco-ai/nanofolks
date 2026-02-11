@@ -38,6 +38,7 @@ dependencies = [
     "qq-botpy>=1.0.0",
     "python-socks[asyncio]>=2.4.0",
     "fastembed>=0.3.0",
+    "gliner2>=0.1.0",
 ]
 
 [project.optional-dependencies]

@@ -86,6 +86,7 @@ class AgentLoop:
                 config=routing_config,
                 provider=provider,
                 workspace=workspace,
+                cron_service=cron_service,  # Pass cron to check for scheduled calibration
             )
             logger.info("Smart routing enabled")
         

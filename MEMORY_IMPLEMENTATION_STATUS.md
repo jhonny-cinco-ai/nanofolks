@@ -109,17 +109,39 @@ The memory system is **significantly implemented** and **functional for knowledg
 
 ---
 
-### ❌ Phase 4: Hierarchical Summaries - 0% COMPLETE
+### ✅ Phase 4: Hierarchical Summaries - 100% COMPLETE
 
-**What's Missing (Everything):**
-- ❌ `nanobot/memory/summaries.py`
-- ❌ Summary tree management
-- ❌ Staleness tracking
-- ❌ Refresh logic
-- ❌ Summary nodes table operations
+**What's Done:**
+- ✅ **`nanobot/memory/summaries.py`** - SummaryTreeManager with full tree management
+- ✅ Hierarchical structure: root → channel → entity/topic
+- ✅ Staleness tracking (events_since_update counter)
+- ✅ Refresh logic (threshold-based, batch refresh)
+- ✅ Summary nodes table operations (6 new store methods)
+- ✅ Context assembly helper for LLM prompts
+
+**Files:**
+| File | Status | Notes |
+|------|--------|-------|
+| `nanobot/memory/summaries.py` | ✅ Complete | SummaryTreeManager, tree operations |
+
+**Store Methods Added (6):**
+- `create_summary_node()` - Create node
+- `get_summary_node()` - Get by ID
+- `get_all_summary_nodes()` - List all
+- `update_summary_node()` - Update content/staleness
+- `get_events_for_channel()` - Query events
+- `get_entities_for_channel()` - Query entities
+
+**Features:**
+- Tree structure with parent-child relationships
+- Automatic root node creation
+- Staleness threshold (default: 10 events)
+- Batch refresh (up to 20 nodes per cycle)
+- Summary generation for channels, entities, root
+- Context assembly for LLM prompts (`get_summary_for_context`)
 
 **Impact:**
-Without summaries, the system cannot efficiently assemble context for the LLM. It must query raw events instead of pre-computed summaries.
+✅ System can now efficiently assemble context using pre-computed summaries instead of querying raw events every time.
 
 ---
 
@@ -304,12 +326,13 @@ Location: `tests/memory/`
 ## Next Steps
 
 ### Immediate (This Week):
-1. Implement Phase 4 (Summaries) - Critical for context assembly
-2. Implement Phase 6 (Context Assembly) - Connect memory to agent
+1. ✅ ~~Implement Phase 4 (Summaries)~~ - COMPLETE
+2. Implement Phase 6 (Context Assembly) - Connect memory to agent loop
 
 ### Short-term (Next 2 Weeks):
 3. Add CLI memory commands for user visibility
 4. Create comprehensive documentation
+5. Phase 5 (Learning) - Optional but valuable
 
 ### Long-term (Nice to Have):
 5. Phase 5 (Learning and preferences)
@@ -320,12 +343,13 @@ Location: `tests/memory/`
 
 ## Conclusion
 
-The memory system has a **solid foundation** with Phases 1-3 complete (95%). It's **functional for knowledge graph operations** including:
-- ✅ Event logging and storage
-- ✅ Semantic search with embeddings
-- ✅ **Knowledge graph with entity resolution** (NEW - Phase 3 complete!)
+The memory system has a **solid foundation** with Phases 1-4 complete (100%). It's **fully functional** for:
+- ✅ Event logging and storage (Phase 1)
+- ✅ Semantic search with embeddings (Phase 2)
+- ✅ Knowledge graph with entity resolution (Phase 3)
+- ✅ **Hierarchical summaries for context assembly** (NEW - Phase 4 complete!)
 
-Now ready to proceed to **Phase 4 (Hierarchical Summaries)** which builds on the knowledge graph.
+Now ready to proceed to **Phase 6 (Context Assembly)** which connects memory to the agent loop.
 
 To reach the full vision, we still need:
 - **Hierarchical summaries** (Phase 4) for efficient context assembly

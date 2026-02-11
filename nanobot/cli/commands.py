@@ -655,7 +655,27 @@ def gateway(
 
     # Set cron callback (needs agent)
     async def on_cron_job(job: CronJob) -> str | None:
-        """Execute a cron job through the agent."""
+        """Execute a cron job through the agent or handle system jobs."""
+        # Handle calibration jobs (system jobs, not user messages)
+        if job.payload.message == "CALIBRATE_ROUTING":
+            try:
+                from nanobot.agent.router.calibration import CalibrationManager
+                calibration = CalibrationManager(
+                    patterns_file=config.workspace_path / "routing_patterns.json",
+                    analytics_file=config.workspace_path / "routing_stats.json",
+                    config=config.routing.auto_calibration.model_dump() if config.routing.auto_calibration else None,
+                )
+                if calibration.should_calibrate():
+                    results = calibration.calibrate()
+                    logger.info(f"Scheduled calibration completed: {results}")
+                    return f"Calibration completed: {results.get('patterns_added', 0)} patterns added, {results.get('patterns_removed', 0)} removed"
+                else:
+                    return "Calibration not needed yet (insufficient data or too soon)"
+            except Exception as e:
+                logger.error(f"Calibration job failed: {e}")
+                return f"Calibration failed: {e}"
+        
+        # Regular user job - process through agent
         response = await agent.process_direct(
             job.payload.message,
             session_key=f"cron:{job.id}",

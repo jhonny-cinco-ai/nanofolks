@@ -163,6 +163,138 @@ class ExactPhraseMatcher:
             ("npm run", RoutingTier.CODING, 1.0),
             ("pip install", RoutingTier.CODING, 1.0),
             ("cargo build", RoutingTier.CODING, 1.0),
+            
+            # ========== EXPANDED PHRASES (60+ additional) ==========
+            # More git commands
+            ("git stash", RoutingTier.CODING, 1.0),
+            ("git stash pop", RoutingTier.CODING, 1.0),
+            ("git revert", RoutingTier.CODING, 1.0),
+            ("git reset", RoutingTier.CODING, 1.0),
+            ("git cherry-pick", RoutingTier.CODING, 1.0),
+            ("git bisect", RoutingTier.CODING, 1.0),
+            ("git tag", RoutingTier.CODING, 1.0),
+            ("git remote", RoutingTier.CODING, 1.0),
+            ("git show", RoutingTier.CODING, 1.0),
+            ("git blame", RoutingTier.CODING, 1.0),
+            
+            # More docker commands
+            ("docker exec", RoutingTier.CODING, 1.0),
+            ("docker rm", RoutingTier.CODING, 1.0),
+            ("docker rmi", RoutingTier.CODING, 1.0),
+            ("docker volume", RoutingTier.CODING, 1.0),
+            ("docker network", RoutingTier.CODING, 1.0),
+            ("docker pull", RoutingTier.CODING, 1.0),
+            ("docker push", RoutingTier.CODING, 1.0),
+            ("docker system prune", RoutingTier.CODING, 1.0),
+            
+            # Testing & Quality
+            ("run tests", RoutingTier.CODING, 1.0),
+            ("run test", RoutingTier.CODING, 1.0),
+            ("test it", RoutingTier.CODING, 1.0),
+            ("check coverage", RoutingTier.CODING, 1.0),
+            ("coverage report", RoutingTier.CODING, 1.0),
+            ("lint code", RoutingTier.CODING, 1.0),
+            ("eslint", RoutingTier.CODING, 1.0),
+            ("prettier", RoutingTier.CODING, 1.0),
+            ("format code", RoutingTier.CODING, 1.0),
+            ("black", RoutingTier.CODING, 1.0),
+            ("flake8", RoutingTier.CODING, 1.0),
+            ("mypy", RoutingTier.CODING, 1.0),
+            
+            # Debugging & Errors
+            ("debug this", RoutingTier.COMPLEX, 1.0),
+            ("debug it", RoutingTier.COMPLEX, 1.0),
+            ("fix this", RoutingTier.CODING, 1.0),
+            ("fix it", RoutingTier.CODING, 1.0),
+            ("stack trace", RoutingTier.COMPLEX, 1.0),
+            ("error log", RoutingTier.COMPLEX, 1.0),
+            ("log file", RoutingTier.COMPLEX, 1.0),
+            ("breakpoint", RoutingTier.CODING, 1.0),
+            ("debug mode", RoutingTier.CODING, 1.0),
+            ("traceback", RoutingTier.COMPLEX, 1.0),
+            ("not working", RoutingTier.COMPLEX, 1.0),
+            ("broken", RoutingTier.COMPLEX, 1.0),
+            
+            # Build & Deploy
+            ("build it", RoutingTier.CODING, 1.0),
+            ("build project", RoutingTier.CODING, 1.0),
+            ("compile code", RoutingTier.CODING, 1.0),
+            ("deploy it", RoutingTier.CODING, 1.0),
+            ("deploy app", RoutingTier.CODING, 1.0),
+            ("make deploy", RoutingTier.CODING, 1.0),
+            ("webpack", RoutingTier.CODING, 1.0),
+            ("vite", RoutingTier.CODING, 1.0),
+            ("rollup", RoutingTier.CODING, 1.0),
+            ("esbuild", RoutingTier.CODING, 1.0),
+            
+            # File Operations
+            ("read file", RoutingTier.CODING, 1.0),
+            ("write file", RoutingTier.CODING, 1.0),
+            ("delete file", RoutingTier.CODING, 1.0),
+            ("copy file", RoutingTier.CODING, 1.0),
+            ("move file", RoutingTier.CODING, 1.0),
+            ("parse json", RoutingTier.CODING, 1.0),
+            ("parse csv", RoutingTier.CODING, 1.0),
+            ("read json", RoutingTier.CODING, 1.0),
+            ("read csv", RoutingTier.CODING, 1.0),
+            ("extract data", RoutingTier.MEDIUM, 1.0),
+            
+            # Database
+            ("sql query", RoutingTier.CODING, 1.0),
+            ("database query", RoutingTier.CODING, 1.0),
+            ("select from", RoutingTier.CODING, 1.0),
+            ("insert into", RoutingTier.CODING, 1.0),
+            ("update table", RoutingTier.CODING, 1.0),
+            ("delete from", RoutingTier.CODING, 1.0),
+            ("migration", RoutingTier.CODING, 1.0),
+            ("seed database", RoutingTier.CODING, 1.0),
+            
+            # API & Web
+            ("api endpoint", RoutingTier.CODING, 1.0),
+            ("rest api", RoutingTier.CODING, 1.0),
+            ("graphql", RoutingTier.CODING, 1.0),
+            ("fetch data", RoutingTier.CODING, 1.0),
+            ("http request", RoutingTier.CODING, 1.0),
+            ("post request", RoutingTier.CODING, 1.0),
+            ("get request", RoutingTier.CODING, 1.0),
+            ("curl", RoutingTier.CODING, 1.0),
+            
+            # Social - extended
+            ("how are you doing", RoutingTier.SIMPLE, 1.0),
+            ("hows it going", RoutingTier.SIMPLE, 1.0),
+            ("what is new", RoutingTier.SIMPLE, 1.0),
+            ("whats up", RoutingTier.SIMPLE, 1.0),
+            ("long time no see", RoutingTier.SIMPLE, 1.0),
+            ("nice to meet you", RoutingTier.SIMPLE, 1.0),
+            ("see you later", RoutingTier.SIMPLE, 1.0),
+            ("take care", RoutingTier.SIMPLE, 1.0),
+            ("have a good one", RoutingTier.SIMPLE, 1.0),
+            ("cya", RoutingTier.SIMPLE, 1.0),
+            ("ttyl", RoutingTier.SIMPLE, 1.0),
+            
+            # Simple questions - extended
+            ("what is this", RoutingTier.SIMPLE, 1.0),
+            ("how do i", RoutingTier.SIMPLE, 1.0),
+            ("how to", RoutingTier.SIMPLE, 1.0),
+            ("can you", RoutingTier.SIMPLE, 1.0),
+            ("is it", RoutingTier.SIMPLE, 1.0),
+            ("do you", RoutingTier.SIMPLE, 1.0),
+            ("are you", RoutingTier.SIMPLE, 1.0),
+            ("will you", RoutingTier.SIMPLE, 1.0),
+            ("should i", RoutingTier.SIMPLE, 1.0),
+            ("could you", RoutingTier.SIMPLE, 1.0),
+            
+            # Common single words
+            ("stop", RoutingTier.SIMPLE, 1.0),
+            ("start", RoutingTier.SIMPLE, 1.0),
+            ("go", RoutingTier.SIMPLE, 1.0),
+            ("wait", RoutingTier.SIMPLE, 1.0),
+            ("pause", RoutingTier.SIMPLE, 1.0),
+            ("continue", RoutingTier.SIMPLE, 1.0),
+            ("retry", RoutingTier.SIMPLE, 1.0),
+            ("cancel", RoutingTier.SIMPLE, 1.0),
+            ("abort", RoutingTier.SIMPLE, 1.0),
+            ("confirm", RoutingTier.SIMPLE, 1.0),
         ]
         
         for phrase, tier, confidence in phrases:

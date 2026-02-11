@@ -442,7 +442,19 @@ def _configure_single_channel(name: str, schema: dict):
             for field_name, field_info in schema['fields'].items():
                 if field_info.get('type') == 'boolean':
                     continue
-                field_label = field_name.replace('_', ' ').title()
+                # Create descriptive label based on field name
+                if field_name == 'token':
+                    field_label = "bot token"
+                elif field_name == 'botToken':
+                    field_label = "bot token"
+                elif field_name == 'appToken':
+                    field_label = "app token"
+                elif field_name == 'allowFrom':
+                    field_label = "allowed users (allowFrom)"
+                elif field_name == 'bridgeUrl':
+                    field_label = "bridge URL"
+                else:
+                    field_label = field_name.replace('_', ' ').title()
                 console.print(f"  [{option_num}] Configure {field_label}")
                 menu_options.append(('field', field_name, field_info))
                 option_num += 1
@@ -515,7 +527,21 @@ def _configure_single_channel(name: str, schema: dict):
             if current_value:
                 console.print(f"[dim]Current value: {current_value}[/dim]")
             
-            value = Prompt.ask(f"Enter new value for {field_name}", default=current_value if current_value else '')
+            # Create descriptive prompt based on field name
+            if field_name == 'token':
+                prompt_text = "Enter bot token"
+            elif field_name == 'botToken':
+                prompt_text = "Enter bot token"
+            elif field_name == 'appToken':
+                prompt_text = "Enter app token"
+            elif field_name == 'allowFrom':
+                prompt_text = "Enter allowed user IDs/usernames (comma-separated, leave empty for all users)"
+            elif field_name == 'bridgeUrl':
+                prompt_text = "Enter bridge URL"
+            else:
+                prompt_text = f"Enter {field_name.replace('_', ' ')}"
+            
+            value = Prompt.ask(prompt_text, default=current_value if current_value else '')
             
             if value:
                 result = asyncio.run(tool.execute(

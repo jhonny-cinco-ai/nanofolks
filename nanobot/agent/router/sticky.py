@@ -88,10 +88,20 @@ class StickyRouter:
         Apply sticky routing logic.
         
         Rules:
-        1. If no recent complex messages, use current decision
-        2. If recent messages were complex, check if we should downgrade
-        3. Downgrade only if current message is explicitly simple with high confidence
+        1. If message is OBVIOUSLY simple (≥0.95 confidence), always use SIMPLE
+        2. If no recent complex messages, use current decision
+        3. If recent messages were complex, check if we should downgrade
+        4. Downgrade only if current message is explicitly simple with high confidence
         """
+        # EXCEPTION: Unambiguous simple messages should ALWAYS use SIMPLE tier
+        # regardless of conversation context (cost optimization)
+        # Examples: "thanks" (0.90), "good morning" (0.95), "test message" (0.95)
+        # These never need expensive models - saves 90% cost vs keeping COMPLEX
+        if decision.tier == RoutingTier.SIMPLE and decision.confidence >= 0.90:
+            session.metadata["routing_tier"] = RoutingTier.SIMPLE.value
+            decision.metadata["sticky_override"] = "always_simple"
+            return decision
+        
         # Get recent conversation context
         recent_tiers = self._get_recent_tiers(session)
         

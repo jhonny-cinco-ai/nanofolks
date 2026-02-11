@@ -13,7 +13,7 @@ The memory system is **significantly implemented** and **functional for knowledg
 - ✅ Semantic search with embeddings (Phase 2)
 - ✅ **Knowledge graph with entity resolution** (Phase 3 - NEW!)
 
-**Missing:** Hierarchical summaries (Phase 4), learning (Phase 5), and context assembly (Phase 6).
+**Missing:** Context assembly (Phase 5) to connect memory to agent. Learning (Phase 6) is nice to have but not critical.
 
 **MVP Status:** ⚠️ USABLE with Knowledge Graph - Ready for Phase 4 (Summaries)
 
@@ -145,25 +145,7 @@ The memory system is **significantly implemented** and **functional for knowledg
 
 ---
 
-### ❌ Phase 5: Learning + User Preferences + Relevance Decay - 5% COMPLETE
-
-**What's Done:**
-- ✅ Learning dataclass exists in models.py
-
-**What's Missing (Everything Else):**
-- ❌ `nanobot/memory/learning.py` - Feedback detection
-- ❌ `nanobot/memory/preferences.py` - User preferences aggregation
-- ❌ Learning storage and retrieval
-- ❌ Contradiction resolution
-- ❌ Relevance score decay (14-day half-life)
-- ❌ Boost recently accessed memories
-
-**Impact:**
-The bot cannot learn from user corrections or track preferences over time.
-
----
-
-### ⚠️ Phase 6: Context Assembly + Retrieval + Privacy Controls - 20% COMPLETE
+### ❌ Phase 5: Context Assembly + Retrieval + Privacy Controls - 20% COMPLETE ⭐ CRITICAL
 
 **What's Done:**
 - ✅ PrivacyConfig in schema (auto_redact_pii, excluded_patterns)
@@ -179,7 +161,25 @@ The bot cannot learn from user corrections or track preferences over time.
 - ⚠️ PII redaction implementation (config exists, logic missing)
 
 **Impact:**
-The memory system exists but is not connected to the agent. The agent cannot query its own memory or include relevant context in prompts.
+⚠️ **CRITICAL**: The memory system exists but is **NOT CONNECTED** to the agent. The agent cannot query its own memory or include relevant context in prompts. **Without this phase, the bot behaves as if it has no memory.**
+
+---
+
+### ❌ Phase 6: Learning + User Preferences + Relevance Decay - 5% COMPLETE
+
+**What's Done:**
+- ✅ Learning dataclass exists in models.py
+
+**What's Missing (Everything Else):**
+- ❌ `nanobot/memory/learning.py` - Feedback detection
+- ❌ `nanobot/memory/preferences.py` - User preferences aggregation
+- ❌ Learning storage and retrieval
+- ❌ Contradiction resolution
+- ❌ Relevance score decay (14-day half-life)
+- ❌ Boost recently accessed memories
+
+**Impact:**
+The bot cannot learn from user corrections or track preferences over time. **Nice to have, but not critical for MVP.**
 
 ---
 
@@ -212,53 +212,48 @@ Users cannot inspect or manage memory via CLI. Must use direct database access o
 
 ### HIGH Priority (MVP Blockers)
 
-1. **Phase 4: Hierarchical Summaries** ⭐⭐⭐
-   - **Why:** Required for efficient context assembly. Without summaries, every context build queries raw events (slow and token-inefficient).
-   - **Effort:** 4-6 days
-   - **Files to create:** `summaries.py`
-
-2. **Phase 6: Context Assembly** ⭐⭐⭐
-   - **Why:** Connects memory to agent. Currently memory exists but agent can't use it.
+1. **Phase 5: Context Assembly** ⭐⭐⭐ **CRITICAL - NEXT STEP**
+   - **Why:** Connects memory to agent. Currently memory exists but agent can't use it. **Without this, the bot behaves as if it has no memory.**
    - **Effort:** 3-4 days
    - **Files to create:** `context.py`, `retrieval.py`, agent tools
 
 ### MEDIUM Priority (User Experience)
 
-3. **Phase 7: CLI Commands** ⭐⭐
+2. **Phase 7: CLI Commands** ⭐⭐
    - **Why:** Users need visibility into what's stored and ability to manage it.
    - **Effort:** 2-3 days
    - **Files to modify:** `cli/commands.py`
 
-### LOW Priority (Refinements)
+### LOW Priority (Nice to Have)
 
-4. **Phase 3: Separate Extractors** ⭐
-   - **Why:** Code organization. Currently functional but messy.
-   - **Effort:** 1-2 days
-   - **Files to create:** `extractors/gliner2_extractor.py`, `extractors/spacy_extractor.py`
-
-5. **Phase 5: Learning** ⭐
-   - **Why:** Nice to have for personalization, not critical for MVP.
+3. **Phase 6: Learning** ⭐
+   - **Why:** Makes bot learn from feedback, but not critical for basic memory functionality.
    - **Effort:** 3-5 days
    - **Files to create:** `learning.py`, `preferences.py`
 
+### COMPLETED (No Action Needed)
+
+4. **Phase 1-4: Foundation, Embeddings, Knowledge Graph, Summaries** ✅
+   - All complete and functional
+   - Ready to build upon
+
 ---
 
-## Files to Create (Complete List)
+## Files Status
 
-### Critical for MVP:
-1. `nanobot/memory/summaries.py` - Hierarchical summary tree with staleness tracking
-2. `nanobot/memory/context.py` - Token-budgeted context assembly from summaries
-3. `nanobot/memory/retrieval.py` - Query interface (search, lookup, traverse)
+### ✅ COMPLETED:
+1. `nanobot/memory/summaries.py` - Hierarchical summary tree ✅ (Phase 4)
+2. `nanobot/memory/graph.py` - Advanced graph operations ✅ (Phase 3)
 
-### Agent Tools:
-4. `nanobot/agent/tools/memory.py` - Memory tools for agent (search_memory, get_entity, etc.)
+### Critical for MVP (Phase 5):
+3. `nanobot/memory/context.py` - Token-budgeted context assembly ⭐ **NEXT**
+4. `nanobot/memory/retrieval.py` - Query interface (search, lookup, traverse) ⭐ **NEXT**
+5. `nanobot/agent/tools/memory.py` - Memory tools for agent (search_memory, get_entity, etc.) ⭐ **NEXT**
 
-### Nice to Have:
-5. `nanobot/memory/learning.py` - Feedback detection and learning storage
-6. `nanobot/memory/preferences.py` - User preferences aggregation
-7. `nanobot/memory/graph.py` - Advanced graph operations (entity resolution, fact deduplication)
-8. `nanobot/extractors/gliner2_extractor.py` - Separate GLiNER2 implementation
-9. `nanobot/extractors/spacy_extractor.py` - Separate spaCy implementation
+### Nice to Have (Phase 6):
+6. `nanobot/memory/learning.py` - Feedback detection and learning storage
+7. `nanobot/memory/preferences.py` - User preferences aggregation
+8. `nanobot/extractors/gliner2_extractor.py` - Separate GLiNER2 implementation (code organization)
 
 ---
 
@@ -327,15 +322,15 @@ Location: `tests/memory/`
 
 ### Immediate (This Week):
 1. ✅ ~~Implement Phase 4 (Summaries)~~ - COMPLETE
-2. Implement Phase 6 (Context Assembly) - Connect memory to agent loop
+2. Implement Phase 5 (Context Assembly) - Connect memory to agent loop ⭐ CRITICAL
 
 ### Short-term (Next 2 Weeks):
 3. Add CLI memory commands for user visibility
 4. Create comprehensive documentation
-5. Phase 5 (Learning) - Optional but valuable
+5. Phase 6 (Learning) - Optional but valuable
 
 ### Long-term (Nice to Have):
-5. Phase 5 (Learning and preferences)
+5. Phase 6 (Learning and preferences)
 6. Separate extractor files (code organization)
 7. Advanced graph operations
 
@@ -349,11 +344,11 @@ The memory system has a **solid foundation** with Phases 1-4 complete (100%). It
 - ✅ Knowledge graph with entity resolution (Phase 3)
 - ✅ **Hierarchical summaries for context assembly** (NEW - Phase 4 complete!)
 
-Now ready to proceed to **Phase 6 (Context Assembly)** which connects memory to the agent loop.
+Now ready to proceed to **Phase 5 (Context Assembly)** which connects memory to the agent loop.
 
 To reach the full vision, we still need:
 - **Hierarchical summaries** (Phase 4) for efficient context assembly
-- **Context assembly** (Phase 6) to connect memory to agent
+- **Context assembly** (Phase 5) to connect memory to agent
 - **CLI commands** (Phase 7) for user management
 
 **Estimated effort to complete MVP:** 2-3 weeks (Phases 4, 6, 7)

@@ -14,9 +14,11 @@
 
 🐈 **nanobot** is an **ultra-lightweight** personal AI assistant inspired by [OpenClaw](https://github.com/openclaw/openclaw) 
 
-⚡️ Delivers core agent functionality in just **~4,000** lines of code — **99% smaller** than Clawdbot's 430k+ lines.
+⚡️ Delivers core agent functionality in just **~17,000** lines of code — **96% smaller** than Clawdbot's 430k+ lines.
 
-📏 Real-time line count: **3,510 lines** (run `bash core_agent_lines.sh` to verify anytime)
+📏 Real-time line count: **~17,000 lines** (run `bash core_agent_lines.sh` to verify anytime)
+> *Includes: agent core, memory system (TurboMemoryStore), security scanner, routing, and all core modules*
+> *Excludes: channels/, cli/, providers/, bridge/, skills/, tests/*
 
 ## 📢 News
 
@@ -36,7 +38,7 @@
 
 ## Key Features of nanobot:
 
-🪶 **Ultra-Lightweight**: Just ~4,000 lines of core agent code — 99% smaller than Clawdbot.
+🪶 **Ultra-Lightweight**: Just ~17,000 lines of core agent code — 96% smaller than Clawdbot.
 
 🧠 **Production-Hardened Memory**: 10-phase memory system with SQLite storage, semantic search, knowledge graphs, and intelligent context compaction. Handles conversations of any length without losing context.
 

@@ -251,6 +251,13 @@ class AgentLoop:
             for tool in memory_tools:
                 self.tools.register(tool)
             logger.info(f"Registered {len(memory_tools)} memory tools")
+        
+        # Security tools (always available)
+        from nanobot.agent.tools.security import create_security_tools
+        security_tools = create_security_tools()
+        for tool in security_tools:
+            self.tools.register(tool)
+        logger.info(f"Registered {len(security_tools)} security tools")
     
     async def run(self) -> None:
         """Run the agent loop, processing messages from the bus."""

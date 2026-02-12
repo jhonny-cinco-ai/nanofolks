@@ -19,6 +19,9 @@ from nanobot import __logo__
 from nanobot.config.loader import load_config, get_data_dir
 from nanobot.config.schema import MemoryConfig
 
+# Initialize Rich console
+console = Console()
+
 # Main CLI app
 app = typer.Typer(name="nanobot", help="nanobot CLI")
 
@@ -33,58 +36,6 @@ try:
 except ImportError:
     memory_app = None
     session_app = None
-    
-    setup_table.add_row("✓", "Memory database", f"{workspace}/memory/memory.db")
-    
-    # Pre-download memory models (automatic, mandatory)
-    console.print("\n[cyan]🧠 Memory & Learning System[/cyan]")
-    console.print("[dim]Downloading required AI models (~150MB total)...[/dim]\n")
-    
-    from rich.progress import Progress, BarColumn, TextColumn, DownloadColumn, TransferSpeedColumn
-    
-    with Progress(
-        TextColumn("[bold blue]{task.description}"),
-        BarColumn(bar_width=40),
-        "[progress.percentage]{task.percentage:>3.0f}%",
-        "•",
-        DownloadColumn(binary_units=True),
-        "•",
-        TransferSpeedColumn(),
-        console=console,
-    ) as progress:
-        # Download embedding model
-        task1 = progress.add_task("📦 Embedding model (67MB)...", total=67_000_000)
-        try:
-            from fastembed import TextEmbedding
-            # This triggers download
-            _ = TextEmbedding("BAAI/bge-small-en-v1.5")
-            progress.update(task1, completed=67_000_000)
-        except Exception as e:
-            progress.update(task1, completed=0, description=f"[yellow]⚠️  {e}[/yellow]")
-            console.print(f"[yellow]Warning: Could not download embedding model: {e}[/yellow]")
-        
-            # Download extraction model
-            task2 = progress.add_task("📦 Extraction model (80MB)...", total=80_000_000)
-            try:
-                from gliner2 import GLiNER2
-                # This triggers download
-                _ = GLiNER2("fastino/gliner2-base-v1")
-                progress.update(task2, completed=80_000_000)
-            except Exception as e:
-                progress.update(task2, completed=0, description=f"[yellow]⚠️  {e}[/yellow]")
-                console.print(f"[yellow]Warning: Could not download extraction model: {e}[/yellow]")
-    
-    setup_table.add_row("✓", "Memory models", "Ready")
-    
-    console.print(setup_table)
-    
-    console.print(Panel.fit(
-        "[bold green]✓ Workspace initialized successfully![/bold green]",
-        border_style="green"
-    ))
-    
-    # Run step-by-step onboarding wizard
-    _run_onboard_wizard()
 
 
 def _run_onboard_wizard():

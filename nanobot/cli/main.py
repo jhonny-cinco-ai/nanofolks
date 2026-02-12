@@ -43,7 +43,7 @@ console = Console()
 def _get_memory_store():
     """Get memory store with error handling."""
     try:
-        from nanobot.memory.store import MemoryStore
+        from nanobot.memory.store import TurboMemoryStore
         from nanobot.config.loader import load_config, get_data_dir
         from nanobot.config.schema import MemoryConfig
         
@@ -58,7 +58,7 @@ def _get_memory_store():
         memory_dir = workspace / "memory"
         memory_dir.mkdir(exist_ok=True)
         
-        return MemoryStore(config.memory, workspace)
+        return TurboMemoryStore(config.memory, workspace)
     except ImportError:
         console.print("[red]❌ Error importing memory store: {e}")
         console.print("[dim]Make sure memory system is properly installed[/dim]")

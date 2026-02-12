@@ -10,7 +10,7 @@ from typing import Optional
 from loguru import logger
 
 from nanobot.memory.models import Learning, SummaryNode
-from nanobot.memory.store import MemoryStore
+from nanobot.memory.store import TurboMemoryStore
 from nanobot.memory.summaries import SummaryTreeManager
 
 
@@ -24,14 +24,14 @@ class PreferencesAggregator:
     
     def __init__(
         self,
-        store: MemoryStore,
+        store: TurboMemoryStore,
         summary_manager: SummaryTreeManager,
     ):
         """
         Initialize preferences aggregator.
         
         Args:
-            store: MemoryStore for persistence
+            store: TurboMemoryStore for persistence
             summary_manager: SummaryTreeManager for summary nodes
         """
         self.store = store
@@ -225,7 +225,7 @@ class PreferencesAggregator:
 
 
 def create_preferences_aggregator(
-    store: MemoryStore,
+    store: TurboMemoryStore,
     summary_manager: SummaryTreeManager,
 ) -> PreferencesAggregator:
     """Factory function to create PreferencesAggregator."""

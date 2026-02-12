@@ -14,7 +14,7 @@ from uuid import uuid4
 from loguru import logger
 
 from nanobot.memory.models import Entity, Edge, Fact
-from nanobot.memory.store import MemoryStore
+from nanobot.memory.store import TurboMemoryStore
 
 
 class KnowledgeGraphManager:
@@ -22,15 +22,15 @@ class KnowledgeGraphManager:
     Manages the knowledge graph operations.
     
     Handles entity resolution (preventing duplicates), edge management,
-    and fact deduplication. Works on top of MemoryStore.
+    and fact deduplication. Works on top of TurboMemoryStore.
     """
     
-    def __init__(self, store: MemoryStore):
+    def __init__(self, store: TurboMemoryStore):
         """
         Initialize the knowledge graph manager.
         
         Args:
-            store: MemoryStore instance for database operations
+            store: TurboMemoryStore instance for database operations
         """
         self.store = store
     
@@ -423,12 +423,12 @@ class KnowledgeGraphManager:
         return False
 
 
-def create_entity_resolver(store: MemoryStore) -> KnowledgeGraphManager:
+def create_entity_resolver(store: TurboMemoryStore) -> KnowledgeGraphManager:
     """
     Factory function to create a KnowledgeGraphManager.
     
     Args:
-        store: MemoryStore instance
+        store: TurboMemoryStore instance
         
     Returns:
         KnowledgeGraphManager instance

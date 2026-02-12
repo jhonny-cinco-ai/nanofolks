@@ -16,7 +16,7 @@ from uuid import uuid4
 from loguru import logger
 
 from nanobot.memory.models import Learning, Event
-from nanobot.memory.store import MemoryStore
+from nanobot.memory.store import TurboMemoryStore
 from nanobot.memory.embeddings import EmbeddingProvider
 
 
@@ -134,7 +134,7 @@ class LearningManager:
     
     def __init__(
         self,
-        store: MemoryStore,
+        store: TurboMemoryStore,
         embedding_provider: Optional[EmbeddingProvider] = None,
         decay_days: int = 14,
         decay_rate: float = 0.05,
@@ -143,7 +143,7 @@ class LearningManager:
         Initialize learning manager.
         
         Args:
-            store: MemoryStore for persistence
+            store: TurboMemoryStore for persistence
             embedding_provider: Optional for semantic similarity
             decay_days: Half-life for relevance decay (default 14)
             decay_rate: Daily decay rate (default 0.05 = 5%)
@@ -378,7 +378,7 @@ class LearningManager:
 
 
 def create_learning_manager(
-    store: MemoryStore,
+    store: TurboMemoryStore,
     embedding_provider: Optional[EmbeddingProvider] = None,
     **kwargs
 ) -> LearningManager:

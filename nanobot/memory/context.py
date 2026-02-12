@@ -16,7 +16,7 @@ from typing import Optional
 from loguru import logger
 
 from nanobot.memory.models import SummaryNode, Entity
-from nanobot.memory.store import MemoryStore
+from nanobot.memory.store import TurboMemoryStore
 from nanobot.memory.summaries import SummaryTreeManager
 
 
@@ -60,7 +60,7 @@ class ContextAssembler:
     
     def __init__(
         self,
-        store: MemoryStore,
+        store: TurboMemoryStore,
         summary_manager: SummaryTreeManager,
         budget: Optional[ContextBudget] = None,
     ):
@@ -68,7 +68,7 @@ class ContextAssembler:
         Initialize the context assembler.
         
         Args:
-            store: MemoryStore for database access
+            store: TurboMemoryStore for database access
             summary_manager: SummaryTreeManager for summary access
             budget: Token budget allocation (uses default if None)
         """
@@ -262,7 +262,7 @@ Use this context to provide personalized and informed responses."""
 
 
 def create_context_assembler(
-    store: MemoryStore,
+    store: TurboMemoryStore,
     summary_manager: SummaryTreeManager,
     budget: Optional[ContextBudget] = None,
 ) -> ContextAssembler:
@@ -270,7 +270,7 @@ def create_context_assembler(
     Factory function to create a ContextAssembler.
     
     Args:
-        store: MemoryStore instance
+        store: TurboMemoryStore instance
         summary_manager: SummaryTreeManager instance
         budget: Optional custom budget
         

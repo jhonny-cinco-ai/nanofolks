@@ -13,7 +13,7 @@ from nanobot.memory.models import (
     SummaryNode,
     Learning,
 )
-from nanobot.memory.store import MemoryStore
+from nanobot.memory.store import TurboMemoryStore, MemoryStore
 from nanobot.memory.embeddings import (
     EmbeddingProvider,
     pack_embedding,
@@ -64,7 +64,8 @@ __all__ = [
     "Topic",
     "SummaryNode",
     "Learning",
-    "MemoryStore",
+    "TurboMemoryStore",
+    "MemoryStore",  # Deprecated, use TurboMemoryStore
     "EmbeddingProvider",
     "pack_embedding",
     "unpack_embedding",

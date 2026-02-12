@@ -15,7 +15,7 @@ from typing import Optional
 from loguru import logger
 
 from nanobot.memory.models import Event, Entity, Edge, Fact
-from nanobot.memory.store import MemoryStore
+from nanobot.memory.store import TurboMemoryStore
 from nanobot.memory.embeddings import EmbeddingProvider
 
 
@@ -32,14 +32,14 @@ class MemoryRetrieval:
     
     def __init__(
         self,
-        store: MemoryStore,
+        store: TurboMemoryStore,
         embedding_provider: Optional[EmbeddingProvider] = None,
     ):
         """
         Initialize memory retrieval.
         
         Args:
-            store: MemoryStore for database access
+            store: TurboMemoryStore for database access
             embedding_provider: Optional embedding provider for semantic search
         """
         self.store = store
@@ -276,14 +276,14 @@ class MemoryRetrieval:
 
 
 def create_retrieval(
-    store: MemoryStore,
+    store: TurboMemoryStore,
     embedding_provider: Optional[EmbeddingProvider] = None,
 ) -> MemoryRetrieval:
     """
     Factory function to create MemoryRetrieval.
     
     Args:
-        store: MemoryStore instance
+        store: TurboMemoryStore instance
         embedding_provider: Optional embedding provider
         
     Returns:

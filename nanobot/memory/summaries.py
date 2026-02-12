@@ -13,7 +13,7 @@ from typing import Optional
 from loguru import logger
 
 from nanobot.memory.models import SummaryNode
-from nanobot.memory.store import MemoryStore
+from nanobot.memory.store import TurboMemoryStore
 
 
 class SummaryTreeManager:
@@ -33,7 +33,7 @@ class SummaryTreeManager:
     
     def __init__(
         self,
-        store: MemoryStore,
+        store: TurboMemoryStore,
         staleness_threshold: int = 10,
         max_refresh_batch: int = 20,
     ):
@@ -41,7 +41,7 @@ class SummaryTreeManager:
         Initialize the summary tree manager.
         
         Args:
-            store: MemoryStore for database operations
+            store: TurboMemoryStore for database operations
             staleness_threshold: Events before refresh (default: 10)
             max_refresh_batch: Max nodes to refresh per cycle (default: 20)
         """
@@ -311,6 +311,6 @@ class SummaryTreeManager:
         return combined
 
 
-def create_summary_manager(store: MemoryStore, **kwargs) -> SummaryTreeManager:
+def create_summary_manager(store: TurboMemoryStore, **kwargs) -> SummaryTreeManager:
     """Factory function to create a SummaryTreeManager."""
     return SummaryTreeManager(store, **kwargs)

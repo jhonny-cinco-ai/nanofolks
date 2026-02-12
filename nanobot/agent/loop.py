@@ -102,14 +102,14 @@ class AgentLoop:
         self.session_compactor = None
         
         if memory_config and memory_config.enabled:
-            from nanobot.memory.store import MemoryStore
+            from nanobot.memory.store import TurboMemoryStore
             from nanobot.memory.background import ActivityTracker, BackgroundProcessor
             from nanobot.memory.summaries import SummaryTreeManager, create_summary_manager
             from nanobot.memory.context import ContextAssembler, create_context_assembler
             from nanobot.memory.retrieval import MemoryRetrieval, create_retrieval
             from nanobot.memory.embeddings import EmbeddingProvider
             
-            self.memory_store = MemoryStore(memory_config, workspace)
+            self.memory_store = TurboMemoryStore(memory_config, workspace)
             
             # Initialize activity tracker for background processing
             self.activity_tracker = ActivityTracker(

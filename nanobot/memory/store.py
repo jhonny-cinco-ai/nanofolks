@@ -1,6 +1,6 @@
 """SQLite storage layer for the memory system.
 
-This module provides the MemoryStore class which manages all database operations
+This module provides the TurboMemoryStore class which manages all database operations
 for the memory system using SQLite with WAL mode for better concurrency.
 """
 
@@ -17,7 +17,7 @@ from nanobot.config.schema import MemoryConfig
 from nanobot.memory.models import Event, Entity, Edge, Fact, Topic, SummaryNode, Learning
 
 
-class MemoryStore:
+class TurboMemoryStore:
     """
     SQLite-based storage for the memory system.
     
@@ -45,7 +45,24 @@ class MemoryStore:
         # Connection (created on first use)
         self._conn: Optional[sqlite3.Connection] = None
         
-        logger.info(f"MemoryStore initialized: {self.db_path}")
+        # Check if this is a new database and old memory files exist
+        is_new_db = not self.db_path.exists()
+        
+        # Database tables are initialized lazily in _get_connection
+        
+        # Auto-migrate from legacy format if new database and old files exist
+        if is_new_db:
+            memory_dir = workspace / "memory"
+            legacy_files_exist = (
+                (memory_dir / "MEMORY.md").exists() or 
+                any(memory_dir.glob("????-??-??.md"))
+            )
+            if legacy_files_exist:
+                logger.info("Legacy memory files detected, starting migration...")
+                stats = self.migrate_from_legacy(workspace)
+                logger.info(f"Migration complete: {stats}")
+        
+        logger.info(f"TurboMemoryStore initialized: {self.db_path}")
     
     def _get_connection(self) -> sqlite3.Connection:
         """Get or create database connection with WAL mode."""
@@ -1507,3 +1524,132 @@ class MemoryStore:
             times_accessed=row['times_accessed'] or 0,
             last_accessed=datetime.fromtimestamp(row['last_accessed']) if row['last_accessed'] else None,
         )
+
+
+class MemoryStore(TurboMemoryStore):
+    """
+    DEPRECATED: Use TurboMemoryStore instead.
+    
+    This class exists only for backward compatibility.
+    It will be removed in a future version.
+    """
+    
+    def __init__(self, *args, **kwargs):
+        import warnings
+        warnings.warn(
+            "MemoryStore is deprecated. Use TurboMemoryStore instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        super().__init__(*args, **kwargs)
+    
+    def migrate_from_legacy(self, workspace: Path) -> dict:
+        """
+        Migrate data from old file-based memory system (MEMORY.md + daily notes).
+        
+        Reads the legacy MEMORY.md and YYYY-MM-DD.md files and imports them
+        as events into the SQLite database.
+        
+        Args:
+            workspace: Path to workspace directory containing memory/ folder
+            
+        Returns:
+            Migration statistics {"events_imported": int, "files_processed": int}
+        """
+        from pathlib import Path
+        
+        memory_dir = workspace / "memory"
+        if not memory_dir.exists():
+            return {"events_imported": 0, "files_processed": 0}
+        
+        stats = {"events_imported": 0, "files_processed": 0}
+        
+        # Import MEMORY.md as a long-term memory event
+        memory_file = memory_dir / "MEMORY.md"
+        if memory_file.exists():
+            content = memory_file.read_text(encoding="utf-8")
+            if content.strip():
+                event = Event(
+                    content=f"Legacy long-term memory:\n\n{content[:1000]}",  # Truncate if too long
+                    event_type="legacy_import",
+                    source="memory.md_migration",
+                    importance=0.8
+                )
+                self.save_event(event)
+                stats["events_imported"] += 1
+                stats["files_processed"] += 1
+                logger.info(f"Migrated MEMORY.md ({len(content)} chars)")
+        
+        # Import daily notes as events
+        for file_path in memory_dir.glob("????-??-??.md"):
+            try:
+                # Extract date from filename
+                date_str = file_path.stem  # YYYY-MM-DD
+                content = file_path.read_text(encoding="utf-8")
+                
+                if content.strip():
+                    event = Event(
+                        content=f"Legacy daily notes ({date_str}):\n\n{content[:2000]}",  # Truncate if too long
+                        event_type="legacy_import",
+                        source="daily_notes_migration",
+                        timestamp=datetime.strptime(date_str, "%Y-%m-%d"),
+                        importance=0.6
+                    )
+                    self.save_event(event)
+                    stats["events_imported"] += 1
+                    stats["files_processed"] += 1
+                    logger.info(f"Migrated daily notes: {date_str} ({len(content)} chars)")
+            except Exception as e:
+                logger.warning(f"Failed to migrate {file_path}: {e}")
+        
+        logger.info(f"Migration complete: {stats['events_imported']} events from {stats['files_processed']} files")
+        return stats
+    
+    def get_memory_context(self, limit: int = 50) -> str:
+        """
+        Get memory context formatted for system prompt injection.
+        
+        Retrieves recent events, important entities, active learnings,
+        and summary nodes to provide context for the LLM.
+        
+        Args:
+            limit: Maximum number of recent events to include
+            
+        Returns:
+            Formatted memory context string
+        """
+        parts = []
+        
+        # Get recent events
+        recent_events = self.get_recent_events(limit=limit)
+        if recent_events:
+            parts.append("## Recent Activity")
+            for event in recent_events:
+                parts.append(f"- [{event.timestamp.strftime('%Y-%m-%d %H:%M')}] {event.event_type}: {event.content[:100]}")
+        
+        # Get important entities
+        entities = self.get_all_entities()
+        important_entities = [e for e in entities if e.event_count > 2][:10]
+        if important_entities:
+            parts.append("\n## Key Entities")
+            for entity in important_entities:
+                parts.append(f"- {entity.name} ({entity.entity_type}): {entity.description or 'No description'}")
+        
+        # Get active learnings
+        learnings = self.get_active_learnings(limit=5)
+        if learnings:
+            parts.append("\n## Learned Preferences")
+            for learning in learnings:
+                parts.append(f"- {learning.content}")
+        
+        # Get latest summary
+        summaries = self.get_summary_nodes(parent_id=None)
+        if summaries:
+            latest = max(summaries, key=lambda s: s.created_at or datetime.min)
+            parts.append(f"\n## Conversation Summary\n{latest.content}")
+        
+        return "\n".join(parts) if parts else ""
+
+
+# Backward compatibility alias
+MemoryStore = TurboMemoryStore

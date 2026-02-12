@@ -17,7 +17,7 @@ from loguru import logger
 
 from nanobot.agent.tools.base import Tool
 from nanobot.memory.retrieval import MemoryRetrieval
-from nanobot.memory.store import MemoryStore
+from nanobot.memory.store import TurboMemoryStore
 
 
 class MemorySearchTool(Tool):
@@ -321,12 +321,12 @@ class RecallTool(Tool):
             return f"Error recalling information: {e}"
 
 
-def create_memory_tools(store: MemoryStore, retrieval: MemoryRetrieval) -> list[Tool]:
+def create_memory_tools(store: TurboMemoryStore, retrieval: MemoryRetrieval) -> list[Tool]:
     """
     Create all memory tools for the agent.
     
     Args:
-        store: MemoryStore instance
+        store: TurboMemoryStore instance
         retrieval: MemoryRetrieval instance
         
     Returns:

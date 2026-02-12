@@ -148,6 +148,75 @@ nanobot session reset        # Reset all sessions
 
 See [MEMORY_IMPLEMENTATION_STATUS.md](MEMORY_IMPLEMENTATION_STATUS.md) for complete technical details.
 
+## 🔒 Security
+
+nanobot includes a **comprehensive security layer** to protect users from malicious skills based on real-world AI agent attack patterns.
+
+### Skill Security Scanner
+
+Automatically scans all skills for dangerous patterns before allowing use:
+
+| Detection Level | Patterns Detected |
+|----------------|-------------------|
+| 🚫 **Critical** | Credential theft, malware indicators, security bypasses |
+| ⚠️ **High** | `curl \| bash`, sudo escalation, system modification |
+| ⚡ **Medium** | Base64 obfuscation, eval/exec, suspicious downloads |
+| ℹ️ **Low** | Binary execution, external URLs (informational) |
+
+### Skill Verification Workflow
+
+1. **Auto-Detection**: New skills in `workspace/skills/` automatically scanned on startup
+2. **Risk Scoring**: 0-100 scale based on detected patterns
+3. **Approval Required**: Suspicious skills blocked until user approval
+4. **Agent Protection**: Unverified skills never available to the agent
+
+### CLI Commands
+
+```bash
+# Security scanning
+nanobot skills scan ./my-skill          # Detailed security analysis
+nanobot skills scan ./my-skill --strict # Strict mode (blocks on medium)
+nanobot skills list                     # Show all skills with status
+nanobot skills approve x-bookmarks      # Approve skill after review
+nanobot skills reject dangerous-skill   # Mark as dangerous
+
+# Check security configuration
+nanobot skills security
+```
+
+### Agent Security Tools
+
+The agent can validate skills during conversations:
+
+```
+User: "Should I install this skill?"
+Agent: "Let me scan it for security issues first..."
+→ Calls scan_skill tool
+→ Reports: "🚫 Security Scan FAILED - contains credential theft code"
+```
+
+Tools available to agent:
+- `scan_skill` - Detailed security analysis with remediation advice
+- `validate_skill_safety` - Quick true/false safety check
+
+### Configuration
+
+```json
+{
+  "security": {
+    "enabled": true,
+    "strict_mode": false,
+    "scan_on_install": true,
+    "block_on_critical": true,
+    "block_on_high": true,
+    "allow_network_installs": false,
+    "sandbox_skills": false
+  }
+}
+```
+
+Based on security research: [The Tailscale Illusion - AI Agent Security](https://github.com/openclaw/openclaw)
+
 ## 📦 Install
 
 **Install from source** (latest features, recommended for development)
@@ -985,6 +1054,10 @@ Allow the bot to self-improve by modifying its own source code while maintaining
 | `nanobot memory entities` | List all entities |
 | `nanobot session status` | Show context=X%, message count |
 | `nanobot session compact` | Trigger compaction manually |
+| `nanobot skills scan "path"` | Scan skill for security issues |
+| `nanobot skills list` | List skills with verification status |
+| `nanobot skills approve "name"` | Approve skill for use |
+| `nanobot skills security` | Show security configuration |
 
 <details>
 <summary><b>Smart Routing</b></summary>
@@ -1031,6 +1104,36 @@ nanobot session status       # Show context=X%, message count, compaction stats
 nanobot session compact      # Manual compaction trigger
 nanobot session reset        # Reset all sessions
 ```
+
+</details>
+
+<details>
+<summary><b>Security - Skill Scanning & Verification</b></summary>
+
+```bash
+# Scan a skill for security issues
+nanobot skills scan ./my-skill
+nanobot skills scan ./my-skill --strict
+nanobot skills scan ./my-skill --ignore-security
+
+# List all skills with verification status
+nanobot skills list
+nanobot skills list --all
+
+# Approve or reject skills
+nanobot skills approve x-bookmarks
+nanobot skills approve x-bookmarks --force  # Force despite warnings
+nanobot skills reject dangerous-skill
+
+# Check security configuration
+nanobot skills security
+```
+
+**Verification Status:**
+- ✅ **Approved**: Passed security scan, ready to use
+- ✅ **Manually Approved**: User approved despite warnings
+- 🚫 **Rejected**: Failed security scan (dangerous patterns detected)
+- ⏳ **Pending**: Not yet scanned, awaiting verification
 
 </details>
 

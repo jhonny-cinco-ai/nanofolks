@@ -405,6 +405,25 @@ class PrivacyConfig(BaseModel):
     ])
 
 
+class SecurityConfig(BaseModel):
+    """Security and skill scanning configuration."""
+    enabled: bool = True  # Enable security scanning
+    strict_mode: bool = False  # Block on MEDIUM severity (not just CRITICAL/HIGH)
+    block_on_critical: bool = True  # Always block critical issues
+    block_on_high: bool = True  # Always block high severity issues
+    scan_on_install: bool = True  # Scan skills when installing
+    scan_on_load: bool = False  # Scan skills when loading (performance impact)
+    allowed_shell_commands: list[str] = Field(default_factory=lambda: [
+        "git", "npm", "node", "python", "python3", "pip", "pnpm", "yarn"
+    ])
+    blocked_patterns: list[str] = Field(default_factory=lambda: [
+        "curl.*\\|.*bash", "curl.*\\|.*sh", "wget.*\\|.*bash", "wget.*\\|.*sh",
+        "sudo", "rm -rf /", "rm -rf /*", "> /etc/", "> ~/.ssh/"
+    ])
+    allow_network_installs: bool = False  # Allow curl/wget during skill install
+    sandbox_skills: bool = False  # Run skills in sandbox (future feature)
+
+
 class MemoryConfig(BaseModel):
     """Memory system configuration."""
     enabled: bool = True
@@ -432,6 +451,7 @@ class Config(BaseSettings):
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     routing: RoutingConfig = Field(default_factory=RoutingConfig)
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+    security: SecurityConfig = Field(default_factory=SecurityConfig)
     
     @property
     def workspace_path(self) -> Path:

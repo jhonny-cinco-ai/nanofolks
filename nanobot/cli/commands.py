@@ -1264,5 +1264,79 @@ if session_app is not None:
     app.add_typer(session_app, name="session")
 
 
+# Skills Security Commands
+# ============================================================================
+
+skills_app = typer.Typer(name="skills", help="Skills management and security")
+
+@skills_app.command("scan")
+def scan_skill_command(
+    skill_path: str = typer.Argument(..., help="Path to skill directory or file"),
+    strict: bool = typer.Option(False, "--strict", help="Enable strict mode (block on medium severity)"),
+    ignore_security: bool = typer.Option(False, "--ignore-security", help="Ignore security issues (not recommended)"),
+):
+    """
+    Scan a skill for security vulnerabilities.
+    
+    Examples:
+        nanobot skills scan ./my-skill
+        nanobot skills scan ./my-skill --strict
+        nanobot skills scan ./my-skill --ignore-security
+    """
+    from pathlib import Path
+    from nanobot.security.skill_scanner import scan_skill, format_report_for_cli
+    from rich.console import Console
+    
+    console = Console()
+    path = Path(skill_path)
+    
+    if not path.exists():
+        console.print(f"[red]Error: Path not found: {skill_path}[/red]")
+        raise typer.Exit(1)
+    
+    console.print(f"[cyan]🔍 Scanning skill: {path.name}...[/cyan]\n")
+    
+    report = scan_skill(path, strict=strict)
+    
+    # Display report
+    console.print(format_report_for_cli(report))
+    
+    # Exit with error if failed and not ignoring
+    if not report.passed and not ignore_security:
+        console.print("\n[red]❌ Security scan failed. Use --ignore-security to force (not recommended).[/red]")
+        raise typer.Exit(1)
+    elif ignore_security and not report.passed:
+        console.print("\n[yellow]⚠️  Security issues ignored by user request.[/yellow]")
+    elif report.passed:
+        console.print("\n[green]✅ Skill passed security scan![/green]")
+
+
+@skills_app.command("security")
+def skills_security_status():
+    """Show security configuration status."""
+    from nanobot.config.loader import load_config
+    from rich.table import Table
+    
+    config = load_config()
+    security = config.security
+    
+    table = Table(title="Security Configuration")
+    table.add_column("Setting", style="cyan")
+    table.add_column("Value", style="green")
+    table.add_column("Status", style="yellow")
+    
+    table.add_row("Security Enabled", str(security.enabled), "✅" if security.enabled else "❌")
+    table.add_row("Strict Mode", str(security.strict_mode), "🟡 Active" if security.strict_mode else "🟢 Normal")
+    table.add_row("Scan on Install", str(security.scan_on_install), "✅" if security.scan_on_install else "❌")
+    table.add_row("Block Critical", str(security.block_on_critical), "🚫" if security.block_on_critical else "⚠️")
+    table.add_row("Block High", str(security.block_on_high), "🚫" if security.block_on_high else "⚠️")
+    table.add_row("Network Installs", str(security.allow_network_installs), "⚠️ Allowed" if security.allow_network_installs else "🚫 Blocked")
+    
+    console.print(table)
+
+
+app.add_typer(skills_app, name="skills")
+
+
 if __name__ == "__main__":
     app()

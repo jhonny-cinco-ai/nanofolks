@@ -217,6 +217,39 @@ Tools available to agent:
 
 Based on security research: [The Tailscale Illusion - AI Agent Security](https://github.com/openclaw/openclaw)
 
+### Secret Sanitizer 🔐
+
+Automatically detects and masks sensitive information (API keys, passwords, tokens) to prevent accidental exposure:
+
+- ✅ **Before sending to LLMs** — Secrets are masked in messages
+- ✅ **In log files** — No secrets written to disk
+- ✅ **In session history** — Masked before storage
+- ✅ **Warning alerts** — Notifies when secrets are detected
+
+**Supported patterns:**
+- API keys (OpenRouter, Anthropic, OpenAI, Groq, etc.)
+- Bearer tokens and JWTs
+- Passwords
+- GitHub/Discord tokens
+- Database connection strings
+- Private keys
+
+**Example:**
+```
+Input:  "My key is sk-or-abc123..."
+Output: "My key is sk-or-abc1****..." (masked)
+```
+
+### Sandbox & Access Control 🛡️
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `tools.restrictToWorkspace` | `false` | When `true`, restricts **all** agent tools to the workspace directory only |
+| `tools.evolutionary` | `false` | Enable self-improvement mode (allows code modification) |
+| `tools.allowedPaths` | `[]` | Whitelist of paths accessible in evolutionary mode |
+| `tools.protectedPaths` | `["~/.nanobot/config.json"]` | Always-blocked paths (e.g., config with secrets) |
+| `channels.*.allowFrom` | `[]` | Whitelist of user IDs. Empty = allow everyone |
+
 ## 📦 Install
 
 **Install from source** (latest features, recommended for development)
@@ -963,74 +996,6 @@ Current Status:
 - 🧠 **Smart routing** — Customize tier models and confidence thresholds
 - ⚙️ **All settings** — Agents, tools, gateway, security
 - 🚪 **Back buttons** — Exit any submenu without completing
-
-### Security 🔐
-
-nanobot includes multiple layers of security to protect your data and prevent unauthorized access.
-
-#### **Secret Sanitizer** ⭐ NEW
-
-Automatically detects and masks sensitive information (API keys, passwords, tokens) to prevent accidental exposure:
-
-- ✅ **Before sending to LLMs** — Secrets are masked in messages
-- ✅ **In log files** — No secrets written to disk
-- ✅ **In session history** — Masked before storage
-- ✅ **Warning alerts** — Notifies when secrets are detected
-
-**Supported patterns:**
-- API keys (OpenRouter, Anthropic, OpenAI, Groq, etc.)
-- Bearer tokens and JWTs
-- Passwords
-- GitHub/Discord tokens
-- Database connection strings
-- Private keys
-
-**Example:**
-```
-Input:  "My key is sk-or-abc123..."
-Output: "My key is sk-or-abc1****..." (masked)
-```
-
-#### **Sandbox Modes**
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `tools.restrictToWorkspace` | `false` | When `true`, restricts **all** agent tools to the workspace directory only. |
-| `tools.evolutionary` | `false` | ⭐ NEW — Enable self-improvement mode (see below) |
-| `tools.allowedPaths` | `[]` | ⭐ NEW — Whitelist of paths accessible in evolutionary mode |
-| `tools.protectedPaths` | `["~/.nanobot/config.json"]` | ⭐ NEW — Always-blocked paths (e.g., config with secrets) |
-| `channels.*.allowFrom` | `[]` | Whitelist of user IDs. Empty = allow everyone. |
-
-#### **Evolutionary Mode** ⭐ NEW
-
-Allow the bot to self-improve by modifying its own source code while maintaining security boundaries:
-
-```json
-{
-  "tools": {
-    "evolutionary": true,
-    "allowedPaths": [
-      "/projects/nanobot-turbo",
-      "~/.nanobot"
-    ],
-    "protectedPaths": [
-      "~/.nanobot/config.json"
-    ]
-  }
-}
-```
-
-**How it works:**
-- Bot can read/write files in `allowedPaths`
-- Bot **cannot** access files outside `allowedPaths`
-- Files in `protectedPaths` are always blocked (even if in allowedPaths)
-- Perfect for development and self-improvement scenarios
-
-**Security:**
-- Protected paths take precedence over allowed paths
-- No system file access outside whitelist
-- API keys in config.json remain protected
-
 
 ## CLI Reference
 

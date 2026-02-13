@@ -53,6 +53,8 @@ from nanobot.heartbeat.multi_manager import (
     CrossBotCheck,
     TeamHealthReport,
 )
+from nanobot.heartbeat.dashboard import DashboardService, MetricsBuffer
+from nanobot.heartbeat.dashboard_server import DashboardHTTPServer
 
 __version__ = "1.0.0"
 
@@ -78,4 +80,8 @@ __all__ = [
     # Coordination
     "CrossBotCheck",
     "TeamHealthReport",
+    # Dashboard
+    "DashboardService",
+    "MetricsBuffer",
+    "DashboardHTTPServer",
 ]

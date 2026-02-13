@@ -22,6 +22,7 @@
 
 ## 📢 News
 
+- **2026-02-13** 🤖 **Multi-Bot Architecture** — nanobot now runs as a team of 6 specialized bots (researcher, coder, social, auditor, creative, coordinator) with autonomous heartbeats, cross-bot coordination, CLI management, team health monitoring, and a real-time dashboard!
 - **2026-02-11** 🧠 **Production-Hardened Memory System** — Complete 10-phase memory implementation with context compaction, knowledge graphs, and semantic search! Never lose context again.
 - **2026-02-10** 🔐 Added secret sanitizer & interactive configuration wizard — secure, user-friendly setup!
 - **2026-02-10** 🧬 Added evolutionary mode — bots can now self-improve while maintaining security boundaries!
@@ -40,7 +41,11 @@
 
 🪶 **Ultra-Lightweight**: Just ~17,000 lines of core agent code — 96% smaller than Clawdbot.
 
+🤖 **Multi-Bot Team**: Team of 6 specialized bots (researcher, coder, social, auditor, creative, coordinator) that work autonomously and coordinate together.
+
 🧠 **Production-Hardened Memory**: 10-phase memory system with SQLite storage, semantic search, knowledge graphs, and intelligent context compaction. Handles conversations of any length without losing context.
+
+💓 **Autonomous Heartbeats**: Each bot runs independent heartbeats with domain-specific checks — no manual triggers needed.
 
 🔬 **Research-Ready**: Clean, readable code that's easy to understand, modify, and extend for research.
 
@@ -147,6 +152,172 @@ nanobot session reset        # Reset all sessions
 ```
 
 See [MEMORY_IMPLEMENTATION_STATUS.md](docs/MEMORY_IMPLEMENTATION_STATUS.md) for complete technical details.
+
+## 🤖 Multi-Bot Architecture
+
+nanobot now features a **Team of 6 Specialized Bots** that work together as a coordinated team, each with domain expertise and autonomous operation capabilities.
+
+### Bot Team
+
+| Bot | Role | Expertise |
+|-----|------|-----------|
+| **ResearcherBot** | Research & Analysis | Data sources, market trends, competitor tracking |
+| **CoderBot** | Software Engineering | GitHub issues, builds, security, dependencies |
+| **SocialBot** | Social Media & Community | Scheduled posts, mentions, engagement, trends |
+| **AuditorBot** | Quality & Compliance | Code quality, compliance, audit trails, reviews |
+| **CreativeBot** | Content & Design | Assets, deadlines, brand consistency, approvals |
+| **NanobotLeader** | Coordinator | Team health, task delegation, inter-bot communication |
+
+### Why Multi-Bot?
+
+- **Specialization**: Each bot focuses on its domain, becoming an expert
+- **Autonomy**: Bots operate independently via heartbeats, no manual triggers needed
+- **Coordination**: Bots can notify and escalate to each other via the coordinator
+- **Resilience**: One bot's failure doesn't stop the entire system
+- **Scalability**: Add new bots easily for new domains
+
+### Cross-Bot Communication
+
+Bots communicate via a message bus:
+
+```python
+# Bot sends notification to coordinator
+await bot.notify_coordinator(message="Data source degraded", priority="high")
+
+# Bot escalates critical issue
+await bot.escalate_to_coordinator(message="Security vulnerability detected", priority="critical")
+```
+
+### How Bots Work Together
+
+```
+User Request
+     │
+     ▼
+┌─────────────────┐
+│ NanobotLeader  │ ◄── Coordinates and routes
+│  (Coordinator) │
+└────────┬────────┘
+         │
+    ┌────┼────┬──────┬──────┐
+    ▼    ▼    ▼      ▼      ▼
+┌──────┐┌────┐┌─────┐┌─────┐┌──────┐
+│Research││Code││Social││Audit││Creative│
+│  Bot  ││ Bot││  Bot ││ Bot ││  Bot  │
+└──────┘└────┘└─────┘└─────┘└──────┘
+     │    │     │     │      │
+     └────┴─────┴─────┴──────┘
+              │
+         Results back to
+         coordinator for
+         synthesis
+```
+
+## 💓 Multi-Heartbeat System
+
+The **Multi-Heartbeat System** powers the autonomous operation of each bot. Each bot runs its own heartbeat with domain-specific periodic checks.
+
+### Core Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| **🤖 Per-Bot Autonomy** | Each bot (researcher, coder, social, auditor, creative, coordinator) runs its own heartbeat |
+| **⏱️ Configurable Intervals** | 60 minutes default for specialists, 30 minutes for coordinator (YAML/JSON configurable) |
+| **🔄 Domain-Specific Checks** | 24 built-in checks across 6 bots, registered via `@register_check` decorator |
+| **🛡️ Full Resilience** | Circuit breakers, error handling, automatic retry logic |
+| **👥 Cross-Bot Coordination** | Bots can notify/coordinate via `notify_coordinator()` and `escalate_to_coordinator()` |
+| **📊 Team Health Monitoring** | Aggregated metrics, success rates, automatic alert generation |
+| **🖥️ CLI Management** | Start/stop/trigger heartbeats from command line |
+| **📈 Real-Time Dashboard** | Live metrics visualization at http://localhost:9090 |
+
+### Architecture
+
+```
+MultiHeartbeatManager
+    ├── ResearcherBot (60m) ──────► 4 domain checks
+    ├── CoderBot (60m) ───────────► 4 domain checks  
+    ├── SocialBot (60m) ───────────► 4 domain checks
+    ├── AuditorBot (60m, sequential) ──► 4 domain checks
+    ├── CreativeBot (60m) ────────► 4 domain checks
+    └── NanobotLeader (30m) ─────► 4 domain checks
+    
+DashboardService ──► WebSocket Stream ──► Dashboard UI (localhost:9090)
+```
+
+### Check Registry Pattern
+
+Checks are defined using the `@register_check` decorator:
+
+```python
+from nanobot.heartbeat import register_check
+
+@register_check(
+    name="monitor_data_sources",
+    description="Check data source availability",
+    bot_domains=["research"],
+    priority=CheckPriority.HIGH
+)
+async def monitor_data_sources(bot, config):
+    # Check implementation
+    return {"success": True, "data": {"sources": [...]}}
+```
+
+### CLI Commands
+
+```bash
+# Heartbeat management
+nanobot heartbeat start              # Start all bot heartbeats
+nanobot heartbeat start --bot researcher  # Start specific bot
+nanobot heartbeat stop               # Stop all bot heartbeats
+nanobot heartbeat status             # Show all bot statuses
+nanobot heartbeat status --bot coder # Show specific bot status
+nanobot heartbeat trigger --reason "Manual check"  # Trigger all bots
+nanobot heartbeat team-health        # Show team health report
+nanobot heartbeat logs --limit 20    # Show heartbeat logs
+```
+
+### Dashboard
+
+The dashboard provides real-time monitoring of all bot heartbeats:
+
+- **URL**: http://localhost:9090 (auto-starts with gateway)
+- **Features**:
+  - Team health bar with overall success rate
+  - Per-bot status cards (running/stopped)
+  - Metrics: ticks, checks passed/failed, success rate
+  - Real-time updates via WebSocket
+  - Alert display for issues
+
+### Configuration
+
+Heartbeats are configured per-bot via YAML or JSON:
+
+```yaml
+# heartbeat_config.yaml
+researcher:
+  interval_s: 3600        # 60 minutes
+  max_concurrent_checks: 4
+  parallel_checks: true
+  retry_attempts: 3
+
+auditor:
+  interval_s: 3600
+  max_concurrent_checks: 1  # Sequential for audit integrity
+  parallel_checks: false
+
+coordinator:
+  interval_s: 1800        # 30 minutes for faster coordination
+```
+
+### Test Coverage
+
+- **219 tests** covering:
+  - Check registry and execution
+  - Domain-specific checks (24 checks)
+  - Bot integration and lifecycle
+  - Multi-heartbeat manager
+  - CLI commands
+  - Dashboard service
 
 ## 🔒 Security
 
@@ -1019,6 +1190,12 @@ Current Status:
 | `nanobot memory entities` | List all entities |
 | `nanobot session status` | Show context=X%, message count |
 | `nanobot session compact` | Trigger compaction manually |
+| `nanobot heartbeat start` | Start all bot heartbeats |
+| `nanobot heartbeat stop` | Stop all bot heartbeats |
+| `nanobot heartbeat status` | Show heartbeat status |
+| `nanobot heartbeat trigger` | Manually trigger heartbeats |
+| `nanobot heartbeat team-health` | Show team health report |
+| `nanobot heartbeat logs` | Show heartbeat logs |
 | `nanobot skills scan "path"` | Scan skill for security issues |
 | `nanobot skills list` | List skills with verification status |
 | `nanobot skills approve "name"` | Approve skill for use |
@@ -1069,6 +1246,35 @@ nanobot session status       # Show context=X%, message count, compaction stats
 nanobot session compact      # Manual compaction trigger
 nanobot session reset        # Reset all sessions
 ```
+
+</details>
+
+<details>
+<summary><b>Heartbeat System</b></summary>
+
+```bash
+# Start/Stop heartbeats
+nanobot heartbeat start              # Start all bot heartbeats
+nanobot heartbeat start --bot researcher  # Start specific bot
+nanobot heartbeat stop               # Stop all bot heartbeats
+nanobot heartbeat stop --bot coder  # Stop specific bot
+
+# Status and Monitoring
+nanobot heartbeat status             # Show all bot heartbeat status
+nanobot heartbeat status --bot auditor  # Show specific bot status
+
+# Manual Triggers
+nanobot heartbeat trigger           # Manually trigger all bots
+nanobot heartbeat trigger --reason "Scheduled check"  # With reason
+
+# Team Health
+nanobot heartbeat team-health        # Show team health report
+nanobot heartbeat logs               # Show recent heartbeat logs
+nanobot heartbeat logs --bot coder   # Show specific bot logs
+nanobot heartbeat logs --limit 50    # Limit log entries
+```
+
+**Dashboard**: The dashboard is available at http://localhost:9090 when the gateway is running.
 
 </details>
 
@@ -1169,7 +1375,14 @@ nanobot/
 ├── channels/       # 📱 Chat channel integrations
 ├── bus/            # 🚌 Message routing
 ├── cron/           # ⏰ Scheduled tasks
-├── heartbeat/      # 💓 Proactive wake-up
+├── heartbeat/      # 💓 Multi-heartbeat system (6 bots, CLI, dashboard)
+│   ├── models.py   #    Data models (CheckDefinition, HeartbeatConfig...)
+│   ├── check_registry.py  # Check registration with @register_check
+│   ├── bot_heartbeat.py   # Per-bot heartbeat service
+│   ├── multi_manager.py    # MultiHeartbeatManager
+│   ├── dashboard.py        # Dashboard service
+│   └── dashboard_server.py # HTTP/WebSocket server
+├── bots/           # 🤖 Bot implementations (researcher, coder, etc.)
 ├── providers/      # 🤖 LLM providers (OpenRouter, etc.)
 ├── session/        # 💬 Conversation sessions
 ├── config/         # ⚙️ Configuration

@@ -485,6 +485,9 @@ def gateway(
     from nanobot.cron.service import CronService
     from nanobot.cron.types import CronJob
     from nanobot.heartbeat.service import HeartbeatService
+    from nanobot.heartbeat.multi_manager import MultiHeartbeatManager
+    from nanobot.heartbeat.dashboard import DashboardService
+    from nanobot.heartbeat.dashboard_server import DashboardHTTPServer
     
     if verbose:
         import logging
@@ -558,7 +561,7 @@ def gateway(
         return response
     cron.on_job = on_cron_job
     
-    # Create heartbeat service
+    # Create heartbeat service (legacy)
     async def on_heartbeat(prompt: str) -> str:
         """Execute heartbeat through the agent."""
         return await agent.process_direct(prompt, session_key="heartbeat")
@@ -570,8 +573,58 @@ def gateway(
         enabled=True
     )
     
-    # Create channel manager
-    channels = ChannelManager(config, bus, session_manager=session_manager)
+    # Create multi-heartbeat manager with all 6 bots
+    try:
+        from nanobot.bots.implementations import (
+            ResearcherBot, CoderBot, SocialBot, AuditorBot, CreativeBot, NanobotLeader
+        )
+        
+        # Create bot instances with auto-initialization
+        researcher = ResearcherBot(bus=bus, workspace_id=str(config.workspace_path))
+        coder = CoderBot(bus=bus, workspace_id=str(config.workspace_path))
+        social = SocialBot(bus=bus, workspace_id=str(config.workspace_path))
+        auditor = AuditorBot(bus=bus, workspace_id=str(config.workspace_path))
+        creative = CreativeBot(bus=bus, workspace_id=str(config.workspace_path))
+        nanobot = NanobotLeader(bus=bus, workspace_id=str(config.workspace_path))
+        
+        # Initialize multi-heartbeat manager
+        multi_manager = MultiHeartbeatManager()
+        multi_manager.register_bot(researcher)
+        multi_manager.register_bot(coder)
+        multi_manager.register_bot(social)
+        multi_manager.register_bot(auditor)
+        multi_manager.register_bot(creative)
+        multi_manager.register_bot(nanobot)
+        
+        # Wire manager into CLI commands
+        from nanobot.cli.heartbeat_commands import set_heartbeat_manager
+        set_heartbeat_manager(multi_manager)
+        
+        console.print("[green]✓[/green] Multi-heartbeat manager initialized with 6 bots")
+    except Exception as e:
+        logger.warning(f"Failed to initialize multi-heartbeat manager: {e}")
+        multi_manager = None
+    
+        # Create dashboard service for real-time monitoring
+        try:
+            dashboard_service = DashboardService(
+                manager=multi_manager,
+                port=9090,
+                update_interval=5.0,  # Update every 5 seconds
+            )
+            dashboard_server = DashboardHTTPServer(
+                dashboard_service,
+                host="localhost",
+                port=9090
+            )
+            console.print("[green]✓[/green] Dashboard initialized on http://localhost:9090")
+        except Exception as e:
+            logger.warning(f"Failed to initialize dashboard: {e}")
+            dashboard_service = None
+            dashboard_server = None
+        
+        # Create channel manager
+        channels = ChannelManager(config, bus, session_manager=session_manager)
     
     if channels.enabled_channels:
         console.print(f"[green]✓[/green] Channels enabled: {', '.join(channels.enabled_channels)}")
@@ -588,12 +641,34 @@ def gateway(
         try:
             await cron.start()
             await heartbeat.start()
+            
+            # Start multi-heartbeat manager if initialized
+            if multi_manager:
+                await multi_manager.start_all()
+            
+            # Start dashboard service if initialized
+            if dashboard_service:
+                await dashboard_service.start()
+                if dashboard_server:
+                    await dashboard_server.start()
+            
             await asyncio.gather(
                 agent.run(),
                 channels.start_all(),
             )
         except KeyboardInterrupt:
             console.print("\nShutting down...")
+            
+            # Stop dashboard service if initialized
+            if dashboard_service:
+                await dashboard_service.stop()
+            if dashboard_server:
+                await dashboard_server.stop()
+            
+            # Stop multi-heartbeat manager if initialized
+            if multi_manager:
+                await multi_manager.stop_all()
+            
             heartbeat.stop()
             cron.stop()
             await agent.stop()
@@ -2048,6 +2123,13 @@ def skills_list(
 
 
 app.add_typer(skills_app, name="skills")
+
+# Import and wire heartbeat commands
+try:
+    from nanobot.cli.heartbeat_commands import heartbeat_app
+    app.add_typer(heartbeat_app, name="heartbeat")
+except ImportError:
+    logger.warning("Could not import heartbeat commands")
 
 
 if __name__ == "__main__":

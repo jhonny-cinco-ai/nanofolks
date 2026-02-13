@@ -22,6 +22,7 @@
 
 ## 📢 News
 
+- **2026-02-13** 🧠 **Adaptive Chain-of-Thought** — Bot-level reasoning configuration that adapts to conversation complexity! CoderBot uses deep reflection for debugging, while SocialBot skips overhead for simple posts. Saves tokens while maintaining quality.
 - **2026-02-13** 🤖 **Multi-Bot Architecture** — nanobot now runs as a team of 6 specialized bots (researcher, coder, social, auditor, creative, coordinator) with autonomous heartbeats, cross-bot coordination, CLI management, team health monitoring, and a real-time dashboard!
 - **2026-02-11** 🧠 **Production-Hardened Memory System** — Complete 10-phase memory implementation with context compaction, knowledge graphs, and semantic search! Never lose context again.
 - **2026-02-10** 🔐 Added secret sanitizer & interactive configuration wizard — secure, user-friendly setup!
@@ -44,6 +45,8 @@
 🤖 **Multi-Bot Team**: Team of 6 specialized bots (researcher, coder, social, auditor, creative, coordinator) that work autonomously and coordinate together.
 
 🧠 **Production-Hardened Memory**: 10-phase memory system with SQLite storage, semantic search, knowledge graphs, and intelligent context compaction. Handles conversations of any length without losing context.
+
+🧩 **Adaptive Chain-of-Thought**: Bot-level reasoning that adapts to task complexity. CoderBot reflects deeply on code execution while SocialBot skips overhead for simple posts — optimizing token usage without sacrificing quality.
 
 💓 **Autonomous Heartbeats**: Each bot runs independent heartbeats with domain-specific checks — no manual triggers needed.
 
@@ -208,9 +211,68 @@ User Request
      │    │     │     │      │
      └────┴─────┴─────┴──────┘
               │
-         Results back to
-         coordinator for
-         synthesis
+          Results back to
+          coordinator for
+          synthesis
+```
+
+## 🧩 Adaptive Chain-of-Thought (CoT)
+
+nanobot features **bot-level Chain-of-Thought configuration** that adapts reasoning depth to task complexity. Each bot has domain-optimized reasoning that considers:
+
+1. **Bot Specialization** — CoderBot needs deep reflection, SocialBot doesn't
+2. **Routing Tier** — Complex tasks get more reasoning than simple ones
+3. **Tool Context** — Error-prone tools trigger reflection
+
+### CoT Levels by Bot
+
+| Bot | Default Level | Behavior |
+|-----|---------------|----------|
+| **CoderBot** | FULL | Always reflect after code execution (catch errors early) |
+| **NanobotLeader** | FULL | Strategic coordination needs full reasoning |
+| **ResearcherBot** | STANDARD | Analytical depth with efficiency |
+| **AuditorBot** | MINIMAL | Only on errors (sequential by nature) |
+| **CreativeBot** | STANDARD | Reflect after generation/editing |
+| **SocialBot** | NONE | No overhead for simple posts |
+
+### Tier-Aware Adaptation
+
+The system automatically adjusts based on routing tier:
+
+```
+CoderBot (FULL) + "Debug this script" (complex tier) = Full CoT
+CoderBot (FULL) + "What time is it?" (simple tier)   = Standard CoT (downgraded)
+SocialBot (NONE) + any task                         = No CoT (saves tokens)
+```
+
+### Example: Token Savings
+
+```python
+# SocialBot posting "Good morning!"
+Without adaptive CoT: ~50 extra tokens per tool
+With adaptive CoT:   0 extra tokens
+Savings: 100% on simple social tasks
+
+# CoderBot debugging complex code
+Full CoT adds ~250 tokens, but catches errors early
+Prevents costly retry loops — net savings!
+```
+
+### Configuration
+
+Each bot's reasoning is configured in `nanobot/reasoning/config.py`:
+
+```python
+CODER_REASONING = ReasoningConfig(
+    cot_level=CoTLevel.FULL,
+    always_cot_tools={"spawn", "exec", "github"},
+    reflection_prompt="Review code execution and plan next step.",
+)
+
+SOCIAL_REASONING = ReasoningConfig(
+    cot_level=CoTLevel.NONE,  # Skip for simple posts
+    never_cot_tools={"*"},     # Never use CoT
+)
 ```
 
 ## 💓 Multi-Heartbeat System
@@ -1382,6 +1444,8 @@ nanobot/
 │   ├── multi_manager.py    # MultiHeartbeatManager
 │   ├── dashboard.py        # Dashboard service
 │   └── dashboard_server.py # HTTP/WebSocket server
+├── reasoning/      # 🧩 Adaptive Chain-of-Thought configuration
+│   └── config.py   #    Bot-level reasoning configs (CoTLevel, ReasoningConfig)
 ├── bots/           # 🤖 Bot implementations (researcher, coder, etc.)
 ├── providers/      # 🤖 LLM providers (OpenRouter, etc.)
 ├── session/        # 💬 Conversation sessions

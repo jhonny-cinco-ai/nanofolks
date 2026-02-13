@@ -82,7 +82,7 @@ class CheckRegistry:
             logger.warning(f"Check '{name}' already registered, overwriting")
         
         # Determine if handler is async
-        is_async = asyncio.iscoroutinefunction(handler)
+        is_async = inspect.iscoroutinefunction(handler)
         
         # Create definition
         definition = CheckDefinition(

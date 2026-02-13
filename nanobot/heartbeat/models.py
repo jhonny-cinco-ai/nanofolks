@@ -43,7 +43,7 @@ class CheckDefinition:
         config: Dynamic configuration parameters
     """
     name: str
-    description: str
+    description: str = ""
     priority: CheckPriority = CheckPriority.NORMAL
     max_duration_s: float = 60.0
     retry_attempts: int = 1

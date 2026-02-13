@@ -51,6 +51,9 @@ class MigrationManager:
                 ("004_create_bot_expertise_table", self._migration_004_bot_expertise),
                 ("005_create_bot_memory_ledger", self._migration_005_bot_memory_ledger),
                 ("006_add_metadata_to_learnings", self._migration_006_metadata_to_learnings),
+                ("007_create_coordinator_messages", self._migration_007_coordinator_messages),
+                ("008_create_coordinator_tasks", self._migration_008_coordinator_tasks),
+                ("009_create_coordinator_decisions", self._migration_009_coordinator_decisions),
             ]
             
             # Apply pending migrations
@@ -207,3 +210,88 @@ class MigrationManager:
         if "metadata" not in columns:
             conn.execute("ALTER TABLE learnings ADD COLUMN metadata TEXT")
             logger.debug("Added metadata column to learnings table")
+    
+    @staticmethod
+    def _migration_007_coordinator_messages(conn: sqlite3.Connection) -> None:
+        """Create coordinator_messages table for persistent message storage."""
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS coordinator_messages (
+                id TEXT PRIMARY KEY,
+                sender_id TEXT NOT NULL,
+                recipient_id TEXT NOT NULL,
+                message_type TEXT NOT NULL,
+                content TEXT NOT NULL,
+                conversation_id TEXT NOT NULL,
+                context TEXT,
+                timestamp REAL NOT NULL,
+                response_to_id TEXT,
+                workspace_id TEXT
+            )
+        """)
+        
+        # Create indexes for efficient queries
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_messages_conversation ON coordinator_messages(conversation_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_messages_sender ON coordinator_messages(sender_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_messages_recipient ON coordinator_messages(recipient_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_messages_timestamp ON coordinator_messages(timestamp)")
+        
+        logger.debug("Created coordinator_messages table")
+    
+    @staticmethod
+    def _migration_008_coordinator_tasks(conn: sqlite3.Connection) -> None:
+        """Create coordinator_tasks table for persistent task storage."""
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS coordinator_tasks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                domain TEXT NOT NULL,
+                priority INTEGER DEFAULT 3,
+                assigned_to TEXT NOT NULL,
+                status TEXT DEFAULT 'pending',
+                created_by TEXT,
+                created_at REAL NOT NULL,
+                started_at REAL,
+                completed_at REAL,
+                due_date REAL,
+                requirements TEXT,
+                result TEXT,
+                confidence REAL,
+                parent_task_id TEXT,
+                workspace_id TEXT
+            )
+        """)
+        
+        # Create indexes for efficient queries
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_tasks_status ON coordinator_tasks(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_tasks_assigned_to ON coordinator_tasks(assigned_to)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_tasks_domain ON coordinator_tasks(domain)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_tasks_created_at ON coordinator_tasks(created_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_tasks_parent ON coordinator_tasks(parent_task_id)")
+        
+        logger.debug("Created coordinator_tasks table")
+    
+    @staticmethod
+    def _migration_009_coordinator_decisions(conn: sqlite3.Connection) -> None:
+        """Create coordinator_decisions table for decision audit trail."""
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS coordinator_decisions (
+                id TEXT PRIMARY KEY,
+                decision_type TEXT NOT NULL,
+                task_id TEXT,
+                participants TEXT,
+                positions TEXT,
+                reasoning TEXT,
+                final_decision TEXT,
+                confidence REAL,
+                timestamp REAL NOT NULL,
+                workspace_id TEXT
+            )
+        """)
+        
+        # Create indexes for efficient queries
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_decisions_timestamp ON coordinator_decisions(timestamp)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_decisions_task_id ON coordinator_decisions(task_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_coord_decisions_type ON coordinator_decisions(decision_type)")
+        
+        logger.debug("Created coordinator_decisions table")

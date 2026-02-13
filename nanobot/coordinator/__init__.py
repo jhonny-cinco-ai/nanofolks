@@ -15,6 +15,7 @@ from nanobot.coordinator.models import (
 )
 from nanobot.coordinator.bus import InterBotBus
 from nanobot.coordinator.coordinator_bot import CoordinatorBot
+from nanobot.coordinator.store import CoordinatorStore
 
 __all__ = [
     "BotMessage",
@@ -27,4 +28,5 @@ __all__ = [
     "CoordinationEvent",
     "InterBotBus",
     "CoordinatorBot",
+    "CoordinatorStore",
 ]

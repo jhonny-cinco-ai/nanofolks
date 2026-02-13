@@ -48,6 +48,11 @@ from nanobot.heartbeat.check_registry import (
     check_registry,
     register_check,
 )
+from nanobot.heartbeat.multi_manager import (
+    MultiHeartbeatManager,
+    CrossBotCheck,
+    TeamHealthReport,
+)
 
 __version__ = "1.0.0"
 
@@ -65,8 +70,12 @@ __all__ = [
     "HeartbeatHistory",
     # Services
     "BotHeartbeatService",
+    "MultiHeartbeatManager",
     # Registry
     "CheckRegistry",
     "check_registry",
     "register_check",
+    # Coordination
+    "CrossBotCheck",
+    "TeamHealthReport",
 ]

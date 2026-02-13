@@ -14,16 +14,27 @@ from nanobot.models.workspace import Workspace
 
 class NanobotLeader(SpecialistBot):
     """nanobot - The Coordinator/Companion.
-    
+
     Your personalized companion that coordinates the team.
     """
 
-    def __init__(self):
-        """Initialize nanobot leader."""
-        super().__init__(NANOBOT_ROLE)
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+        """Initialize nanobot leader.
+
+        Args:
+            bus: InterBotBus for communication with team
+            workspace_id: Workspace context ID
+            auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
+        """
+        super().__init__(NANOBOT_ROLE, bus, workspace_id)
         self.authority_level = "high"
         self.can_create_workspaces = True
         self.can_recruit_bots = True
+
+        # Auto-initialize heartbeat with coordinator-specific config (30min interval)
+        if auto_init_heartbeat:
+            from nanobot.bots.heartbeat_configs import COORDINATOR_CONFIG
+            self.initialize_heartbeat(config=COORDINATOR_CONFIG)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process a message as the coordinator."""
@@ -46,11 +57,22 @@ class ResearcherBot(SpecialistBot):
     Deep analysis and knowledge synthesis specialist.
     """
 
-    def __init__(self):
-        """Initialize researcher bot."""
-        super().__init__(RESEARCHER_ROLE)
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+        """Initialize researcher bot.
+        
+        Args:
+            bus: InterBotBus for communication with coordinator
+            workspace_id: Workspace context ID
+            auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
+        """
+        super().__init__(RESEARCHER_ROLE, bus, workspace_id)
         self.add_expertise("data_analysis")
         self.add_expertise("web_research")
+        
+        # Auto-initialize heartbeat with researcher-specific config
+        if auto_init_heartbeat:
+            from nanobot.bots.heartbeat_configs import RESEARCHER_CONFIG
+            self.initialize_heartbeat(config=RESEARCHER_CONFIG)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process research request."""
@@ -70,16 +92,27 @@ class ResearcherBot(SpecialistBot):
 
 class CoderBot(SpecialistBot):
     """@coder - The Gunner/Tech.
-    
+
     Code implementation and technical solutions.
     """
 
-    def __init__(self):
-        """Initialize coder bot."""
-        super().__init__(CODER_ROLE)
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+        """Initialize coder bot.
+
+        Args:
+            bus: InterBotBus for communication with coordinator
+            workspace_id: Workspace context ID
+            auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
+        """
+        super().__init__(CODER_ROLE, bus, workspace_id)
         self.add_expertise("python")
         self.add_expertise("testing")
         self.add_expertise("refactoring")
+
+        # Auto-initialize heartbeat with coder-specific config
+        if auto_init_heartbeat:
+            from nanobot.bots.heartbeat_configs import CODER_CONFIG
+            self.initialize_heartbeat(config=CODER_CONFIG)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process code request."""
@@ -99,15 +132,26 @@ class CoderBot(SpecialistBot):
 
 class SocialBot(SpecialistBot):
     """@social - The Lookout/Manager.
-    
+
     Community engagement and social media specialist.
     """
 
-    def __init__(self):
-        """Initialize social bot."""
-        super().__init__(SOCIAL_ROLE)
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+        """Initialize social bot.
+
+        Args:
+            bus: InterBotBus for communication with coordinator
+            workspace_id: Workspace context ID
+            auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
+        """
+        super().__init__(SOCIAL_ROLE, bus, workspace_id)
         self.add_expertise("community_management")
         self.add_expertise("social_media")
+
+        # Auto-initialize heartbeat with social-specific config
+        if auto_init_heartbeat:
+            from nanobot.bots.heartbeat_configs import SOCIAL_CONFIG
+            self.initialize_heartbeat(config=SOCIAL_CONFIG)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process community request."""
@@ -127,15 +171,26 @@ class SocialBot(SpecialistBot):
 
 class CreativeBot(SpecialistBot):
     """@creative - The Artist/Designer.
-    
+
     Design and content creation specialist.
     """
 
-    def __init__(self):
-        """Initialize creative bot."""
-        super().__init__(CREATIVE_ROLE)
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+        """Initialize creative bot.
+
+        Args:
+            bus: InterBotBus for communication with coordinator
+            workspace_id: Workspace context ID
+            auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
+        """
+        super().__init__(CREATIVE_ROLE, bus, workspace_id)
         self.add_expertise("visual_design")
         self.add_expertise("content_creation")
+
+        # Auto-initialize heartbeat with creative-specific config
+        if auto_init_heartbeat:
+            from nanobot.bots.heartbeat_configs import CREATIVE_CONFIG
+            self.initialize_heartbeat(config=CREATIVE_CONFIG)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process creative request."""
@@ -155,15 +210,26 @@ class CreativeBot(SpecialistBot):
 
 class AuditorBot(SpecialistBot):
     """@auditor - The Quartermaster/Medic.
-    
+
     Quality review and compliance specialist.
     """
 
-    def __init__(self):
-        """Initialize auditor bot."""
-        super().__init__(AUDITOR_ROLE)
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+        """Initialize auditor bot.
+
+        Args:
+            bus: InterBotBus for communication with coordinator
+            workspace_id: Workspace context ID
+            auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
+        """
+        super().__init__(AUDITOR_ROLE, bus, workspace_id)
         self.add_expertise("quality_assurance")
         self.add_expertise("compliance")
+
+        # Auto-initialize heartbeat with auditor-specific config
+        if auto_init_heartbeat:
+            from nanobot.bots.heartbeat_configs import AUDITOR_CONFIG
+            self.initialize_heartbeat(config=AUDITOR_CONFIG)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process audit request."""

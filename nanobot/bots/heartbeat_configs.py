@@ -1,0 +1,615 @@
+"""Heartbeat configurations for all bot types.
+
+This module provides default heartbeat configurations for each bot type
+and utilities for loading custom configurations. Users can override
+defaults by providing a heartbeat.yaml or heartbeat.json file.
+
+Usage:
+    from nanobot.bots.heartbeat_configs import get_bot_heartbeat_config
+    
+    config = get_bot_heartbeat_config("researcher")
+    service = BotHeartbeatService(bot, config)
+    await service.start()
+"""
+
+from typing import Any, Dict, List, Optional
+from pathlib import Path
+import yaml
+import json
+from loguru import logger
+
+from nanobot.heartbeat.models import HeartbeatConfig, CheckDefinition, CheckPriority
+
+
+# Default interval: 60 minutes for specialists, 30 minutes for coordinator
+DEFAULT_SPECIALIST_INTERVAL_S = 3600  # 60 minutes
+DEFAULT_COORDINATOR_INTERVAL_S = 1800  # 30 minutes
+
+
+def _create_check(name: str, description: str, priority: str = "normal", 
+                  max_duration_s: float = 60.0, config: Optional[Dict] = None) -> CheckDefinition:
+    """Helper to create a CheckDefinition."""
+    priority_map = {
+        "critical": CheckPriority.CRITICAL,
+        "high": CheckPriority.HIGH,
+        "normal": CheckPriority.NORMAL,
+        "low": CheckPriority.LOW
+    }
+    
+    return CheckDefinition(
+        name=name,
+        description=description,
+        priority=priority_map.get(priority, CheckPriority.NORMAL),
+        max_duration_s=max_duration_s,
+        config=config or {}
+    )
+
+
+# =============================================================================
+# Default Configurations by Bot Type
+# =============================================================================
+
+RESEARCHER_CONFIG = HeartbeatConfig(
+    bot_name="researcher",
+    interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
+    max_execution_time_s=300,
+    enabled=True,
+    checks=[
+        _create_check(
+            "monitor_data_sources",
+            "Check data feeds for updates and availability",
+            priority="high",
+            max_duration_s=120.0,
+            config={
+                "sources": [],  # Auto-detect from bot config
+                "timeout_s": 30
+            }
+        ),
+        _create_check(
+            "track_market_trends",
+            "Analyze market changes and detect anomalies",
+            priority="normal",
+            max_duration_s=180.0,
+            config={
+                "symbols": [],  # Configurable list of symbols
+                "alert_threshold_pct": 5.0
+            }
+        ),
+        _create_check(
+            "monitor_research_deadlines",
+            "Alert on approaching research deadlines",
+            priority="critical",
+            max_duration_s=30.0,
+            config={
+                "alert_days": [7, 3, 1]
+            }
+        ),
+        _create_check(
+            "update_competitor_tracking",
+            "Track competitor activities and updates",
+            priority="normal",
+            max_duration_s=90.0,
+            config={
+                "competitors": [],  # Configurable list
+                "track_changes": True
+            }
+        ),
+    ],
+    parallel_checks=True,
+    max_concurrent_checks=2,
+    stop_on_first_failure=False,
+    notify_on_failure=True,
+    notification_channels=["coordinator"],
+    retain_history_count=50
+)
+
+
+CODER_CONFIG = HeartbeatConfig(
+    bot_name="coder",
+    interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
+    max_execution_time_s=300,
+    enabled=True,
+    checks=[
+        _create_check(
+            "check_github_issues",
+            "Monitor repos for critical issues requiring attention",
+            priority="high",
+            max_duration_s=60.0,
+            config={
+                "repositories": [],  # Auto-detect
+                "labels": ["critical", "security", "bug"]
+            }
+        ),
+        _create_check(
+            "monitor_build_status",
+            "CI/CD pipeline monitoring for failures",
+            priority="critical",
+            max_duration_s=90.0,
+            config={
+                "pipelines": [],  # Auto-detect
+                "alert_on_failure": True
+            }
+        ),
+        _create_check(
+            "security_vulnerability_scan",
+            "Dependency security scanning",
+            priority="high",
+            max_duration_s=120.0,
+            config={
+                "scan_dependencies": True,
+                "severity_threshold": "medium"
+            }
+        ),
+        _create_check(
+            "check_dependency_updates",
+            "Check for available package updates",
+            priority="low",
+            max_duration_s=90.0,
+            config={
+                "check_outdated": True,
+                "check_security_only": False
+            }
+        ),
+    ],
+    parallel_checks=True,
+    max_concurrent_checks=2,
+    stop_on_first_failure=False,
+    notify_on_failure=True,
+    notification_channels=["coordinator"],
+    retain_history_count=50
+)
+
+
+SOCIAL_CONFIG = HeartbeatConfig(
+    bot_name="social",
+    interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
+    max_execution_time_s=300,
+    enabled=True,
+    checks=[
+        _create_check(
+            "publish_scheduled_posts",
+            "Auto-publish posts scheduled for current time",
+            priority="critical",
+            max_duration_s=60.0,
+            config={}
+        ),
+        _create_check(
+            "monitor_community_mentions",
+            "Track mentions requiring response",
+            priority="high",
+            max_duration_s=90.0,
+            config={
+                "platforms": ["twitter", "linkedin", "reddit"],
+                "sentiment_threshold": "negative"
+            }
+        ),
+        _create_check(
+            "check_engagement_metrics",
+            "Detect engagement anomalies",
+            priority="normal",
+            max_duration_s=60.0,
+            config={
+                "metrics": ["likes", "shares", "comments", "reach"]
+            }
+        ),
+        _create_check(
+            "track_trending_topics",
+            "Monitor trending topics for opportunities",
+            priority="low",
+            max_duration_s=120.0,
+            config={
+                "topics": [],  # Configurable
+                "min_volume": 1000
+            }
+        ),
+    ],
+    parallel_checks=True,
+    max_concurrent_checks=3,
+    stop_on_first_failure=False,
+    notify_on_failure=True,
+    notification_channels=["coordinator"],
+    retain_history_count=100
+)
+
+
+AUDITOR_CONFIG = HeartbeatConfig(
+    bot_name="auditor",
+    interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
+    max_execution_time_s=300,
+    enabled=True,
+    checks=[
+        _create_check(
+            "check_code_quality_scores",
+            "Monitor code quality metrics and flag declining trends",
+            priority="high",
+            max_duration_s=120.0,
+            config={
+                "repositories": [],  # Auto-detect
+                "thresholds": {
+                    "coverage": 70,
+                    "lint_score": 80,
+                    "complexity": 15
+                }
+            }
+        ),
+        _create_check(
+            "audit_compliance_status",
+            "Verify compliance with security and privacy policies",
+            priority="critical",
+            max_duration_s=180.0,
+            config={}
+        ),
+        _create_check(
+            "review_audit_trail_integrity",
+            "Verify audit trail completeness and detect gaps",
+            priority="high",
+            max_duration_s=90.0,
+            config={
+                "lookback_hours": 24
+            }
+        ),
+        _create_check(
+            "check_pending_reviews",
+            "Check for pending code reviews and quality gates",
+            priority="normal",
+            max_duration_s=60.0,
+            config={
+                "max_wait_hours": 24
+            }
+        ),
+    ],
+    parallel_checks=False,  # Sequential for audit integrity
+    max_concurrent_checks=1,
+    stop_on_first_failure=False,
+    notify_on_failure=True,
+    notification_channels=["coordinator"],
+    retain_history_count=200  # Keep more history for audits
+)
+
+
+CREATIVE_CONFIG = HeartbeatConfig(
+    bot_name="creative",
+    interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
+    max_execution_time_s=300,
+    enabled=True,
+    checks=[
+        _create_check(
+            "check_design_asset_status",
+            "Monitor design asset health and detect outdated files",
+            priority="high",
+            max_duration_s=90.0,
+            config={
+                "max_age_days": 30
+            }
+        ),
+        _create_check(
+            "monitor_creative_deadlines",
+            "Track approaching creative project deadlines",
+            priority="critical",
+            max_duration_s=60.0,
+            config={}
+        ),
+        _create_check(
+            "validate_brand_consistency",
+            "Check brand guidelines compliance across assets",
+            priority="normal",
+            max_duration_s=120.0,
+            config={}
+        ),
+        _create_check(
+            "check_content_approval_queue",
+            "Monitor content awaiting approval and publishing",
+            priority="high",
+            max_duration_s=60.0,
+            config={
+                "max_wait_hours": 48
+            }
+        ),
+    ],
+    parallel_checks=True,
+    max_concurrent_checks=2,
+    stop_on_first_failure=False,
+    notify_on_failure=True,
+    notification_channels=["coordinator"],
+    retain_history_count=50
+)
+
+
+COORDINATOR_CONFIG = HeartbeatConfig(
+    bot_name="coordinator",
+    interval_s=DEFAULT_COORDINATOR_INTERVAL_S,  # 30 minutes - more frequent
+    max_execution_time_s=180,
+    enabled=True,
+    checks=[
+        _create_check(
+            "check_bot_team_health",
+            "Monitor health status of all specialist bots",
+            priority="critical",
+            max_duration_s=60.0,
+            config={
+                "max_silence_minutes": 120
+            }
+        ),
+        _create_check(
+            "monitor_task_delegation_queue",
+            "Check for stalled or failed task delegations",
+            priority="high",
+            max_duration_s=60.0,
+            config={
+                "max_wait_hours": 4
+            }
+        ),
+        _create_check(
+            "review_inter_bot_communication",
+            "Check for communication failures between bots",
+            priority="high",
+            max_duration_s=45.0,
+            config={
+                "lookback_hours": 2
+            }
+        ),
+        _create_check(
+            "check_resource_utilization",
+            "Monitor system resource usage across bot team",
+            priority="normal",
+            max_duration_s=45.0,
+            config={
+                "thresholds": {
+                    "cpu_percent": 80,
+                    "memory_percent": 85,
+                    "api_rate_percent": 70,
+                    "storage_percent": 90
+                }
+            }
+        ),
+    ],
+    parallel_checks=True,
+    max_concurrent_checks=4,
+    stop_on_first_failure=False,
+    notify_on_failure=True,
+    notification_channels=["admin"],
+    retain_history_count=100
+)
+
+
+# Map of bot names to default configs
+DEFAULT_CONFIGS: Dict[str, HeartbeatConfig] = {
+    "researcher": RESEARCHER_CONFIG,
+    "coder": CODER_CONFIG,
+    "social": SOCIAL_CONFIG,
+    "auditor": AUDITOR_CONFIG,
+    "creative": CREATIVE_CONFIG,
+    "coordinator": COORDINATOR_CONFIG,
+}
+
+
+# =============================================================================
+# Configuration Loading
+# =============================================================================
+
+def load_config_from_file(config_path: Path) -> Optional[Dict[str, Any]]:
+    """Load heartbeat configuration from YAML or JSON file.
+    
+    Args:
+        config_path: Path to configuration file
+        
+    Returns:
+        Configuration dict or None if file doesn't exist
+    """
+    if not config_path.exists():
+        return None
+    
+    try:
+        with open(config_path, 'r') as f:
+            if config_path.suffix in ['.yaml', '.yml']:
+                return yaml.safe_load(f)
+            elif config_path.suffix == '.json':
+                return json.load(f)
+            else:
+                # Try YAML first, then JSON
+                try:
+                    return yaml.safe_load(f)
+                except:
+                    f.seek(0)
+                    return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load heartbeat config from {config_path}: {e}")
+        return None
+
+
+def merge_config(base: HeartbeatConfig, override: Dict[str, Any]) -> HeartbeatConfig:
+    """Merge override settings into base configuration.
+    
+    Args:
+        base: Base configuration
+        override: Override settings from file
+        
+    Returns:
+        Merged configuration
+    """
+    # Create a copy
+    merged = HeartbeatConfig(
+        bot_name=base.bot_name,
+        interval_s=override.get('interval_s', base.interval_s),
+        max_execution_time_s=override.get('max_execution_time_s', base.max_execution_time_s),
+        enabled=override.get('enabled', base.enabled),
+        checks=base.checks.copy(),  # Will update below
+        parallel_checks=override.get('parallel_checks', base.parallel_checks),
+        max_concurrent_checks=override.get('max_concurrent_checks', base.max_concurrent_checks),
+        stop_on_first_failure=override.get('stop_on_first_failure', base.stop_on_first_failure),
+        notify_on_failure=override.get('notify_on_failure', base.notify_on_failure),
+        notify_on_success=override.get('notify_on_success', base.notify_on_success),
+        notification_channels=override.get('notification_channels', base.notification_channels),
+        log_level=override.get('log_level', base.log_level),
+        retain_history_count=override.get('retain_history_count', base.retain_history_count)
+    )
+    
+    # Update check configurations
+    if 'checks' in override:
+        check_overrides = {c['name']: c for c in override['checks'] if 'name' in c}
+        
+        updated_checks = []
+        for check in merged.checks:
+            if check.name in check_overrides:
+                override_check = check_overrides[check.name]
+                updated_checks.append(CheckDefinition(
+                    name=check.name,
+                    description=override_check.get('description', check.description),
+                    priority=CheckPriority(override_check.get('priority', check.priority.value)),
+                    max_duration_s=override_check.get('max_duration_s', check.max_duration_s),
+                    retry_attempts=override_check.get('retry_attempts', check.retry_attempts),
+                    dependencies=override_check.get('dependencies', check.dependencies),
+                    enabled=override_check.get('enabled', check.enabled),
+                    config={**check.config, **override_check.get('config', {})}
+                ))
+            else:
+                updated_checks.append(check)
+        
+        merged.checks = updated_checks
+    
+    return merged
+
+
+def get_bot_heartbeat_config(
+    bot_name: str,
+    config_dir: Optional[Path] = None,
+    custom_overrides: Optional[Dict[str, Any]] = None
+) -> HeartbeatConfig:
+    """Get heartbeat configuration for a bot.
+    
+    Loads default configuration and applies any overrides from:
+    1. Configuration file (heartbeat.yaml or heartbeat.json)
+    2. Custom overrides passed as parameter
+    
+    Args:
+        bot_name: Name of the bot (researcher, coder, social, auditor, creative, coordinator)
+        config_dir: Directory containing heartbeat.yaml/json (default: current dir)
+        custom_overrides: Additional override settings
+        
+    Returns:
+        Configured HeartbeatConfig for the bot
+        
+    Example:
+        >>> config = get_bot_heartbeat_config("researcher")
+        >>> print(f"Interval: {config.interval_s}s")
+        
+        >>> config = get_bot_heartbeat_config(
+        ...     "social",
+        ...     custom_overrides={"interval_s": 1800}  # 30 min
+        ... )
+    """
+    # Get default config
+    if bot_name not in DEFAULT_CONFIGS:
+        logger.warning(f"Unknown bot '{bot_name}', using generic config")
+        base_config = HeartbeatConfig(bot_name=bot_name)
+    else:
+        base_config = DEFAULT_CONFIGS[bot_name]
+    
+    # Load from file if exists
+    if config_dir is None:
+        config_dir = Path.cwd()
+    
+    for filename in ['heartbeat.yaml', 'heartbeat.yml', 'heartbeat.json']:
+        config_file = config_dir / filename
+        if config_file.exists():
+            file_config = load_config_from_file(config_file)
+            if file_config and bot_name in file_config:
+                logger.info(f"Loading heartbeat config for {bot_name} from {config_file}")
+                base_config = merge_config(base_config, file_config[bot_name])
+            break
+    
+    # Apply custom overrides
+    if custom_overrides:
+        base_config = merge_config(base_config, custom_overrides)
+    
+    return base_config
+
+
+def get_all_heartbeat_configs(
+    config_dir: Optional[Path] = None
+) -> Dict[str, HeartbeatConfig]:
+    """Get heartbeat configurations for all bots.
+    
+    Args:
+        config_dir: Directory containing configuration files
+        
+    Returns:
+        Dict mapping bot names to their configurations
+    """
+    return {
+        name: get_bot_heartbeat_config(name, config_dir)
+        for name in DEFAULT_CONFIGS.keys()
+    }
+
+
+def save_heartbeat_config(
+    config: HeartbeatConfig,
+    config_path: Path,
+    format: str = "yaml"
+) -> None:
+    """Save heartbeat configuration to file.
+    
+    Args:
+        config: Configuration to save
+        config_path: Path to save to
+        format: 'yaml' or 'json'
+        
+    Example:
+        >>> config = HeartbeatConfig(bot_name="custom")
+        >>> save_heartbeat_config(config, Path("config.yaml"))
+    """
+    config_dict = {
+        config.bot_name: {
+            "interval_s": config.interval_s,
+            "max_execution_time_s": config.max_execution_time_s,
+            "enabled": config.enabled,
+            "parallel_checks": config.parallel_checks,
+            "max_concurrent_checks": config.max_concurrent_checks,
+            "stop_on_first_failure": config.stop_on_first_failure,
+            "notify_on_failure": config.notify_on_failure,
+            "notify_on_success": config.notify_on_success,
+            "notification_channels": config.notification_channels,
+            "log_level": config.log_level,
+            "retain_history_count": config.retain_history_count,
+            "checks": [
+                {
+                    "name": c.name,
+                    "description": c.description,
+                    "priority": c.priority.value,
+                    "max_duration_s": c.max_duration_s,
+                    "retry_attempts": c.retry_attempts,
+                    "dependencies": c.dependencies,
+                    "enabled": c.enabled,
+                    "config": c.config
+                }
+                for c in config.checks
+            ]
+        }
+    }
+    
+    with open(config_path, 'w') as f:
+        if format in ['yaml', 'yml']:
+            yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False)
+        else:
+            json.dump(config_dict, f, indent=2)
+    
+    logger.info(f"Saved heartbeat config to {config_path}")
+
+
+__all__ = [
+    # Default configs
+    "RESEARCHER_CONFIG",
+    "CODER_CONFIG", 
+    "SOCIAL_CONFIG",
+    "AUDITOR_CONFIG",
+    "CREATIVE_CONFIG",
+    "COORDINATOR_CONFIG",
+    "DEFAULT_CONFIGS",
+    
+    # Functions
+    "get_bot_heartbeat_config",
+    "get_all_heartbeat_configs",
+    "load_config_from_file",
+    "save_heartbeat_config",
+    "merge_config",
+]

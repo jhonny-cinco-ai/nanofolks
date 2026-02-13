@@ -5,10 +5,12 @@ This module provides an interactive CLI wizard that guides new users through:
 2. Capability selection
 3. Team composition recommendation
 4. #general workspace creation
+5. SOUL.md personality file generation for team members
 
 Uses typer and rich for interactive prompts and rich terminal output.
 """
 
+from pathlib import Path
 from typing import List, Set, Dict, Optional
 from rich.console import Console
 from rich.panel import Panel
@@ -18,12 +20,21 @@ from rich import box
 
 from nanobot.themes import ThemeManager, list_themes, get_theme
 from nanobot.models import Workspace, WorkspaceType
+from nanobot.soul import SoulManager
 
 console = Console()
 
 
 class OnboardingWizard:
-    """Interactive onboarding wizard for multi-agent team setup."""
+    """Interactive onboarding wizard for multi-agent team setup.
+    
+    Guides users through:
+    1. Theme selection (personality style)
+    2. Domain/capability selection
+    3. Team composition recommendation
+    4. Workspace creation
+    5. SOUL.md personality file generation
+    """
     
     DOMAIN_DESCRIPTIONS = {
         "coordination": "Team leadership, task delegation, decision making",
@@ -48,16 +59,20 @@ class OnboardingWizard:
         self.selected_theme: Optional[str] = None
         self.selected_domains: Set[str] = set()
         self.recommended_team: List[str] = []
+        self.soul_manager: Optional[SoulManager] = None
     
-    def run(self) -> Dict:
+    def run(self, workspace_path: Optional[Path] = None) -> Dict:
         """Run the complete onboarding wizard.
+        
+        Args:
+            workspace_path: Optional workspace path for SOUL file generation
         
         Returns:
             Dictionary containing:
                 - theme: selected theme name
                 - domains: set of selected domains
                 - team: list of recommended bot names
-                - general_workspace: created workspace object
+                - workspace_path: workspace path used
         """
         self._show_welcome()
         self._select_theme()
@@ -65,10 +80,15 @@ class OnboardingWizard:
         self._recommend_team()
         self._confirm_and_create()
         
+        # Apply theme to workspace if path provided
+        if workspace_path:
+            self._apply_theme_to_workspace(workspace_path)
+        
         return {
             "theme": self.selected_theme,
             "domains": self.selected_domains,
             "team": self.recommended_team,
+            "workspace_path": str(workspace_path) if workspace_path else None,
         }
     
     def _show_welcome(self) -> None:
@@ -318,6 +338,45 @@ class OnboardingWizard:
             }
         )
         return general_ws
+    
+    def _apply_theme_to_workspace(self, workspace_path: Path) -> None:
+        """Apply selected theme to team in workspace.
+        
+        Creates SOUL.md personality files for each team member.
+        
+        Args:
+            workspace_path: Path to workspace
+        """
+        try:
+            # Initialize SoulManager for workspace
+            soul_manager = SoulManager(workspace_path)
+            theme = get_theme(self.selected_theme)
+            
+            if theme:
+                console.print("\n[cyan]Applying theme to team...[/cyan]")
+                
+                # Apply theme to all team members
+                results = soul_manager.apply_theme_to_team(
+                    theme,
+                    self.recommended_team,
+                    force=True
+                )
+                
+                # Show results
+                successful = sum(1 for v in results.values() if v)
+                console.print(
+                    f"[green]✓ Applied theme to {successful}/{len(self.recommended_team)} bots[/green]"
+                )
+                
+                # Show team personalities
+                console.print("\n[bold]Team personalities configured:[/bold]")
+                for bot in self.recommended_team:
+                    theming = theme.get_bot_theming(bot)
+                    if theming:
+                        console.print(f"  {theming.emoji} {theming.title} ({bot})")
+        
+        except Exception as e:
+            console.print(f"[yellow]⚠ Could not apply theme: {e}[/yellow]")
 
 
 def run_onboarding():

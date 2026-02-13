@@ -4,11 +4,12 @@ import base64
 import mimetypes
 import platform
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from nanobot.memory.store import TurboMemoryStore
 from nanobot.agent.skills import SkillsLoader
 from nanobot.config.loader import load_config
+from nanobot.soul import SoulManager
 
 
 class ContextBuilder:
@@ -16,7 +17,7 @@ class ContextBuilder:
     Builds the context (system prompt + messages) for the agent.
     
     Assembles bootstrap files, memory, skills, and conversation history
-    into a coherent prompt for the LLM.
+    into a coherent prompt for the LLM. Supports bot-specific SOUL.md loading.
     """
     
     BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"]
@@ -32,13 +33,19 @@ class ContextBuilder:
             self.memory = None
             
         self.skills = SkillsLoader(workspace)
+        self.soul_manager = SoulManager(workspace)
     
-    def build_system_prompt(self, skill_names: list[str] | None = None) -> str:
+    def build_system_prompt(
+        self,
+        skill_names: list[str] | None = None,
+        bot_name: Optional[str] = None
+    ) -> str:
         """
         Build the system prompt from bootstrap files, memory, and skills.
         
         Args:
             skill_names: Optional list of skills to include.
+            bot_name: Optional bot name for personality injection.
         
         Returns:
             Complete system prompt.
@@ -48,8 +55,8 @@ class ContextBuilder:
         # Core identity
         parts.append(self._get_identity())
         
-        # Bootstrap files
-        bootstrap = self._load_bootstrap_files()
+        # Bootstrap files (with optional bot-specific SOUL)
+        bootstrap = self._load_bootstrap_files(bot_name=bot_name)
         if bootstrap:
             parts.append(bootstrap)
         
@@ -115,11 +122,26 @@ For normal conversation, just respond with text - do not call the message tool.
 
 Always be helpful, accurate, and concise. When using tools, explain what you're doing."""
     
-    def _load_bootstrap_files(self) -> str:
-        """Load all bootstrap files from workspace."""
+    def _load_bootstrap_files(self, bot_name: Optional[str] = None) -> str:
+        """Load bootstrap files with bot-specific SOUL if available.
+        
+        Args:
+            bot_name: Optional bot name for personality injection.
+        
+        Returns:
+            Formatted bootstrap content.
+        """
         parts = []
         
         for filename in self.BOOTSTRAP_FILES:
+            # Special handling for SOUL.md with bot-specific support
+            if filename == "SOUL.md":
+                soul_content = self._load_soul_for_bot(bot_name)
+                if soul_content:
+                    parts.append(soul_content)
+                continue
+            
+            # Other bootstrap files
             file_path = self.workspace / filename
             if file_path.exists():
                 content = file_path.read_text(encoding="utf-8")
@@ -127,11 +149,35 @@ Always be helpful, accurate, and concise. When using tools, explain what you're 
         
         return "\n\n".join(parts) if parts else ""
     
+    def _load_soul_for_bot(self, bot_name: Optional[str] = None) -> Optional[str]:
+        """Load appropriate SOUL.md for bot or workspace.
+        
+        Args:
+            bot_name: Bot name to load specific SOUL
+        
+        Returns:
+            Formatted SOUL content or None
+        """
+        # If bot specified, try to load bot-specific SOUL
+        if bot_name:
+            soul_content = self.soul_manager.get_bot_soul(bot_name)
+            if soul_content:
+                return f"## SOUL.md (Bot: {bot_name})\n\n{soul_content}"
+        
+        # Fall back to workspace SOUL.md
+        workspace_soul = self.workspace / "SOUL.md"
+        if workspace_soul.exists():
+            content = workspace_soul.read_text(encoding="utf-8")
+            return f"## SOUL.md\n\n{content}"
+        
+        return None
+    
     def build_messages(
         self,
         history: list[dict[str, Any]],
         current_message: str,
         skill_names: list[str] | None = None,
+        bot_name: Optional[str] = None,
         media: list[str] | None = None,
         channel: str | None = None,
         chat_id: str | None = None,
@@ -144,6 +190,7 @@ Always be helpful, accurate, and concise. When using tools, explain what you're 
             history: Previous conversation messages.
             current_message: The new user message.
             skill_names: Optional skills to include.
+            bot_name: Optional bot name for personality injection.
             media: Optional list of local file paths for images/media.
             channel: Current channel (telegram, feishu, etc.).
             chat_id: Current chat/user ID.
@@ -154,8 +201,11 @@ Always be helpful, accurate, and concise. When using tools, explain what you're 
         """
         messages = []
 
-        # System prompt
-        system_prompt = self.build_system_prompt(skill_names)
+        # System prompt with optional bot personality
+        system_prompt = self.build_system_prompt(
+            skill_names=skill_names,
+            bot_name=bot_name
+        )
         if channel and chat_id:
             system_prompt += f"\n\n## Current Session\nChannel: {channel}\nChat ID: {chat_id}"
         

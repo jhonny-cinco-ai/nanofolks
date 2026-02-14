@@ -8,6 +8,7 @@ from loguru import logger
 
 from nanobot.models.role_card import RoleCard
 from nanobot.models.workspace import Workspace
+from nanobot.themes import ThemeManager, get_theme
 
 
 class SpecialistBot(ABC):
@@ -20,17 +21,27 @@ class SpecialistBot(ABC):
     - Self-managed state
     """
 
-    def __init__(self, role_card: RoleCard, bus=None, workspace_id: Optional[str] = None):
+    def __init__(
+        self,
+        role_card: RoleCard,
+        bus=None,
+        workspace_id: Optional[str] = None,
+        theme_manager: Optional[ThemeManager] = None,
+        custom_name: Optional[str] = None
+    ):
         """Initialize a bot with a role card.
         
         Args:
             role_card: Role card defining bot's personality and constraints
             bus: InterBotBus for communication with coordinator
             workspace_id: Workspace context ID
+            theme_manager: Optional theme manager for applying themed display names
+            custom_name: Optional custom display name (overrides theme)
         """
         self.role_card = role_card
         self.bus = bus
         self.workspace_id = workspace_id
+        self._theme_manager = theme_manager
         self.private_memory: Dict[str, Any] = {
             "learnings": [],  # Lessons learned by this bot
             "expertise_domains": [],  # Domains where bot is competent
@@ -40,9 +51,44 @@ class SpecialistBot(ABC):
             "heartbeat_history": [],  # History of heartbeat executions
         }
         
+        # Apply theme if available
+        if theme_manager and theme_manager.current_theme:
+            self._apply_theme_to_role_card()
+        
+        # Apply custom name if provided (highest priority)
+        if custom_name:
+            self.set_display_name(custom_name)
+        
         # Heartbeat service (initialized lazily)
         self._heartbeat = None
         self._heartbeat_config = None
+
+    def _apply_theme_to_role_card(self) -> None:
+        """Apply current theme to role card display name and personality."""
+        if not self._theme_manager or not self._theme_manager.current_theme:
+            return
+        
+        try:
+            theming = self._theme_manager.get_bot_theming(self.role_card.bot_name)
+            if theming:
+                # Update display name from theme (use title as default display name)
+                title = theming.get("title")
+                if title:
+                    self.role_card.set_display_name(title)
+                    logger.debug(
+                        f"[{self.role_card.bot_name}] Applied theme display name: {title}"
+                    )
+                
+                # Update greeting if theme provides one
+                if theming.get("greeting"):
+                    self.role_card.greeting = theming["greeting"]
+                
+                # Update voice if theme provides one
+                if theming.get("voice"):
+                    self.role_card.voice = theming["voice"]
+                    
+        except Exception as e:
+            logger.warning(f"[{self.role_card.bot_name}] Failed to apply theme: {e}")
 
     @property
     def name(self) -> str:
@@ -58,6 +104,35 @@ class SpecialistBot(ABC):
     def title(self) -> str:
         """Get bot title."""
         return self.role_card.title
+
+    @property
+    def display_name(self) -> str:
+        """Get bot display name (user-customizable).
+        
+        Returns:
+            Display name (falls back to title if not set)
+        """
+        return self.role_card.get_display_name()
+
+    def set_display_name(self, name: str) -> None:
+        """Set a custom display name for this bot.
+        
+        Args:
+            name: Custom display name (e.g., "Blackbeard", "Slash", "Neo")
+        """
+        old_name = self.display_name
+        self.role_card.set_display_name(name)
+        logger.info(
+            f"[{self.role_card.bot_name}] Display name changed: "
+            f"'{old_name}' → '{self.display_name}'"
+        )
+
+    def reset_display_name(self) -> None:
+        """Reset display name to default (uses title or themed name)."""
+        self.role_card.set_display_name("")
+        # Re-apply theme if available
+        if self._theme_manager and self._theme_manager.current_theme:
+            self._apply_theme_to_role_card()
 
     def can_perform_action(self, action: str) -> tuple[bool, Optional[str]]:
         """Validate if bot can perform an action (check hard bans).
@@ -139,6 +214,7 @@ class SpecialistBot(ABC):
         """
         return {
             "name": self.name,
+            "display_name": self.display_name,
             "domain": self.domain,
             "title": self.title,
             "learnings_count": len(self.private_memory["learnings"]),

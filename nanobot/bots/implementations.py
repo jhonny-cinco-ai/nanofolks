@@ -18,15 +18,17 @@ class NanobotLeader(SpecialistBot):
     Your personalized companion that coordinates the team.
     """
 
-    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True, theme_manager=None, custom_name=None):
         """Initialize nanobot leader.
 
         Args:
             bus: InterBotBus for communication with team
             workspace_id: Workspace context ID
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
+            theme_manager: Optional theme manager for applying themed display names
+            custom_name: Optional custom display name (overrides theme)
         """
-        super().__init__(NANOBOT_ROLE, bus, workspace_id)
+        super().__init__(NANOBOT_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.authority_level = "high"
         self.can_create_workspaces = True
         self.can_recruit_bots = True
@@ -53,19 +55,21 @@ class NanobotLeader(SpecialistBot):
 
 class ResearcherBot(SpecialistBot):
     """@researcher - The Navigator/Scout.
-    
+
     Deep analysis and knowledge synthesis specialist.
     """
 
-    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True, theme_manager=None, custom_name=None):
         """Initialize researcher bot.
-        
+
         Args:
             bus: InterBotBus for communication with coordinator
             workspace_id: Workspace context ID
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
+            theme_manager: Optional theme manager for applying themed display names
+            custom_name: Optional custom display name (overrides theme)
         """
-        super().__init__(RESEARCHER_ROLE, bus, workspace_id)
+        super().__init__(RESEARCHER_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("data_analysis")
         self.add_expertise("web_research")
         
@@ -96,15 +100,17 @@ class CoderBot(SpecialistBot):
     Code implementation and technical solutions.
     """
 
-    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True, theme_manager=None, custom_name=None):
         """Initialize coder bot.
 
         Args:
             bus: InterBotBus for communication with coordinator
             workspace_id: Workspace context ID
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
+            theme_manager: Optional theme manager for applying themed display names
+            custom_name: Optional custom display name (overrides theme)
         """
-        super().__init__(CODER_ROLE, bus, workspace_id)
+        super().__init__(CODER_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("python")
         self.add_expertise("testing")
         self.add_expertise("refactoring")
@@ -136,7 +142,7 @@ class SocialBot(SpecialistBot):
     Community engagement and social media specialist.
     """
 
-    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True, theme_manager=None, custom_name=None):
         """Initialize social bot.
 
         Args:
@@ -144,7 +150,7 @@ class SocialBot(SpecialistBot):
             workspace_id: Workspace context ID
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
         """
-        super().__init__(SOCIAL_ROLE, bus, workspace_id)
+        super().__init__(SOCIAL_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("community_management")
         self.add_expertise("social_media")
 
@@ -175,7 +181,7 @@ class CreativeBot(SpecialistBot):
     Design and content creation specialist.
     """
 
-    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True, theme_manager=None, custom_name=None):
         """Initialize creative bot.
 
         Args:
@@ -183,7 +189,7 @@ class CreativeBot(SpecialistBot):
             workspace_id: Workspace context ID
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
         """
-        super().__init__(CREATIVE_ROLE, bus, workspace_id)
+        super().__init__(CREATIVE_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("visual_design")
         self.add_expertise("content_creation")
 
@@ -214,7 +220,7 @@ class AuditorBot(SpecialistBot):
     Quality review and compliance specialist.
     """
 
-    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True):
+    def __init__(self, bus=None, workspace_id=None, auto_init_heartbeat: bool = True, theme_manager=None, custom_name=None):
         """Initialize auditor bot.
 
         Args:
@@ -222,7 +228,7 @@ class AuditorBot(SpecialistBot):
             workspace_id: Workspace context ID
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
         """
-        super().__init__(AUDITOR_ROLE, bus, workspace_id)
+        super().__init__(AUDITOR_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("quality_assurance")
         self.add_expertise("compliance")
 

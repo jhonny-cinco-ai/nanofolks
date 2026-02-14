@@ -52,12 +52,15 @@ class Affinity:
 class RoleCard:
     """Complete personality, constraints, and relationships for a bot."""
 
-    bot_name: str  # "nanobot", "researcher", "coder", etc.
+    bot_name: str  # "nanobot", "researcher", "coder", etc. (system identifier)
     domain: RoleCardDomain  # What this bot specializes in
     title: str  # Role title ("Captain", "Navigator", "Gunner", etc.)
     description: str  # What this bot does
     inputs: List[str]  # What this bot accepts as work
     outputs: List[str]  # What this bot produces
+
+    # Display name (user-customizable, defaults to title)
+    display_name: str = ""  # User-facing name (e.g., "Blackbeard", "Slash", "Neo")
 
     # Constraints
     hard_bans: List[HardBan] = field(default_factory=list)
@@ -75,6 +78,22 @@ class RoleCard:
 
     emoji: str = ""
     """Visual identifier for bot"""
+
+    def get_display_name(self) -> str:
+        """Get the display name for this bot.
+        
+        Returns:
+            display_name if set, otherwise falls back to title
+        """
+        return self.display_name if self.display_name else self.title
+
+    def set_display_name(self, name: str) -> None:
+        """Set a custom display name for this bot.
+        
+        Args:
+            name: Custom display name (empty string to reset to title)
+        """
+        self.display_name = name.strip() if name else ""
 
     # Relationships
     affinities: List[Affinity] = field(default_factory=list)
@@ -175,6 +194,8 @@ class RoleCard:
             "bot_name": self.bot_name,
             "domain": self.domain.value,
             "title": self.title,
+            "display_name": self.display_name,
+            "effective_name": self.get_display_name(),
             "description": self.description,
             "inputs": self.inputs,
             "outputs": self.outputs,

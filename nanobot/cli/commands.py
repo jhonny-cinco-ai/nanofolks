@@ -579,13 +579,48 @@ def gateway(
             ResearcherBot, CoderBot, SocialBot, AuditorBot, CreativeBot, NanobotLeader
         )
         
-        # Create bot instances with auto-initialization
-        researcher = ResearcherBot(bus=bus, workspace_id=str(config.workspace_path))
-        coder = CoderBot(bus=bus, workspace_id=str(config.workspace_path))
-        social = SocialBot(bus=bus, workspace_id=str(config.workspace_path))
-        auditor = AuditorBot(bus=bus, workspace_id=str(config.workspace_path))
-        creative = CreativeBot(bus=bus, workspace_id=str(config.workspace_path))
-        nanobot = NanobotLeader(bus=bus, workspace_id=str(config.workspace_path))
+        # Load appearance configuration (themes and custom names)
+        from nanobot.bots.appearance_config import get_appearance_config
+        appearance_config = get_appearance_config()
+        theme_manager = appearance_config.theme_manager
+        
+        # Create bot instances with auto-initialization and appearance config
+        researcher = ResearcherBot(
+            bus=bus,
+            workspace_id=str(config.workspace_path),
+            theme_manager=theme_manager,
+            custom_name=appearance_config.get_custom_name("researcher")
+        )
+        coder = CoderBot(
+            bus=bus,
+            workspace_id=str(config.workspace_path),
+            theme_manager=theme_manager,
+            custom_name=appearance_config.get_custom_name("coder")
+        )
+        social = SocialBot(
+            bus=bus,
+            workspace_id=str(config.workspace_path),
+            theme_manager=theme_manager,
+            custom_name=appearance_config.get_custom_name("social")
+        )
+        auditor = AuditorBot(
+            bus=bus,
+            workspace_id=str(config.workspace_path),
+            theme_manager=theme_manager,
+            custom_name=appearance_config.get_custom_name("auditor")
+        )
+        creative = CreativeBot(
+            bus=bus,
+            workspace_id=str(config.workspace_path),
+            theme_manager=theme_manager,
+            custom_name=appearance_config.get_custom_name("creative")
+        )
+        nanobot = NanobotLeader(
+            bus=bus,
+            workspace_id=str(config.workspace_path),
+            theme_manager=theme_manager,
+            custom_name=appearance_config.get_custom_name("nanobot")
+        )
         
         # Initialize multi-heartbeat manager
         multi_manager = MultiHeartbeatManager()
@@ -2129,6 +2164,291 @@ def skills_list(
 
 
 app.add_typer(skills_app, name="skills")
+
+# ============================================================================
+# Theme Commands
+# ============================================================================
+
+theme_app = typer.Typer(help="Manage crew themes and bot personalities")
+
+
+@theme_app.command("list")
+def theme_list():
+    """List available crew themes."""
+    from nanobot.themes import list_themes
+    
+    themes = list_themes()
+    
+    if not themes:
+        console.print("[yellow]No themes available.[/yellow]")
+        return
+    
+    table = Table(title="Available Crew Themes")
+    table.add_column("Theme", style="cyan")
+    table.add_column("Description")
+    table.add_column("Emoji", justify="center")
+    
+    for theme in themes:
+        table.add_row(
+            theme["display_name"],
+            theme["description"],
+            theme["emoji"]
+        )
+    
+    console.print(table)
+    console.print("\n[dim]Use 'nanobot theme set <theme_name>' to change your crew's theme[/dim]")
+
+
+@theme_app.command("set")
+def theme_set(
+    theme_name: str = typer.Argument(..., help="Theme name (pirate_crew, rock_band, swat_team, professional, space_crew)"),
+):
+    """Set the crew theme."""
+    from nanobot.themes import get_theme, ThemeManager
+    from nanobot.config.loader import get_data_dir
+    import json
+    
+    # Validate theme
+    theme = get_theme(theme_name)
+    if not theme:
+        console.print(f"[red]❌ Unknown theme: {theme_name}[/red]")
+        console.print("\n[dim]Available themes:[/dim]")
+        theme_list()
+        raise typer.Exit(1)
+    
+    # Save theme preference
+    config_dir = get_data_dir()
+    theme_config_file = config_dir / "theme_config.json"
+    
+    theme_config = {
+        "current_theme": theme_name,
+        "theme_display_name": theme.name.value.replace("_", " ").title(),
+        "emoji": theme.nanobot.emoji,
+    }
+    
+    theme_config_file.write_text(json.dumps(theme_config, indent=2))
+    
+    console.print(f"\n{theme.nanobot.emoji} [green]✓ Theme set to:[/green] {theme.name.value.replace('_', ' ').title()}")
+    console.print(f"[dim]{theme.description}[/dim]\n")
+    
+    # Show bot personalities in this theme
+    table = Table(title="Your Crew")
+    table.add_column("Bot", style="cyan")
+    table.add_column("Role")
+    table.add_column("Personality")
+    table.add_column("Emoji", justify="center")
+    
+    bot_mappings = [
+        ("nanobot", "Leader"),
+        ("researcher", "Researcher"),
+        ("coder", "Coder"),
+        ("social", "Social"),
+        ("creative", "Creative"),
+        ("auditor", "Auditor"),
+    ]
+    
+    for bot_name, role in bot_mappings:
+        theming = theme.get_bot_theming(bot_name)
+        if theming:
+            table.add_row(
+                role,
+                theming.title,
+                theming.personality[:40] + "..." if len(theming.personality) > 40 else theming.personality,
+                theming.emoji
+            )
+    
+    console.print(table)
+    console.print("\n[dim]Restart nanobot to apply the new theme to your crew.[/dim]")
+
+
+@theme_app.command("show")
+def theme_show():
+    """Show current theme settings."""
+    from nanobot.themes import ThemeManager
+    from nanobot.config.loader import get_data_dir
+    import json
+    
+    # Load saved theme
+    config_dir = get_data_dir()
+    theme_config_file = config_dir / "theme_config.json"
+    
+    if theme_config_file.exists():
+        theme_config = json.loads(theme_config_file.read_text())
+        current_theme_name = theme_config.get("current_theme", "pirate_crew")
+    else:
+        current_theme_name = "pirate_crew"
+    
+    # Get theme
+    theme_manager = ThemeManager(current_theme_name)
+    theme = theme_manager.get_current_theme()
+    
+    if not theme:
+        console.print("[yellow]No theme currently set.[/yellow]")
+        return
+    
+    console.print(f"\n{theme.nanobot.emoji} [bold]{theme.name.value.replace('_', ' ').title()}[/bold]")
+    console.print(f"[dim]{theme.description}[/dim]\n")
+    
+    table = Table(title="Current Crew")
+    table.add_column("Bot", style="cyan")
+    table.add_column("Display Name")
+    table.add_column("Greeting")
+    
+    bot_roles = [
+        ("nanobot", "Leader"),
+        ("researcher", "Researcher"),
+        ("coder", "Coder"),
+        ("social", "Social"),
+        ("creative", "Creative"),
+        ("auditor", "Auditor"),
+    ]
+    
+    for bot_name, role in bot_roles:
+        theming = theme.get_bot_theming(bot_name)
+        if theming:
+            greeting = theming.greeting[:50] + "..." if len(theming.greeting) > 50 else theming.greeting
+            table.add_row(
+                f"{theming.emoji} {role}",
+                theming.title,
+                f"[dim]'{greeting}'[/dim]"
+            )
+    
+    console.print(table)
+
+
+app.add_typer(theme_app, name="theme")
+
+# ============================================================================
+# Bot Management Commands
+# ============================================================================
+
+bot_app = typer.Typer(help="Manage your AI crew members")
+
+
+@bot_app.command("list")
+def bot_list():
+    """List all crew members."""
+    from nanobot.bots.definitions import (
+        NANOBOT_ROLE,
+        RESEARCHER_ROLE,
+        CODER_ROLE,
+        SOCIAL_ROLE,
+        CREATIVE_ROLE,
+        AUDITOR_ROLE,
+    )
+    from nanobot.config.loader import get_data_dir
+    import json
+    
+    # Load custom names
+    config_dir = get_data_dir()
+    bot_names_file = config_dir / "bot_custom_names.json"
+    custom_names = {}
+    if bot_names_file.exists():
+        custom_names = json.loads(bot_names_file.read_text())
+    
+    bots = [
+        ("nanobot", NANOBOT_ROLE),
+        ("researcher", RESEARCHER_ROLE),
+        ("coder", CODER_ROLE),
+        ("social", SOCIAL_ROLE),
+        ("creative", CREATIVE_ROLE),
+        ("auditor", AUDITOR_ROLE),
+    ]
+    
+    table = Table(title="Your AI Crew")
+    table.add_column("Bot", style="cyan")
+    table.add_column("Display Name")
+    table.add_column("Domain")
+    table.add_column("Status")
+    
+    for bot_id, role in bots:
+        custom_name = custom_names.get(bot_id)
+        display = custom_name if custom_name else role.title
+        status = "🟢 Active" if custom_name else "⚪ Default"
+        
+        table.add_row(
+            f"{role.emoji} {bot_id}",
+            display,
+            role.domain.value,
+            status
+        )
+    
+    console.print(table)
+    console.print("\n[dim]Use 'nanobot bot rename <bot> <name>' to customize names[/dim]")
+
+
+@bot_app.command("rename")
+def bot_rename(
+    bot_name: str = typer.Argument(..., help="Bot to rename (nanobot, researcher, coder, social, creative, auditor)"),
+    new_name: str = typer.Argument(..., help="New display name"),
+):
+    """Rename a crew member."""
+    from nanobot.config.loader import get_data_dir
+    import json
+    
+    # Validate bot name
+    valid_bots = ["nanobot", "researcher", "coder", "social", "creative", "auditor"]
+    if bot_name.lower() not in valid_bots:
+        console.print(f"[red]❌ Unknown bot: {bot_name}[/red]")
+        console.print(f"[dim]Valid bots: {', '.join(valid_bots)}[/dim]")
+        raise typer.Exit(1)
+    
+    # Load existing custom names
+    config_dir = get_data_dir()
+    bot_names_file = config_dir / "bot_custom_names.json"
+    custom_names = {}
+    if bot_names_file.exists():
+        custom_names = json.loads(bot_names_file.read_text())
+    
+    # Update name
+    old_name = custom_names.get(bot_name.lower(), "(default)")
+    custom_names[bot_name.lower()] = new_name
+    
+    # Save
+    bot_names_file.write_text(json.dumps(custom_names, indent=2))
+    
+    console.print(f"\n📝 [green]✓ Renamed {bot_name}:[/green]")
+    console.print(f"   From: [dim]{old_name}[/dim]")
+    console.print(f"   To:   [bold]{new_name}[/bold]")
+    console.print("\n[dim]Restart nanobot to see the change.[/dim]")
+
+
+@bot_app.command("reset")
+def bot_reset(
+    bot_name: str = typer.Argument(..., help="Bot to reset (or 'all' for all bots)"),
+):
+    """Reset a crew member's name to default."""
+    from nanobot.config.loader import get_data_dir
+    import json
+    
+    config_dir = get_data_dir()
+    bot_names_file = config_dir / "bot_custom_names.json"
+    
+    if not bot_names_file.exists():
+        console.print("[yellow]No custom names to reset.[/yellow]")
+        return
+    
+    custom_names = json.loads(bot_names_file.read_text())
+    
+    if bot_name.lower() == "all":
+        # Reset all
+        count = len(custom_names)
+        custom_names = {}
+        bot_names_file.write_text(json.dumps(custom_names, indent=2))
+        console.print(f"\n🔄 [green]✓ Reset {count} crew members to default names[/green]")
+    else:
+        # Reset specific bot
+        if bot_name.lower() in custom_names:
+            old_name = custom_names.pop(bot_name.lower())
+            bot_names_file.write_text(json.dumps(custom_names, indent=2))
+            console.print(f"\n🔄 [green]✓ Reset {bot_name}[/green] (was: {old_name})")
+        else:
+            console.print(f"[yellow]{bot_name} already uses default name[/yellow]")
+    
+    console.print("\n[dim]Restart nanobot to see the changes.[/dim]")
+
+
+app.add_typer(bot_app, name="bot")
 
 # Import and wire heartbeat commands
 try:

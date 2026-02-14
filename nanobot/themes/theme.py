@@ -24,6 +24,15 @@ class BotTheming:
     greeting: str  # How bot introduces itself
     voice_directive: str  # How bot should communicate
     emoji: str = ""  # Visual identifier
+    default_name: str = ""  # Default display name (e.g., "Blackbeard", "Slash")
+
+    def get_default_display_name(self) -> str:
+        """Get the default display name for this bot.
+        
+        Returns:
+            default_name if set, otherwise falls back to title
+        """
+        return self.default_name if self.default_name else self.title
 
 
 @dataclass

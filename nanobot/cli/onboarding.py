@@ -1,17 +1,18 @@
-"""Interactive onboarding wizard for multi-agent orchestration setup.
+"""Unified onboarding wizard for multi-agent orchestration setup.
 
-This module provides an interactive CLI wizard that guides new users through:
-1. Theme selection
-2. Capability selection
-3. Team composition recommendation
-4. #general workspace creation
-5. SOUL.md personality file generation for team members
+This module provides a unified CLI wizard that guides new users through:
+1. Provider selection (API key)
+2. Model selection
+3. Theme/Team selection (with team description)
+4. #general workspace creation with all bots
+5. SOUL.md personality file generation
 
 Uses typer and rich for interactive prompts and rich terminal output.
 """
 
+import asyncio
 from pathlib import Path
-from typing import List, Set, Dict, Optional
+from typing import Dict, Optional
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -26,303 +27,369 @@ console = Console()
 
 
 class OnboardingWizard:
-    """Interactive onboarding wizard for multi-agent team setup.
+    """Unified onboarding wizard for multi-agent team setup.
     
-    Guides users through:
-    1. Theme selection (personality style)
-    2. Domain/capability selection
-    3. Team composition recommendation
+    Complete wizard that guides users through:
+    1. Provider selection and API key
+    2. Model selection
+    3. Theme/Team selection with full team description
     4. Workspace creation
     5. SOUL.md personality file generation
     """
     
-    DOMAIN_DESCRIPTIONS = {
-        "coordination": "Team leadership, task delegation, decision making",
-        "research": "Information gathering, analysis, pattern recognition",
-        "development": "Code implementation, architecture, technical solutions",
-        "community": "User engagement, communication, relationship building",
-        "design": "Creative solutions, visual thinking, innovation",
-        "quality": "Testing, validation, error checking, compliance",
-    }
-    
-    BOT_DESCRIPTIONS = {
-        "researcher": "📚 Researcher Bot - Gathers and analyzes information",
-        "coder": "💻 Coder Bot - Implements technical solutions",
-        "social": "🤝 Social Bot - Handles communication and engagement",
-        "creative": "🎨 Creative Bot - Generates novel ideas and solutions",
-        "auditor": "✓ Auditor Bot - Validates and ensures quality",
+    PROVIDERS = {
+        "1": ("openrouter", "OpenRouter - Access multiple AI models (recommended)"),
+        "2": ("anthropic", "Anthropic - Claude models"),
+        "3": ("openai", "OpenAI - GPT models"),
+        "4": ("groq", "Groq - Fast inference"),
+        "5": ("deepseek", "DeepSeek - Chinese models"),
+        "6": ("moonshot", "Moonshot - Kimi models"),
+        "7": ("gemini", "Gemini - Google AI models"),
     }
     
     def __init__(self):
         """Initialize the onboarding wizard."""
         self.theme_manager = ThemeManager()
         self.selected_theme: Optional[str] = None
-        self.selected_domains: Set[str] = set()
-        self.recommended_team: List[str] = []
         self.soul_manager: Optional[SoulManager] = None
+        self.config_result: Dict = {}
     
     def run(self, workspace_path: Optional[Path] = None) -> Dict:
         """Run the complete onboarding wizard.
         
         Args:
-            workspace_path: Optional workspace path for SOUL file generation
+            workspace_path: Optional workspace path for SOUL file generation and workspace storage
         
         Returns:
             Dictionary containing:
+                - provider: selected provider name
+                - model: selected model
                 - theme: selected theme name
-                - domains: set of selected domains
-                - team: list of recommended bot names
                 - workspace_path: workspace path used
+                - general_workspace: created Workspace object for #general
         """
         self._show_welcome()
+        
+        # Step 1: Provider & API Key
+        self._configure_provider()
+        
+        # Step 2: Theme/Team Selection
         self._select_theme()
-        self._select_domains()
-        self._recommend_team()
+        
+        # Step 3: Summary & Create
         self._confirm_and_create()
+        
+        # Create the #general workspace
+        general_workspace = self.create_general_workspace()
         
         # Apply theme to workspace if path provided
         if workspace_path:
             self._apply_theme_to_workspace(workspace_path)
+            # Save the general workspace to disk
+            self._save_workspace(general_workspace, workspace_path)
         
         return {
+            "provider": self.config_result.get("provider"),
+            "model": self.config_result.get("model"),
             "theme": self.selected_theme,
-            "domains": self.selected_domains,
-            "team": self.recommended_team,
             "workspace_path": str(workspace_path) if workspace_path else None,
+            "general_workspace": general_workspace,
         }
     
     def _show_welcome(self) -> None:
         """Display welcome panel."""
         console.print(Panel.fit(
-            "[bold cyan]🤖 Multi-Agent Team Onboarding[/bold cyan]\n\n"
-            "Welcome! Let's set up your personalized team of AI bots.\n"
-            "This wizard will help you:\n"
-            "  1. Select a team personality theme\n"
-            "  2. Choose your focus areas (domains)\n"
-            "  3. Build your custom team\n"
-            "  4. Create your #general workspace",
-            title="Welcome",
+            "[bold cyan]🚀 Welcome to Nanobot![/bold cyan]\n\n"
+            "Let's set up your multi-agent team in just a few steps.\n"
+            "This wizard will guide you through:\n"
+            "  1. [bold]AI Provider[/bold] + Model (with Smart Routing)\n"
+            "  2. [bold]Evolutionary Mode[/bold] (optional)\n"
+            "  3. [bold]Team Theme[/bold] - Choose your team's personality\n"
+            "  4. [bold]Launch[/bold] - Create workspace and initialize bots",
+            title="🎉",
             border_style="cyan"
         ))
         console.print()
     
+    def _configure_provider(self) -> None:
+        """Step 1: Configure AI provider and API key."""
+        console.print("[bold cyan]Step 1: AI Provider Setup[/bold cyan]\n")
+        console.print("Choose the AI provider for your team:\n")
+        
+        for key, (name, desc) in self.PROVIDERS.items():
+            console.print(f"  [{key}] {desc}")
+        
+        provider_choice = Prompt.ask(
+            "\nSelect provider",
+            choices=list(self.PROVIDERS.keys()),
+            default="1"
+        )
+        provider_name, provider_desc = self.PROVIDERS[provider_choice]
+        
+        # Get API key
+        console.print(f"\n[dim]{provider_desc}[/dim]")
+        api_key = Prompt.ask(f"Enter your {provider_name.title()} API key", password=True)
+        
+        if not api_key:
+            console.print("[yellow]⚠ No API key provided. You can configure this later with: nanobot configure[/yellow]\n")
+            self.config_result["provider"] = None
+            self.config_result["api_key"] = None
+        else:
+            # Save API key
+            console.print(f"\n[cyan]Saving API key for {provider_name}...[/cyan]")
+            self.config_result["provider"] = provider_name
+            self.config_result["api_key"] = api_key
+            
+            # Configure using UpdateConfigTool
+            asyncio.run(self._save_provider_config(provider_name, api_key))
+            console.print(f"[green]✓ {provider_name.title()} configured![/green]\n")
+        
+        # Model selection
+        console.print("[bold]Select Model[/bold]")
+        console.print("Choose the default model for your team:\n")
+        
+        models = self._get_available_models(provider_name)
+        for i, model in enumerate(models[:5], 1):
+            console.print(f"  [{i}] {model}")
+        console.print("  [c] Custom model")
+        
+        model_choice = Prompt.ask(
+            "\nSelect model",
+            choices=[str(i) for i in range(1, min(6, len(models)+1))] + ["c"],
+            default="1"
+        )
+        
+        if model_choice == "c":
+            primary_model = Prompt.ask("Enter custom model name")
+        else:
+            primary_model = models[int(model_choice) - 1]
+        
+        self.config_result["model"] = primary_model
+        
+        # Save model selection
+        if primary_model and api_key:
+            asyncio.run(self._save_model_config(primary_model))
+            console.print(f"[green]✓ Primary model set to {primary_model}[/green]\n")
+        
+        # Smart Routing configuration
+        self._configure_smart_routing(provider_name, primary_model)
+        
+        # Evolutionary Mode configuration
+        self._configure_evolutionary_mode()
+    
+    def _configure_smart_routing(self, provider: str, primary_model: str) -> None:
+        """Step 1b: Configure Smart Routing."""
+        console.print("[bold cyan]Step 1b: Smart Routing[/bold cyan]\n")
+        console.print("""
+[dim]Smart routing automatically selects the best model based on query complexity:[/dim]
+  • Simple queries → Cheaper, faster models
+  • Complex tasks → Stronger, more capable models
+  • Coding → Specialized coding models
+  • Reasoning → Advanced reasoning models
+
+[dim]This saves costs while maintaining quality.[/dim]
+        """)
+        
+        enable_routing = Confirm.ask("Enable smart routing?", default=True)
+        
+        if enable_routing:
+            asyncio.run(self._save_routing_config(True))
+            console.print("[green]✓ Smart routing enabled![/green]\n")
+            console.print("[dim]Models will be auto-configured based on your provider.[/dim]")
+            console.print("[dim]Customize later: nanobot configure[/dim]\n")
+        else:
+            console.print("[dim]Smart routing disabled. Will use primary model for all queries.[/dim]\n")
+    
+    def _configure_evolutionary_mode(self) -> None:
+        """Step 1c: Configure Evolutionary Mode."""
+        console.print("[bold cyan]Step 1c: Evolutionary Mode (Optional)[/bold cyan]\n")
+        console.print("""
+[dim]Evolutionary mode allows bots to:[/dim]
+  • Modify their own source code
+  • Access paths outside the workspace
+  • Self-improve and adapt
+
+[yellow]⚠ Security Warning:[/yellow] Only enable if you understand the risks.
+        """)
+        
+        enable_evo = Confirm.ask("Enable evolutionary mode?", default=False)
+        
+        if enable_evo:
+            asyncio.run(self._save_evolutionary_config(True))
+            console.print("[green]✓ Evolutionary mode enabled![/green]\n")
+        else:
+            console.print("[dim]Evolutionary mode disabled. Bots restricted to workspace only.[/dim]\n")
+    
+    async def _save_routing_config(self, enabled: bool) -> None:
+        """Save routing configuration."""
+        try:
+            from nanobot.agent.tools.update_config import UpdateConfigTool
+            tool = UpdateConfigTool()
+            await tool.execute(path="routing.enabled", value=enabled)
+        except Exception as e:
+            console.print(f"[yellow]⚠ Could not save routing config: {e}[/yellow]")
+    
+    async def _save_evolutionary_config(self, enabled: bool) -> None:
+        """Save evolutionary mode configuration."""
+        try:
+            from nanobot.agent.tools.update_config import UpdateConfigTool
+            tool = UpdateConfigTool()
+            await tool.execute(path="tools.evolutionary", value=enabled)
+            if enabled:
+                await tool.execute(path="tools.allowedPaths", value=["/projects/nanobot-turbo", "~/.nanobot"])
+        except Exception as e:
+            console.print(f"[yellow]⚠ Could not save evolutionary config: {e}[/yellow]")
+    
+    async def _save_provider_config(self, provider: str, api_key: str) -> None:
+        """Save provider API key to config."""
+        try:
+            from nanobot.agent.tools.update_config import UpdateConfigTool
+            tool = UpdateConfigTool()
+            await tool.execute(path=f"providers.{provider}.apiKey", value=api_key)
+        except Exception as e:
+            console.print(f"[yellow]⚠ Could not save API key: {e}[/yellow]")
+    
+    async def _save_model_config(self, model: str) -> None:
+        """Save default model to config."""
+        try:
+            from nanobot.agent.tools.update_config import UpdateConfigTool
+            tool = UpdateConfigTool()
+            await tool.execute(path="agents.defaults.model", value=model)
+        except Exception as e:
+            console.print(f"[yellow]⚠ Could not save model: {e}[/yellow]")
+    
+    def _get_available_models(self, provider: str) -> list:
+        """Get available models for a provider."""
+        # Simplified - in production would query provider schema
+        defaults = {
+            "openrouter": ["openrouter/anthropic/claude-3-5-sonnet", "openrouter/openai/gpt-4o"],
+            "anthropic": ["anthropic/claude-3-5-sonnet-20241022"],
+            "openai": ["openai/gpt-4o"],
+            "groq": ["groq/llama-3.3-70b"],
+            "deepseek": ["deepseek/deepseek-chat"],
+            "moonshot": ["moonshot/kimi-k2.5"],
+            "gemini": ["gemini-2.0-flash-exp"],
+        }
+        return defaults.get(provider, ["default-model"])
+    
     def _select_theme(self) -> None:
-        """Interactive theme selection."""
-        console.print("[bold]Step 1: Select Team Theme[/bold]")
-        console.print("Choose how your team will present itself:\n")
+        """Interactive team/theme selection."""
+        console.print("[bold cyan]Step 2: Choose Your Team Theme[/bold cyan]\n")
         
         themes = list_themes()
         theme_names = [t["name"] for t in themes]
         
-        # Display themes with descriptions
+        # First show just the team theme options
+        console.print("Choose your team's personality:\n")
         for i, theme in enumerate(themes, 1):
-            console.print(f"{i}. [bold cyan]{theme['display_name']}[/bold cyan]")
-            console.print(f"   {theme['description']}\n")
+            console.print(f"  [{i}] {theme['display_name']} - {theme['description']}")
+        console.print("  [b] Back to previous step")
         
-        # Prompt for selection
-        while True:
-            choice = Prompt.ask(
-                "Select theme (number or name)",
-                choices=[str(i) for i in range(1, len(themes) + 1)] + theme_names,
-            )
-            
-            # Convert number to theme name
-            if choice.isdigit():
-                self.selected_theme = theme_names[int(choice) - 1]
-            else:
-                self.selected_theme = choice
-            
-            # Validate and confirm
-            theme_obj = get_theme(self.selected_theme)
-            if theme_obj:
-                if Confirm.ask(
-                    f"\n✓ Confirmed: [cyan]{theme_obj.description}[/cyan]?",
-                    default=True
-                ):
-                    self.theme_manager.select_theme(self.selected_theme)
-                    console.print()
-                    break
-                console.print()
-    
-    def _select_domains(self) -> None:
-        """Interactive domain/capability selection."""
-        console.print("[bold]Step 2: Select Focus Areas (Domains)[/bold]")
-        console.print("Choose the areas your team will focus on:\n")
-        
-        domains = list(self.DOMAIN_DESCRIPTIONS.keys())
-        
-        # Display domains
-        for i, domain in enumerate(domains, 1):
-            console.print(f"{i}. [bold cyan]{domain.upper()}[/bold cyan]")
-            console.print(f"   {self.DOMAIN_DESCRIPTIONS[domain]}\n")
-        
-        # Multi-select with checkmarks
-        selected = set()
-        console.print("[cyan]Enter domain numbers separated by spaces (e.g., '1 2 3')[/cyan]")
-        console.print("[cyan]Or press Enter to select all[/cyan]\n")
-        
-        while True:
-            choice = Prompt.ask("Select domains").strip()
-            
-            if not choice:
-                # Select all domains
-                selected = set(domains)
-                break
-            
-            # Parse numbers
-            try:
-                numbers = [int(x.strip()) for x in choice.split()]
-                if all(1 <= n <= len(domains) for n in numbers):
-                    selected = {domains[n - 1] for n in numbers}
-                    break
-                console.print("[red]✗ Invalid selection. Please enter valid numbers.[/red]\n")
-            except ValueError:
-                console.print("[red]✗ Invalid input. Please enter numbers separated by spaces.[/red]\n")
-        
-        self.selected_domains = selected
-        
-        # Show confirmation
-        console.print("\n[green]✓ Selected domains:[/green]")
-        for domain in sorted(self.selected_domains):
-            console.print(f"  • {domain.upper()}")
         console.print()
-    
-    def compute_recommended_team(self) -> List[str]:
-        """Compute team composition based on selected domains.
         
-        Returns:
-            List of recommended bot names
-        """
-        # Always include nanobot leader
-        domain_to_bots = {
-            "coordination": ["nanobot"],
-            "research": ["researcher"],
-            "development": ["coder"],
-            "community": ["social"],
-            "design": ["creative"],
-            "quality": ["auditor"],
-        }
+        # Let user select
+        choice = Prompt.ask(
+            "Select team theme",
+            choices=[str(i) for i in range(1, len(themes) + 1)] + ["b"],
+        )
         
-        # Collect recommended bots
-        recommended = {"nanobot"}
-        for domain in self.selected_domains:
-            for bot in domain_to_bots.get(domain, []):
-                recommended.add(bot)
+        if choice == "b":
+            # Go back to provider configuration
+            self._configure_provider()
+            return
         
-        return sorted(list(recommended))
-    
-    def _recommend_team(self, interactive: bool = True) -> None:
-        """Recommend team composition based on selected domains.
+        selected_theme = themes[int(choice) - 1]
+        self.selected_theme = selected_theme["name"]
         
-        Args:
-            interactive: If True, show prompts and allow customization
-        """
-        if interactive:
-            console.print("[bold]Step 3: Build Your Team[/bold]")
-            console.print("Based on your selected domains, here are recommended team members:\n")
+        # Now show the full team composition for the selected theme
+        self._show_team_for_theme(selected_theme["name"])
         
-        self.recommended_team = self.compute_recommended_team()
+        # Confirm with option to go back
+        console.print()
+        confirm = Confirm.ask(f"✓ Confirm {selected_theme['display_name']} team?", default=True)
         
-        if interactive:
-            # Display with descriptions
-            for bot_name in self.recommended_team:
-                if bot_name in self.BOT_DESCRIPTIONS:
-                    console.print(self.BOT_DESCRIPTIONS[bot_name])
-            
-            # Allow customization
+        if confirm:
+            self.theme_manager.select_theme(self.selected_theme)
             console.print()
-            if Confirm.ask("Would you like to customize the team?"):
-                self._customize_team()
-            else:
-                console.print("[green]✓ Team composition confirmed[/green]\n")
+        else:
+            # Let them choose again
+            self._select_theme()
     
-    def _customize_team(self) -> None:
-        """Allow user to customize team composition."""
-        console.print("\n[bold]Team Customization[/bold]\n")
+    def _show_team_for_theme(self, theme_name: str) -> None:
+        """Show the full team composition for a theme."""
+        theme = get_theme(theme_name)
+        if not theme:
+            return
         
-        all_bots = ["researcher", "coder", "social", "creative", "auditor"]
-        current_team = set(self.recommended_team)
+        console.print(f"\n[bold]Team: {theme.name.value}[/bold]\n")
+        console.print(f"[dim]{theme.description}[/dim]\n")
         
-        # Show available bots to add/remove
-        console.print("[cyan]Current team:[/cyan]")
-        for bot in self.recommended_team:
-            console.print(f"  ✓ {bot}")
+        # Create a table showing each team member
+        team_table = Table(title="Your Team Members", box=box.ROUNDED)
+        team_table.add_column("Role", style="cyan", width=15)
+        team_table.add_column("Bot", style="green", width=12)
+        team_table.add_column("Description", style="white")
         
-        console.print("\n[cyan]Available to add:[/cyan]")
-        available = [b for b in all_bots if b not in current_team]
-        for i, bot in enumerate(available, 1):
-            console.print(f"  {i}. {self.BOT_DESCRIPTIONS[bot]}")
+        # Add each bot
+        bots = [
+            ("Leader", theme.nanobot, "nanobot"),
+            ("Researcher", theme.researcher, "researcher"),
+            ("Coder", theme.coder, "coder"),
+            ("Social", theme.social, "social"),
+            ("Creative", theme.creative, "creative"),
+            ("Auditor", theme.auditor, "auditor"),
+        ]
         
-        # Prompt for additions
-        if available:
-            console.print()
-            to_add = Prompt.ask(
-                "Add bots (numbers separated by spaces, or press Enter to skip)",
-                default=""
-            )
-            
-            if to_add:
-                try:
-                    numbers = [int(x.strip()) for x in to_add.split()]
-                    for num in numbers:
-                        if 1 <= num <= len(available):
-                            self.recommended_team.append(available[num - 1])
-                except ValueError:
-                    console.print("[yellow]⚠ Skipping additions due to invalid input[/yellow]")
+        for role, bot_theming, bot_name in bots:
+            if bot_theming:
+                team_table.add_row(
+                    f"{bot_theming.emoji} {bot_theming.title}",
+                    f"@{bot_name}",
+                    bot_theming.personality
+                )
         
-        # Prompt for removals (except nanobot)
-        removable = [b for b in self.recommended_team if b != "nanobot"]
-        if removable:
-            console.print("\n[cyan]Remove from team:[/cyan]")
-            for i, bot in enumerate(removable, 1):
-                console.print(f"  {i}. {bot}")
-            
-            to_remove = Prompt.ask(
-                "Remove bots (numbers separated by spaces, or press Enter to skip)",
-                default=""
-            )
-            
-            if to_remove:
-                try:
-                    numbers = sorted([int(x.strip()) for x in to_remove.split()], reverse=True)
-                    for num in numbers:
-                        if 1 <= num <= len(removable):
-                            self.recommended_team.remove(removable[num - 1])
-                except ValueError:
-                    console.print("[yellow]⚠ Skipping removals due to invalid input[/yellow]")
-        
-        self.recommended_team = sorted(list(set(self.recommended_team)))
-        console.print("\n[green]✓ Team customization complete[/green]\n")
+        console.print(team_table)
+        console.print()
+        console.print("[dim]All 6 bots will be created and ready to use.[/dim]\n")
     
     def _confirm_and_create(self) -> None:
         """Final confirmation and workspace creation."""
-        console.print("[bold]Step 4: Summary[/bold]\n")
+        console.print("[bold cyan]Step 3: Ready to Launch![/bold cyan]\n")
         
         # Show summary table
-        summary_table = Table(title="Team Setup Summary", box=box.ROUNDED)
+        summary_table = Table(title="Your Setup Summary", box=box.ROUNDED)
         summary_table.add_column("Setting", style="cyan")
         summary_table.add_column("Value", style="green")
         
+        # Provider info
+        provider = self.config_result.get("provider", "Not configured")
+        model = self.config_result.get("model", "default")
+        summary_table.add_row("AI Provider", provider)
+        summary_table.add_row("Model", model)
+        
+        # Theme info
         theme_obj = self.theme_manager.get_current_theme()
-        summary_table.add_row("Theme", theme_obj.name)
-        summary_table.add_row("Domains", ", ".join(sorted(self.selected_domains)))
-        summary_table.add_row("Team Members", ", ".join(self.recommended_team))
+        theme_name = theme_obj.name.value if theme_obj else self.selected_theme or "Unknown"
+        summary_table.add_row("Team Theme", theme_name)
+        summary_table.add_row("Bots", "6 (all ready)")
+        summary_table.add_row("Workspace", "#general")
         
         console.print(summary_table)
         console.print()
         
-        if Confirm.ask("Create team and #general workspace?", default=True):
-            console.print("[green]✓ Setup complete![/green]")
-            console.print("\nYour team is ready. Start using it with:")
-            console.print("  [cyan]@researcher analyze <topic>[/cyan]")
-            console.print("  [cyan]@coder implement <feature>[/cyan]")
-            console.print("  [cyan]#general <message>[/cyan]")
-            console.print()
+        if Confirm.ask("🚀 Launch your team?", default=True):
+            console.print("\n[green]✓ Setup complete![/green]\n")
+            console.print("Your multi-agent team is ready!")
+            console.print("\n[bold]Get started:[/bold]")
+            console.print("  [cyan]nanobot agent[/cyan]        - Start chatting")
+            console.print("  [cyan]#general[/cyan]            - Team chat")
+            console.print("  [cyan]@researcher[/cyan]        - DM a bot directly")
+            console.print("  [cyan]nanobot configure[/cyan]  - Add more providers/models\n")
         else:
             console.print("[yellow]Setup cancelled[/yellow]\n")
     
     def create_general_workspace(self) -> Workspace:
-        """Create #general workspace with recommended team.
+        """Create #general workspace with nanobot (Leader).
         
         Returns:
             Created Workspace object
@@ -330,7 +397,7 @@ class OnboardingWizard:
         general_ws = Workspace(
             id="general",
             type=WorkspaceType.OPEN,
-            participants=self.recommended_team,
+            participants=["nanobot"],  # Only Leader in general workspace by default
             owner="system",
             metadata={
                 "name": "General",
@@ -339,10 +406,51 @@ class OnboardingWizard:
         )
         return general_ws
     
-    def _apply_theme_to_workspace(self, workspace_path: Path) -> None:
-        """Apply selected theme to team in workspace.
+    def _save_workspace(self, workspace: Workspace, workspace_path: Path) -> None:
+        """Save workspace to disk.
         
-        Creates SOUL.md personality files for each team member.
+        Args:
+            workspace: Workspace object to save
+            workspace_path: Path to workspace root directory
+        """
+        import json
+        from datetime import datetime
+        
+        try:
+            # Create workspaces directory if it doesn't exist
+            workspaces_dir = workspace_path / "workspaces"
+            workspaces_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Convert workspace to JSON-serializable format
+            workspace_data = {
+                "id": workspace.id,
+                "type": workspace.type.value,
+                "participants": workspace.participants,
+                "owner": workspace.owner,
+                "created_at": workspace.created_at.isoformat(),
+                "auto_archive": workspace.auto_archive,
+                "archive_after_days": workspace.archive_after_days,
+                "coordinator_mode": workspace.coordinator_mode,
+                "escalation_threshold": workspace.escalation_threshold,
+                "deadline": workspace.deadline,
+                "metadata": workspace.metadata,
+                "summary": workspace.summary,
+            }
+            
+            # Save to workspace-specific JSON file
+            workspace_file = workspaces_dir / f"{workspace.id}.json"
+            with open(workspace_file, "w") as f:
+                json.dump(workspace_data, f, indent=2, default=str)
+            
+            console.print(f"[green]✓ Saved workspace to {workspace_file}[/green]")
+        
+        except Exception as e:
+            console.print(f"[yellow]⚠ Could not save workspace: {e}[/yellow]")
+    
+    def _apply_theme_to_workspace(self, workspace_path: Path) -> None:
+        """Apply selected theme to all team members in workspace.
+        
+        Creates SOUL.md personality files for the entire team so all bots are ready.
         
         Args:
             workspace_path: Path to workspace
@@ -350,30 +458,31 @@ class OnboardingWizard:
         try:
             # Initialize SoulManager for workspace
             soul_manager = SoulManager(workspace_path)
-            theme = get_theme(self.selected_theme)
+            theme = get_theme(self.selected_theme) if self.selected_theme else None
             
-            if theme:
-                console.print("\n[cyan]Applying theme to team...[/cyan]")
+            if theme and self.selected_theme:
+                console.print("\n[cyan]Initializing team personalities...[/cyan]")
                 
-                # Apply theme to all team members
+                # Apply theme to entire team
+                team = ["nanobot", "researcher", "coder", "social", "creative", "auditor"]
                 results = soul_manager.apply_theme_to_team(
                     theme,
-                    self.recommended_team,
+                    team,
                     force=True
                 )
                 
                 # Show results
                 successful = sum(1 for v in results.values() if v)
                 console.print(
-                    f"[green]✓ Applied theme to {successful}/{len(self.recommended_team)} bots[/green]"
+                    f"[green]✓ Initialized {successful}/{len(team)} team members[/green]"
                 )
                 
                 # Show team personalities
                 console.print("\n[bold]Team personalities configured:[/bold]")
-                for bot in self.recommended_team:
-                    theming = theme.get_bot_theming(bot)
+                for bot_name in team:
+                    theming = theme.get_bot_theming(bot_name)
                     if theming:
-                        console.print(f"  {theming.emoji} {theming.title} ({bot})")
+                        console.print(f"  {theming.emoji} {theming.title} ({bot_name})")
         
         except Exception as e:
             console.print(f"[yellow]⚠ Could not apply theme: {e}[/yellow]")

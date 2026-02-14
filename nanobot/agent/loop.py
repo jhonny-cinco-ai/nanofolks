@@ -238,8 +238,78 @@ class AgentLoop:
         # Initialize work log manager for transparency
         self.work_log_manager = get_work_log_manager()
         
+        # Initialize bot invoker for delegating to specialist bots
+        from nanobot.agent.bot_invoker import BotInvoker
+        self.bot_invoker = BotInvoker(
+            provider=provider,
+            workspace=workspace,
+            bus=bus,
+            work_log_manager=self.work_log_manager,
+            model=self.model,
+            brave_api_key=brave_api_key,
+            exec_config=self.exec_config,
+            restrict_to_workspace=restrict_to_workspace,
+            evolutionary=evolutionary,
+            allowed_paths=allowed_paths,
+            protected_paths=protected_paths,
+        )
+        
+        # Ensure theme is applied to nanobot SOUL on first agent start
+        self._apply_theme_if_needed()
+        
         self._running = False
         self._register_default_tools()
+    
+    def _apply_theme_if_needed(self) -> None:
+        """Apply the selected theme to all team members' SOUL files on first start.
+        
+        This ensures all bots are ready to use immediately, whether in workspaces or via DM.
+        Team includes: nanobot (Leader), researcher, coder, social, creative, auditor
+        """
+        try:
+            from nanobot.themes import ThemeManager
+            from nanobot.soul import SoulManager
+            
+            # Check if theme has been applied already (use nanobot as indicator)
+            soul_file = self.workspace / "bots" / "nanobot" / "SOUL.md"
+            if soul_file.exists():
+                # Theme already applied to team
+                logger.debug("Team SOUL files already initialized")
+                return
+            
+            # Get the current theme from theme manager
+            theme_manager = ThemeManager()
+            theme = theme_manager.get_current_theme()
+            
+            if not theme:
+                # No theme selected, skip
+                logger.debug("No theme configured, skipping SOUL generation for team")
+                return
+            
+            # Define the complete team (all available bots)
+            team = ["nanobot", "researcher", "coder", "social", "creative", "auditor"]
+            
+            # Apply the theme to all team members
+            soul_manager = SoulManager(self.workspace)
+            results = soul_manager.apply_theme_to_team(
+                theme,
+                team,
+                force=False
+            )
+            
+            # Log results
+            successful = sum(1 for v in results.values() if v)
+            logger.info(f"Initialized SOUL files for {successful}/{len(team)} team members")
+            
+            # Show which bots are ready
+            for bot_name, success in results.items():
+                if success:
+                    logger.debug(f"  ✓ {bot_name} ready for use (DM or workspace)")
+                else:
+                    logger.warning(f"  ✗ {bot_name} SOUL initialization failed")
+            
+        except Exception as e:
+            logger.warning(f"Could not initialize team SOUL files: {e}")
     
     def _register_default_tools(self) -> None:
         """Register the default set of tools."""
@@ -286,6 +356,11 @@ class AgentLoop:
         # Spawn tool (for subagents)
         spawn_tool = SpawnTool(manager=self.subagents)
         self.tools.register(spawn_tool)
+        
+        # Invoke tool (for delegating to specialist bots)
+        from nanobot.agent.tools.invoke import InvokeTool
+        invoke_tool = InvokeTool(invoker=self.bot_invoker)
+        self.tools.register(invoke_tool)
         
         # Cron tool (for scheduling)
         if self.cron_service:

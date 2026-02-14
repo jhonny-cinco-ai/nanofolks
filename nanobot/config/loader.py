@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from typing import Any
+from loguru import logger
 
 from nanobot.config.schema import Config
 
@@ -13,34 +14,59 @@ def get_config_path() -> Path:
 
 
 def get_data_dir() -> Path:
-    """Get the nanobot data directory."""
-    from nanobot.utils.helpers import get_data_path
-    return get_data_path()
+     """Get the nanobot data directory."""
+     from nanobot.utils.helpers import get_data_path
+     return get_data_path()
+
+
+def _ensure_workspace_initialized(config: Config) -> None:
+     """Ensure the default #general workspace is created on first run.
+     
+     Args:
+         config: Configuration object with workspace path
+     """
+     try:
+         from nanobot.bots.workspace_manager import WorkspaceManager
+         
+         # This will create the default #general workspace if it doesn't exist
+         # WorkspaceManager uses get_data_dir() internally, which respects config
+         manager = WorkspaceManager()
+         logger.info("Initialized default #general workspace with Leader")
+     except Exception as e:
+         # Don't fail if workspace creation fails - it will be retried on agent start
+         print(f"Note: Could not initialize workspace: {e}")
 
 
 def load_config(config_path: Path | None = None) -> Config:
-    """
-    Load configuration from file or create default.
-    
-    Args:
-        config_path: Optional path to config file. Uses default if not provided.
-    
-    Returns:
-        Loaded configuration object.
-    """
-    path = config_path or get_config_path()
-    
-    if path.exists():
-        try:
-            with open(path) as f:
-                data = json.load(f)
-            data = _migrate_config(data)
-            return Config.model_validate(convert_keys(data))
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"Warning: Failed to load config from {path}: {e}")
-            print("Using default configuration.")
-    
-    return Config()
+     """
+     Load configuration from file or create default.
+     
+     Args:
+         config_path: Optional path to config file. Uses default if not provided.
+     
+     Returns:
+         Loaded configuration object.
+     """
+     path = config_path or get_config_path()
+     is_first_run = not path.exists()
+     
+     if path.exists():
+         try:
+             with open(path) as f:
+                 data = json.load(f)
+             data = _migrate_config(data)
+             return Config.model_validate(convert_keys(data))
+         except (json.JSONDecodeError, ValueError) as e:
+             print(f"Warning: Failed to load config from {path}: {e}")
+             print("Using default configuration.")
+     
+     config = Config()
+     
+     # On first run, ensure workspace is created
+     if is_first_run:
+         _ensure_workspace_initialized(config)
+     
+     return config
 
 
 def save_config(config: Config, config_path: Path | None = None) -> None:
@@ -101,6 +127,6 @@ def camel_to_snake(name: str) -> str:
 
 
 def snake_to_camel(name: str) -> str:
-    """Convert snake_case to camelCase."""
-    components = name.split("_")
-    return components[0] + "".join(x.title() for x in components[1:])
+     """Convert snake_case to camelCase."""
+     components = name.split("_")
+     return components[0] + "".join(x.title() for x in components[1:])

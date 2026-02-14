@@ -362,6 +362,22 @@ If disabled, your bot will use [bold]{}[/bold] for all queries.
     console.print("  [cyan]nanobot configure[/cyan] - Advanced settings")
 
 
+@app.command("onboard")
+def onboard():
+    """Set up your multi-agent team from scratch.
+    
+    This wizard will guide you through:
+    1. AI Provider & API key configuration
+    2. Model selection  
+    3. Team theme selection with full team preview
+    4. Workspace creation with all bots ready
+    """
+    from nanobot.cli.onboarding import OnboardingWizard
+    
+    wizard = OnboardingWizard()
+    result = wizard.run()
+
+
 @app.command()
 def configure():
     """Interactive configuration wizard."""

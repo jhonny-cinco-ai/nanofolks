@@ -1,8 +1,10 @@
 """Invoke tool for delegating tasks to specialist bots.
 
-This tool allows the main agent (nanobot) to synchronously invoke
-specialist bots (researcher, coder, social, creative, auditor) and
-wait for their responses.
+This tool allows the main agent (nanobot) to delegate tasks to specialist bots
+(researcher, coder, social, creative, auditor). The bot works in the background
+and reports results back when complete. The main agent continues immediately.
+
+This is always async - no waiting for results.
 """
 
 from typing import Any, TYPE_CHECKING
@@ -24,16 +26,19 @@ class InvokeTool(Tool):
     - creative: Creative brainstorming, design, content
     - auditor: Quality review, validation, compliance
     
-    The invoked bot will process the task and return its response.
+    The bot works in the background and reports back when complete.
     """
     
     def __init__(self, invoker: "BotInvoker"):
         self._invoker = invoker
         self._context: str | None = None
+        self._origin_channel: str = "cli"
+        self._origin_chat_id: str = "direct"
     
-    def set_context(self, context: str) -> None:
+    def set_context(self, channel: str, chat_id: str) -> None:
         """Set conversation context for invocations."""
-        self._context = context
+        self._origin_channel = channel
+        self._origin_chat_id = chat_id
     
     @property
     def name(self) -> str:
@@ -44,8 +49,8 @@ class InvokeTool(Tool):
         return (
             "Invoke a specialist bot to handle a task in your domain of expertise. "
             "Use this when you need help from a specific team member. "
-            "The bot will process the task and return its response. "
-            "Available bots: researcher, coder, social, creative, auditor."
+            "Available bots: researcher, coder, social, creative, auditor. "
+            "The bot will work in background and report results when ready."
         )
     
     @property
@@ -66,28 +71,26 @@ class InvokeTool(Tool):
             "required": ["bot", "task"],
         }
     
-    async def execute(self, bot: str, task: str, **kwargs: Any) -> str:
+    async def execute(
+        self,
+        bot: str,
+        task: str,
+        **kwargs: Any,
+    ) -> str:
         """
         Invoke a specialist bot to handle a task.
         
-        Args:
-            bot: Bot name to invoke
-            task: Task description
-            
-        Returns:
-            Bot's response to the task
+        The bot works in the background and reports results when complete.
         """
         result = await self._invoker.invoke(
             bot_name=bot,
             task=task,
             context=self._context,
+            origin_channel=self._origin_channel,
+            origin_chat_id=self._origin_chat_id,
         )
         
-        # Format result nicely
-        bot_info = self._invoker.get_bot_info(bot)
-        bot_title = bot_info.get("default_name", bot) if bot_info else bot
-        
-        return f"@{bot} ({bot_title}) response:\n\n{result}"
+        return result
     
     def list_available_bots(self) -> dict:
         """List all bots that can be invoked."""

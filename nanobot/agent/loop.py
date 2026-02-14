@@ -578,6 +578,13 @@ class AgentLoop:
         if isinstance(spawn_tool, SpawnTool):
             spawn_tool.set_context(msg.channel, msg.chat_id)
         
+        invoke_tool = self.tools.get("invoke")
+        if invoke_tool:
+            # Check for set_context method (invoke tool has it)
+            set_context = getattr(invoke_tool, "set_context", None)
+            if set_context and callable(set_context):
+                set_context(msg.channel, msg.chat_id)
+        
         cron_tool = self.tools.get("cron")
         if isinstance(cron_tool, CronTool):
             cron_tool.set_context(msg.channel, msg.chat_id)
@@ -960,6 +967,12 @@ class AgentLoop:
         spawn_tool = self.tools.get("spawn")
         if isinstance(spawn_tool, SpawnTool):
             spawn_tool.set_context(origin_channel, origin_chat_id)
+        
+        invoke_tool = self.tools.get("invoke")
+        if invoke_tool:
+            set_context = getattr(invoke_tool, "set_context", None)
+            if set_context and callable(set_context):
+                set_context(origin_channel, origin_chat_id)
         
         cron_tool = self.tools.get("cron")
         if isinstance(cron_tool, CronTool):

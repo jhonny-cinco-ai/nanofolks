@@ -1,5 +1,18 @@
-"""Spawn tool for creating background subagents."""
+"""Spawn tool for creating background subagents.
 
+DEPRECATED: This tool is deprecated in favor of async bot invocations.
+
+Use:
+    invoke bot="researcher", task="...", async_mode=True
+
+Instead of:
+    spawn task="..."
+
+The async invoke tool provides the same functionality but with proper bot
+personalities (SOUL) and better integration with the multi-bot architecture.
+"""
+
+import warnings
 from typing import Any, TYPE_CHECKING
 
 from nanobot.agent.tools.base import Tool
@@ -10,13 +23,25 @@ if TYPE_CHECKING:
 
 class SpawnTool(Tool):
     """
-    Tool to spawn a subagent for background task execution.
+    DEPRECATED: Tool to spawn a subagent for background task execution.
+    
+    .. deprecated::
+        Use InvokeTool with async_mode=True instead.
+        
+        Example:
+            invoke bot="researcher", task="research topic", async_mode=True
     
     The subagent runs asynchronously and announces its result back
     to the main agent when complete.
     """
     
     def __init__(self, manager: "SubagentManager"):
+        warnings.warn(
+            "SpawnTool is deprecated. Use InvokeTool with async_mode=True instead. "
+            "Example: invoke bot='researcher', task='...', async_mode=True",
+            DeprecationWarning,
+            stacklevel=2
+        )
         self._manager = manager
         self._origin_channel = "cli"
         self._origin_chat_id = "direct"

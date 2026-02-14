@@ -1,8 +1,24 @@
-"""Subagent manager for background task execution."""
+"""Subagent manager for background task execution.
+
+DEPRECATED: This module is deprecated in favor of async bot invocations.
+
+The multi-bot architecture now handles background tasks via BotInvoker with async_mode=True.
+Each specialist bot (researcher, coder, social, creative, auditor) can work in the
+background and report results back when complete.
+
+This module is kept for backward compatibility but will be removed in a future version.
+
+If you need background task execution, use:
+    invoke bot="researcher", task="...", async_mode=True
+
+Instead of:
+    spawn task="..."
+"""
 
 import asyncio
 import json
 import uuid
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -20,11 +36,13 @@ from nanobot.agent.tools.web import WebSearchTool, WebFetchTool
 
 class SubagentManager:
     """
-    Manages background subagent execution.
+    DEPRECATED: Manages background subagent execution.
     
-    Subagents are lightweight agent instances that run in the background
-    to handle specific tasks. They share the same LLM provider but have
-    isolated context and a focused system prompt.
+    .. deprecated::
+        Use BotInvoker with async_mode=True instead.
+        
+        Example:
+            invoke bot="researcher", task="research topic", async_mode=True
     """
     
     def __init__(
@@ -40,6 +58,13 @@ class SubagentManager:
         allowed_paths: list[str] | None = None,
         protected_paths: list[str] | None = None,
     ):
+        warnings.warn(
+            "SubagentManager is deprecated. Use BotInvoker with async_mode=True instead. "
+            "Example: invoke bot='researcher', task='...', async_mode=True",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
         from nanobot.config.schema import ExecToolConfig
         self.provider = provider
         self.workspace = workspace

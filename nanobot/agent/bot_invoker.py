@@ -1,7 +1,9 @@
 """Bot invocation system for delegating tasks to specialist bots.
 
-This module provides synchronous bot invocation where the main agent (nanobot)
-can delegate tasks to specialist bots and wait for their responses.
+This module provides both synchronous and asynchronous bot invocation where 
+the main agent (nanobot) can delegate tasks to specialist bots. Supports:
+- Synchronous: waits for response before continuing (legacy mode)
+- Asynchronous: fires off task and notifies when complete (recommended)
 """
 
 import asyncio
@@ -95,9 +97,8 @@ class BotInvoker:
         # Work log manager for multi-bot tracking
         self.work_log_manager = work_log_manager
         
-        # Active invocations
+        # Active invocations (all async now)
         self._active_invocations: dict[str, asyncio.Task[None]] = {}
-        self._pending_results: dict[str, asyncio.Future[str]] = {}
     
     async def invoke(
         self,
@@ -105,18 +106,25 @@ class BotInvoker:
         task: str,
         context: Optional[str] = None,
         session_id: str = "invoke:default",
+        origin_channel: str = "cli",
+        origin_chat_id: str = "direct",
     ) -> str:
         """
         Invoke a specialist bot to handle a task.
+        
+        The bot works in the background and reports results back when complete.
+        This is always async - the main agent continues immediately.
         
         Args:
             bot_name: Name of bot to invoke (researcher, coder, social, creative, auditor)
             task: Task description for the bot
             context: Additional context from the main conversation
             session_id: Session ID for this invocation
+            origin_channel: Channel to send notification when complete
+            origin_chat_id: Chat ID to send notification when complete
             
         Returns:
-            Bot's response to the task
+            Confirmation message that the bot was invoked
         """
         if bot_name not in AVAILABLE_BOTS:
             return f"Error: Unknown bot '{bot_name}'. Available bots: {', '.join(AVAILABLE_BOTS.keys())}"
@@ -126,17 +134,34 @@ class BotInvoker:
         
         invocation_id = str(uuid.uuid4())[:8]
         
-        # Create future to wait for result
-        loop = asyncio.get_event_loop()
-        result_future: asyncio.Future[str] = loop.create_future()
-        self._pending_results[invocation_id] = result_future
-        
-        logger.info(f"Invoking {bot_name} (id: {invocation_id}): {task[:50]}...")
+        # Always async - fire and forget
+        return await self._invoke_async(
+            invocation_id=invocation_id,
+            bot_name=bot_name,
+            task=task,
+            context=context,
+            session_id=session_id,
+            origin_channel=origin_channel,
+            origin_chat_id=origin_chat_id,
+        )
+    
+    async def _invoke_async(
+        self,
+        invocation_id: str,
+        bot_name: str,
+        task: str,
+        context: Optional[str],
+        session_id: str,
+        origin_channel: str,
+        origin_chat_id: str,
+    ) -> str:
+        """Asynchronous invocation - fires off task and notifies when complete."""
+        logger.info(f"Invoking {bot_name} (id: {invocation_id}, async): {task[:50]}...")
         
         # Log the bot invocation request
         self._log_invocation_request(bot_name, task, context)
         
-        # Create the invocation task
+        # Launch in background, don't wait
         task_handle = asyncio.create_task(
             self._process_invocation(
                 invocation_id=invocation_id,
@@ -144,33 +169,18 @@ class BotInvoker:
                 task=task,
                 context=context,
                 session_id=session_id,
-                result_future=result_future,
+                origin_channel=origin_channel,
+                origin_chat_id=origin_chat_id,
             )
         )
         self._active_invocations[invocation_id] = task_handle
         
-        try:
-            # Wait for result with timeout (5 minutes)
-            result = await asyncio.wait_for(result_future, timeout=300.0)
-            logger.info(f"Invocation {invocation_id} completed: {result[:100]}...")
-            
-            # Log the bot's response
-            self._log_invocation_response(bot_name, task, result)
-            
-            return result
-        except asyncio.TimeoutError:
-            logger.warning(f"Invocation {invocation_id} timed out")
-            self._log_invocation_error(bot_name, task, "timeout")
-            return f"Error: Bot '{bot_name}' timed out after 5 minutes"
-        except Exception as e:
-            logger.error(f"Invocation {invocation_id} failed: {e}")
-            self._log_invocation_error(bot_name, task, str(e))
-            return f"Error: Bot '{bot_name}' failed: {str(e)}"
-            return f"Error: Bot '{bot_name}' failed: {str(e)}"
-        finally:
-            # Cleanup
-            self._active_invocations.pop(invocation_id, None)
-            self._pending_results.pop(invocation_id, None)
+        # Get bot info for nice message
+        bot_info = self.get_bot_info(bot_name)
+        bot_title = bot_info.get("default_name", bot_name) if bot_info else bot_name
+        
+        # Return immediately with confirmation
+        return f"@{bot_name} ({bot_title}) is on the task. I'll share the results when ready."
     
     async def _process_invocation(
         self,
@@ -179,9 +189,13 @@ class BotInvoker:
         task: str,
         context: Optional[str],
         session_id: str,
-        result_future: asyncio.Future[str],
+        origin_channel: str,
+        origin_chat_id: str,
     ) -> None:
-        """Process a bot invocation."""
+        """Process a bot invocation and announce result when complete."""
+        result: str = ""
+        status = "ok"
+        
         try:
             # Build system prompt for this bot
             system_prompt = await self._build_bot_system_prompt(bot_name, task)
@@ -191,17 +205,69 @@ class BotInvoker:
             if context:
                 user_message = f"Context from Leader:\n{context}\n\n---\n\nTask:\n{task}"
             
-            # Process through LLM (simplified - just use main model for now)
+            # Process through LLM
             response = await self._call_bot_llm(bot_name, system_prompt, user_message, session_id)
+            result = response or "Task completed but no response generated."
             
-            # Set result
-            if not result_future.done():
-                result_future.set_result(response)
-                
+            logger.info(f"Async invocation {invocation_id} completed")
+            
+            # Log the bot's response
+            self._log_invocation_response(bot_name, task, result)
+            
         except Exception as e:
-            logger.error(f"Invocation {invocation_id} error: {e}")
-            if not result_future.done():
-                result_future.set_exception(e)
+            logger.error(f"Async invocation {invocation_id} failed: {e}")
+            result = f"Error: {str(e)}"
+            status = "error"
+            self._log_invocation_error(bot_name, task, str(e))
+        finally:
+            # Cleanup
+            self._active_invocations.pop(invocation_id, None)
+            
+            # Announce result back to main agent via system message
+            await self._announce_result(
+                invocation_id=invocation_id,
+                bot_name=bot_name,
+                task=task,
+                result=result,
+                origin_channel=origin_channel,
+                origin_chat_id=origin_chat_id,
+                status=status,
+            )
+    
+    async def _announce_result(
+        self,
+        invocation_id: str,
+        bot_name: str,
+        task: str,
+        result: str,
+        origin_channel: str,
+        origin_chat_id: str,
+        status: str,
+    ) -> None:
+        """Announce the bot result back to the main agent via system message."""
+        bot_info = self.get_bot_info(bot_name)
+        bot_title = bot_info.get("default_name", bot_name) if bot_info else bot_name
+        status_text = "completed" if status == "ok" else "failed"
+        
+        announce_content = f"""[Bot @{bot_name} ({bot_title}) {status_text}]
+
+Task: {task}
+
+Result:
+{result}
+
+Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not mention technical details like 'invocation' or task IDs."""
+        
+        # Inject as system message to trigger main agent
+        msg = InboundMessage(
+            channel="system",
+            sender_id=f"invoke:{bot_name}",
+            chat_id=f"{origin_channel}:{origin_chat_id}",
+            content=announce_content,
+        )
+        
+        await self.bus.publish_inbound(msg)
+        logger.debug(f"Invocation {invocation_id} announced result to {origin_channel}:{origin_chat_id}")
     
     async def _build_bot_system_prompt(self, bot_name: str, task: str) -> str:
         """Build system prompt for the invoked bot."""
@@ -256,7 +322,7 @@ Focus only on your domain expertise and provide a helpful response.
             max_tokens=4000,
         )
         
-        return response.content
+        return response.content or ""
     
     def list_available_bots(self) -> dict:
         """List all bots that can be invoked."""

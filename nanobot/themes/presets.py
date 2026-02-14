@@ -200,7 +200,7 @@ FERAL_CLOWDER = Theme(
     ),
     coder=BotTheming(
         title="Hacker",
-        default_name="Scratch",
+        default_name="Shadow",
         personality="Quick paws, breaks into anything",
         greeting="*claws at keyboard* I'll get us in...",
         voice_directive="Resourceful, quick, mischievous",
@@ -224,7 +224,7 @@ FERAL_CLOWDER = Theme(
     ),
     auditor=BotTheming(
         title="Guard",
-        default_name="Shadow",
+        default_name="Night",
         personality="Watches the territory, keeps crew safe",
         greeting="*hisses* All clear. No dogs in sight.",
         voice_directive="Watchful, protective, territorial",

@@ -447,6 +447,15 @@ This will guide you through:
 
 Each theme comes with 6 unique bots:
 
+| Bot | Role | What they do |
+|-----|------|--------------|
+| **Leader** (@nanobot) | Coordinator | Plans, delegates, makes decisions |
+| **Researcher** (@researcher) | Research | Analyzes, gathers information |
+| **Coder** (@coder) | Development | Codes, debugs, builds |
+| **Social** (@social) | Community | Engages, communicates |
+| **Creative** (@creative) | Creative | Brainstorms, designs, creates |
+| **Auditor** (@auditor) | Quality | Reviews, validates, tests |
+
 ## Add Your API Key
 
 After onboarding, add your API key to `~/.nanobot/config.json`:

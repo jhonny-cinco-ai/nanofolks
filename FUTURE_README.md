@@ -434,18 +434,9 @@ This will guide you through:
 | **4. Evolutionary Mode** | Optional self-improvement features |
 | **5. Team Theme** | Choose your crew's personality |
 
-### Team Themes
+### Your Team
 
-| Theme | Description |
-|-------|-------------|
-| **Pirate Crew** | Bold adventurers exploring uncharted territories |
-| **Rock Band** | Creative team making hits together |
-| **SWAT Team** | Elite tactical unit handling critical operations |
-| **Feral Clowder** | Independent and resourceful team |
-| **Executive Suite** | Corporate leadership team |
-| **Space Crew** | Interstellar exploration team |
-
-Each theme comes with 6 unique bots:
+Each Nanofolks crew has 6 bots:
 
 | Bot | Role | What they do |
 |-----|------|--------------|

@@ -1069,6 +1069,8 @@ async def _detect_room_creation_intent(user_message: str, config) -> Optional[di
         content = response.content if hasattr(response, 'content') else str(response)
         
         # Find JSON in the response
+        if not content:
+            return None
         json_match = re.search(r'\{[^{}]*\}', content, re.DOTALL)
         if json_match:
             data = json.loads(json_match.group())
@@ -1277,7 +1279,11 @@ def agent(
         from nanobot.bots.room_manager import get_room_manager
         
         theme_manager = ThemeManager()
-        room_manager = get_room_manager()
+        room_manager_local = get_room_manager()
+        
+        # Ensure current_room and room_manager are available
+        assert current_room is not None, "current_room should not be None"
+        assert room_manager_local is not None, "room_manager should not be None"
         
         # Display enhanced UI with team roster and room list
         console.print(f"{__logo__} Interactive mode\n")
@@ -1286,7 +1292,7 @@ def agent(
         console.print(_render_team_roster(current_room.participants, theme_manager))
         
         # Room list
-        console.print(_render_room_list(room_manager, room))
+        console.print(_render_room_list(room_manager_local, room))
         
         # Status bar
         console.print(_render_status_bar(room, current_room.participants, theme_manager))
@@ -1343,7 +1349,7 @@ def agent(
                 logger.debug(f"Layout redraw failed: {e}")
         
         async def run_interactive():
-            nonlocal current_room  # Allow updating current_room
+            nonlocal current_room, room_manager_local  # Allow updating current_room and accessing room_manager
             
             # Phase 3: Initialize advanced layout
             layout_manager = None
@@ -1363,7 +1369,7 @@ def agent(
                         current_room.participants,
                         compact=False
                     )
-                    rooms_list = room_manager.list_rooms()
+                    rooms_list = room_manager_local.list_rooms()
                     room_list_display = RoomList().render(
                         rooms_list,
                         current_room.id
@@ -1474,7 +1480,7 @@ def agent(
                             
                             # Create room with spinner - Phase 2 improvement
                             with console.status(f"[cyan]Creating room #{room_name}...[/cyan]", spinner="dots"):
-                                new_room = room_manager.create_room(
+                                new_room = room_manager_local.create_room(
                                     name=room_name,
                                     room_type=RoomType(room_type),
                                     participants=["leader"]
@@ -1489,7 +1495,7 @@ def agent(
                             
                             # Phase 3: Update sidebar if layout is active
                             if layout_manager:
-                                rooms_list = room_manager.list_rooms()
+                                rooms_list = room_manager_local.list_rooms()
                                 room_list_display = RoomList().render(rooms_list, new_room.id)
                                 sidebar_manager.update_room_list(room_list_display)
                                 layout_manager.update(sidebar=sidebar_manager.get_content())
@@ -1514,10 +1520,10 @@ def agent(
                         
                         # Invite bot with spinner - Phase 2 improvement
                         with console.status(f"[cyan]Inviting @{bot_name}...[/cyan]", spinner="dots"):
-                            invite_success = room_manager.invite_bot(room, bot_name)
+                            invite_success = room_manager_local.invite_bot(room, bot_name)
                         
                         if invite_success:
-                            updated_room = room_manager.get_room(room)
+                            updated_room = room_manager_local.get_room(room)
                             console.print(f"\n✅ @{bot_name} invited to #{room}\n")
                             current_room = updated_room
                             
@@ -1543,7 +1549,7 @@ def agent(
                         if not new_room_id:
                             # Show available rooms if no argument provided
                             room_manager = get_room_manager()
-                            rooms = room_manager.list_rooms()
+                            rooms = room_manager_local.list_rooms()
                             
                             if rooms:
                                 room_list_ui = RoomList()
@@ -1558,7 +1564,7 @@ def agent(
                         
                         # Show switching spinner - Phase 2 improvement
                         with console.status(f"[cyan]Switching to #{new_room_id}...[/cyan]", spinner="dots"):
-                            new_room = room_manager.get_room(new_room_id)
+                            new_room = room_manager_local.get_room(new_room_id)
                         
                         if not new_room:
                             console.print(f"\n[red]❌ Room '{new_room_id}' not found[/red]\n")
@@ -1576,7 +1582,7 @@ def agent(
                         # Phase 3: Update layout if active
                         if layout_manager:
                             roster_display = TeamRoster().render(current_room.participants, compact=False)
-                            rooms_list = room_manager.list_rooms()
+                            rooms_list = room_manager_local.list_rooms()
                             room_list_display = RoomList().render(rooms_list, current_room.id)
                             
                             sidebar_manager.update_team_roster(roster_display)
@@ -1598,7 +1604,7 @@ def agent(
                         from nanobot.bots.room_manager import get_room_manager
                         
                         room_manager = get_room_manager()
-                        rooms = room_manager.list_rooms()
+                        rooms = room_manager_local.list_rooms()
                         
                         table = Table(title="Available Rooms")
                         table.add_column("Room", style="cyan")
@@ -1779,11 +1785,11 @@ def explain_last_decision(
         if not entries:
             console.print(f"[yellow]No entries found for bot: {bot}[/yellow]")
             raise typer.Exit(1)
-        console.print(f"[cyan]Work log for {log.workspace_id} - showing entries from {bot}[/cyan]\n")
+        console.print(f"[cyan]Work log for {log.session_id} - showing entries from {bot}[/cyan]\n")
     else:
         entries = log.entries
-        if log.workspace_id != "default":
-            console.print(f"[cyan]Work log for {log.workspace_id} ({log.workspace_type.value})[/cyan]\n")
+        if log.session_id != "default":
+            console.print(f"[cyan]Work log for {log.session_id}[/cyan]\n")
     
     # Handle special display modes
     if mode == "coordination":

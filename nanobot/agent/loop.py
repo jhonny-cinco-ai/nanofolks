@@ -272,7 +272,7 @@ class AgentLoop:
     def _apply_theme_if_needed(self) -> None:
         """Apply the selected theme to all team members' SOUL files on first start.
         
-        This ensures all bots are ready to use immediately, whether in workspaces or via DM.
+        This ensures all bots are ready to use immediately, whether in rooms or via DM.
         Team includes: nanobot (Leader), researcher, coder, social, creative, auditor
         """
         try:
@@ -313,7 +313,7 @@ class AgentLoop:
             # Show which bots are ready
             for bot_name, success in results.items():
                 if success:
-                    logger.debug(f"  ✓ {bot_name} ready for use (DM or workspace)")
+                    logger.debug(f"  ✓ {bot_name} ready for use (DM or room)")
                 else:
                     logger.warning(f"  ✗ {bot_name} SOUL initialization failed")
             

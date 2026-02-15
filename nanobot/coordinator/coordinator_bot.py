@@ -26,7 +26,7 @@ from nanobot.coordinator.audit import (
 )
 from nanobot.coordinator.explanation import ExplanationEngine
 from nanobot.memory.bot_memory import BotExpertise
-from nanobot.models.workspace import Workspace
+from nanobot.models.room import Room
 
 
 class CoordinatorBot(SpecialistBot):
@@ -625,12 +625,12 @@ class CoordinatorBot(SpecialistBot):
     # Abstract Method Implementations
     # =========================================================================
     
-    async def process_message(self, message: str, workspace: Workspace) -> str:
+    async def process_message(self, message: str, room: Room) -> str:
         """Process a message and generate response.
         
         Args:
             message: User or system message
-            workspace: Workspace context
+            room: Room context
             
         Returns:
             Bot's response message
@@ -649,12 +649,12 @@ class CoordinatorBot(SpecialistBot):
         
         return "\n".join(response_parts)
     
-    async def execute_task(self, task: str, workspace: Workspace) -> Dict[str, Any]:
+    async def execute_task(self, task: str, room: Room) -> Dict[str, Any]:
         """Execute a specific task.
         
         Args:
             task: Task description
-            workspace: Workspace context
+            room: Room context
             
         Returns:
             Task result dictionary

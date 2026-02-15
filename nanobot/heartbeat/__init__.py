@@ -29,8 +29,8 @@ Example Usage:
     await service.start()
 """
 
-# Legacy single-heartbeat service (maintained for backward compatibility)
-from nanobot.heartbeat.service import HeartbeatService
+# Note: The legacy HeartbeatService has been removed.
+# Use BotHeartbeatService and MultiHeartbeatManager instead.
 
 # New multi-heartbeat system
 from nanobot.heartbeat.models import (
@@ -59,8 +59,6 @@ from nanobot.heartbeat.dashboard_server import DashboardHTTPServer
 __version__ = "1.0.0"
 
 __all__ = [
-    # Legacy (backward compatibility)
-    "HeartbeatService",
     # Enums
     "CheckPriority",
     "CheckStatus",

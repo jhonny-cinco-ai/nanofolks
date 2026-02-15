@@ -312,7 +312,7 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
         Returns:
             Formatted AGENTS content or None
         """
-        # If no bot specified, no AGENTS content (workspace-level is deprecated)
+        # If no bot specified, return None
         if not bot_name:
             return None
         
@@ -341,7 +341,7 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
         Returns:
             Formatted SOUL content or None
         """
-        # If no bot specified, no SOUL content (workspace-level is deprecated)
+        # If no bot specified, return None
         if not bot_name:
             return None
         

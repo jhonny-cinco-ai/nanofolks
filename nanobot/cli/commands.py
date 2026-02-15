@@ -205,6 +205,71 @@ def _print_agent_response(response: str, render_markdown: bool) -> None:
     console.print()
 
 
+async def _show_thinking_logs(agent_loop, bot_name: Optional[str] = None) -> Optional["ThinkingDisplay"]:
+    """Fetch and display thinking logs after agent response.
+    
+    Args:
+        agent_loop: The agent loop that just processed the input
+        bot_name: Optional bot name to filter entries (for multi-agent)
+        
+    Returns:
+        ThinkingDisplay instance if logs found, None otherwise
+    """
+    from nanobot.agent.work_log_manager import get_work_log_manager
+    from nanobot.cli.ui.thinking_display import ThinkingDisplay
+    
+    manager = get_work_log_manager()
+    if not manager or not manager.current_log:
+        return None
+    
+    # Create and display the thinking component
+    display = ThinkingDisplay(manager.current_log, bot_name=bot_name)
+    console.print(display.render_collapsed())
+    
+    return display
+
+
+async def _handle_thinking_toggle(display: "ThinkingDisplay") -> None:
+    """Wait for user input to toggle thinking view.
+    
+    - SPACE: Toggle between collapsed/expanded
+    - ESC: Exit thinking view
+    - Ctrl+C: Graceful interrupt
+    - Any other key: Continue to next prompt
+    
+    Args:
+        display: The ThinkingDisplay to manage
+    """
+    from nanobot.cli.ui.input_handler import ThinkingInputHandler
+    
+    handler = ThinkingInputHandler()
+    
+    while True:
+        try:
+            action = await handler.get_thinking_action(timeout=None)
+            
+            if action == "toggle":
+                # Clear the line and re-render
+                console.print("\r" + " " * 100 + "\r", end="", highlight=False)
+                display.toggle()
+                console.print(display.render())
+            elif action == "exit":
+                # User pressed ESC - exit thinking view
+                break
+            elif action == "interrupt":
+                # User pressed Ctrl+C - break gracefully
+                console.print()
+                raise KeyboardInterrupt()
+            else:
+                # Any other action: break out and continue
+                break
+        except KeyboardInterrupt:
+            raise
+        except Exception:
+            # On any error, exit gracefully
+            break
+
+
 def _run_onboard_wizard():
     """Run the step-by-step onboarding wizard."""
     # Show spinner immediately while imports load
@@ -596,7 +661,6 @@ def gateway(
     from nanobot.session.manager import SessionManager
     from nanobot.cron.service import CronService
     from nanobot.cron.types import CronJob
-    from nanobot.heartbeat.service import HeartbeatService
     from nanobot.heartbeat.multi_manager import MultiHeartbeatManager
     from nanobot.heartbeat.dashboard import DashboardService
     from nanobot.heartbeat.dashboard_server import DashboardHTTPServer
@@ -675,18 +739,6 @@ def gateway(
             ))
         return response
     cron.on_job = on_cron_job
-    
-    # Create heartbeat service (legacy)
-    async def on_heartbeat(prompt: str) -> str:
-        """Execute heartbeat through the agent."""
-        return await agent.process_direct(prompt, session_key="heartbeat")
-    
-    heartbeat = HeartbeatService(
-        workspace=config.workspace_path,
-        on_heartbeat=on_heartbeat,
-        interval_s=30 * 60,  # 30 minutes
-        enabled=True
-    )
     
     # Create multi-heartbeat manager with all 6 bots
     try:
@@ -823,7 +875,6 @@ def gateway(
     async def run():
         try:
             await cron.start()
-            await heartbeat.start()
             
             # Start multi-heartbeat manager if initialized
             if multi_manager:
@@ -852,7 +903,6 @@ def gateway(
             if multi_manager:
                 multi_manager.stop_all()
             
-            heartbeat.stop()
             cron.stop()
             await agent.stop()
             await channels.stop_all()
@@ -1266,6 +1316,11 @@ def agent(
                 with _thinking_ctx():
                     response = await agent_loop.process_direct(message, session_id, room_id=room)
                 _print_agent_response(response, render_markdown=markdown)
+                
+                # NEW: Show thinking logs after response
+                thinking_display = await _show_thinking_logs(agent_loop)
+                if thinking_display:
+                    await _handle_thinking_toggle(thinking_display)
             finally:
                 await agent_loop.close_mcp()
         
@@ -1701,6 +1756,11 @@ def agent(
                     with _thinking_ctx():
                         response = await agent_loop.process_direct(user_input, session_id, room_id=room)
                     _print_agent_response(response, render_markdown=markdown)
+                    
+                    # NEW: Show thinking logs after response
+                    thinking_display = await _show_thinking_logs(agent_loop)
+                    if thinking_display:
+                        await _handle_thinking_toggle(thinking_display)
                 except KeyboardInterrupt:
                     _restore_terminal()
                     console.print("\nGoodbye!")

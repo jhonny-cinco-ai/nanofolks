@@ -19,10 +19,8 @@ from nanobot.agent.tools.filesystem import ReadFileTool, WriteFileTool, EditFile
 from nanobot.agent.tools.shell import ExecTool
 from nanobot.agent.tools.web import WebSearchTool, WebFetchTool
 from nanobot.agent.tools.message import MessageTool
-from nanobot.agent.tools.spawn import SpawnTool
 from nanobot.agent.tools.cron import CronTool
 from nanobot.agent.tools.update_config import UpdateConfigTool
-from nanobot.agent.subagent import SubagentManager
 from nanobot.agent.stages import RoutingStage, RoutingContext
 from nanobot.config.schema import RoutingConfig
 from nanobot.session.manager import SessionManager, Session
@@ -236,21 +234,6 @@ class AgentLoop:
                 f"Session compaction: {memory_config.session_compaction.mode} mode"
             )
         
-        self.subagents = SubagentManager(
-            provider=provider,
-            workspace=workspace,
-            bus=bus,
-            model=self.model,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            brave_api_key=brave_api_key,
-            exec_config=self.exec_config,
-            restrict_to_workspace=restrict_to_workspace,
-            evolutionary=evolutionary,
-            allowed_paths=allowed_paths,
-            protected_paths=protected_paths,
-        )
-        
         # Initialize work log manager for transparency
         self.work_log_manager = get_work_log_manager()
         
@@ -373,10 +356,6 @@ class AgentLoop:
         # Message tool
         message_tool = MessageTool(send_callback=self.bus.publish_outbound)
         self.tools.register(message_tool)
-        
-        # Spawn tool (for subagents)
-        spawn_tool = SpawnTool(manager=self.subagents)
-        self.tools.register(spawn_tool)
         
         # Invoke tool (for delegating to specialist bots)
         from nanobot.agent.tools.invoke import InvokeTool
@@ -643,10 +622,6 @@ class AgentLoop:
         message_tool = self.tools.get("message")
         if isinstance(message_tool, MessageTool):
             message_tool.set_context(msg.channel, msg.chat_id)
-        
-        spawn_tool = self.tools.get("spawn")
-        if isinstance(spawn_tool, SpawnTool):
-            spawn_tool.set_context(msg.channel, msg.chat_id)
         
         invoke_tool = self.tools.get("invoke")
         if invoke_tool:
@@ -1039,10 +1014,6 @@ class AgentLoop:
         message_tool = self.tools.get("message")
         if isinstance(message_tool, MessageTool):
             message_tool.set_context(origin_channel, origin_chat_id)
-        
-        spawn_tool = self.tools.get("spawn")
-        if isinstance(spawn_tool, SpawnTool):
-            spawn_tool.set_context(origin_channel, origin_chat_id)
         
         invoke_tool = self.tools.get("invoke")
         if invoke_tool:

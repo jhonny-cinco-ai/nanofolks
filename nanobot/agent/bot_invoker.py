@@ -305,6 +305,25 @@ Focus only on your domain expertise and provide a helpful response.
         
         return system_prompt
     
+    def _create_bot_tool_registry(self, bot_name: str) -> "ToolRegistry":
+        """Create a tool registry for a bot based on permissions.
+        
+        Args:
+            bot_name: Name of the bot
+            
+        Returns:
+            ToolRegistry configured for this bot
+        """
+        from nanobot.agent.tools.factory import create_bot_registry
+        
+        return create_bot_registry(
+            workspace=self.workspace,
+            bot_name=bot_name,
+            brave_api_key=self.brave_api_key,
+            exec_config=self.exec_config,
+            restrict_to_workspace=self.restrict_to_workspace,
+        )
+    
     async def _call_bot_llm(
         self,
         bot_name: str,
@@ -312,22 +331,93 @@ Focus only on your domain expertise and provide a helpful response.
         user_message: str,
         session_id: str,
     ) -> str:
-        """Call LLM with bot's context."""
-        # Build messages
+        """Call LLM with bot's context and execute tools if needed.
+        
+        If the bot has tool permissions, this will:
+        1. Create a filtered tool registry
+        2. Call LLM with tool definitions
+        3. Execute any tool calls
+        4. Feed results back to LLM
+        5. Continue until no more tool calls
+        """
+        from nanobot.agent.tools import ToolRegistry
+        
+        # Create tool registry for this bot
+        tool_registry = self._create_bot_tool_registry(bot_name)
+        tool_definitions = tool_registry.get_definitions()
+        
+        # Build initial messages
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ]
         
-        # Call LLM
-        response = await self.provider.chat(
-            model=self.model,
-            messages=messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-        )
+        # Maximum tool call iterations to prevent infinite loops
+        max_iterations = 10
         
-        return response.content or ""
+        for iteration in range(max_iterations):
+            # Call LLM
+            response = await self.provider.chat(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                tools=tool_definitions if tool_definitions else None,
+            )
+            
+            # Get content and tool calls
+            content = response.content or ""
+            tool_calls = getattr(response, 'tool_calls', None) or []
+            
+            # If no tool calls, return the response
+            if not tool_calls:
+                return content
+            
+            # Execute tool calls and add results to messages
+            for tool_call in tool_calls:
+                tool_name = tool_call.function.name
+                tool_args = tool_call.function.arguments
+                
+                # Parse arguments (could be string or dict)
+                if isinstance(tool_args, str):
+                    import json
+                    try:
+                        tool_args = json.loads(tool_args)
+                    except json.JSONDecodeError:
+                        tool_args = {}
+                
+                # Execute tool
+                logger.debug(f"[{bot_name}] Executing tool: {tool_name}")
+                result = await tool_registry.execute(tool_name, tool_args)
+                
+                # Add tool result to messages
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "name": tool_name,
+                    "content": result,
+                })
+            
+            # Add assistant message with tool calls
+            messages.append({
+                "role": "assistant",
+                "content": content,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        }
+                    }
+                    for tc in tool_calls
+                ],
+            })
+        
+        # Max iterations reached, return last content
+        logger.warning(f"[{bot_name}] Max tool iterations ({max_iterations}) reached")
+        return content
     
     def list_available_bots(self) -> dict:
         """List all bots that can be invoked."""

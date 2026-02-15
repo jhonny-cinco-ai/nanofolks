@@ -514,26 +514,38 @@ class OnboardingWizard:
                     if theming:
                         console.print(f"  {theming.emoji} {theming.title} ({bot_name})")
             
-            # Always create HEARTBEAT.md files for each bot
-            self._create_heartbeat_files(workspace_path)
+            # Create per-bot files (HEARTBEAT.md and AGENTS.md)
+            self._create_bot_files(workspace_path)
             
         except Exception as e:
             console.print(f"[yellow]⚠ Could not apply theme: {e}[/yellow]")
     
-    def _create_heartbeat_files(self, workspace_path: Path) -> None:
-        """Create empty HEARTBEAT.md files for each bot.
+    def _create_bot_files(self, workspace_path: Path) -> None:
+        """Create per-bot HEARTBEAT.md and AGENTS.md files.
         
         Args:
             workspace_path: Path to workspace
         """
         try:
+            from nanobot.soul import SoulManager
+            
+            soul_manager = SoulManager(workspace_path)
+            team = ["nanobot", "researcher", "coder", "social", "creative", "auditor"]
+            
+            console.print("\n[cyan]Creating bot configuration files...[/cyan]")
+            
+            # Create AGENTS.md for each bot
+            agents_results = soul_manager.apply_agents_to_team(team)
+            agents_count = sum(1 for v in agents_results.values() if v)
+            
+            if agents_count > 0:
+                console.print(f"  [green]✓[/green] Created AGENTS.md for {agents_count} bots")
+            
+            # Create HEARTBEAT.md for each bot
             bots_dir = workspace_path / "bots"
             bots_dir.mkdir(parents=True, exist_ok=True)
             
-            team = ["nanobot", "researcher", "coder", "social", "creative", "auditor"]
-            
-            console.print("\n[cyan]Creating heartbeat files...[/cyan]")
-            
+            heartbeat_count = 0
             for bot_name in team:
                 bot_dir = bots_dir / bot_name
                 bot_dir.mkdir(parents=True, exist_ok=True)
@@ -541,7 +553,6 @@ class OnboardingWizard:
                 heartbeat_file = bot_dir / "HEARTBEAT.md"
                 
                 if not heartbeat_file.exists():
-                    # Create template HEARTBEAT.md
                     template = f"""# Heartbeat for @{bot_name}
 
 This file defines periodic tasks for @{bot_name}.
@@ -562,16 +573,17 @@ Use markdown with checkboxes:
 - [ ] Generate daily summary
 """
                     heartbeat_file.write_text(template)
-                    console.print(f"  [green]✓[/green] Created HEARTBEAT.md for @{bot_name}")
-                else:
-                    console.print(f"  [dim]•[/dim] HEARTBEAT.md for @{bot_name} already exists")
+                    heartbeat_count += 1
             
-            console.print(f"\n[green]✓ Heartbeat files ready![/green]")
-            console.print("[dim]  Edit these files to add periodic tasks for each bot.[/dim]")
-            console.print("[dim]  Leave empty if no periodic tasks needed.[/dim]")
+            if heartbeat_count > 0:
+                console.print(f"  [green]✓[/green] Created HEARTBEAT.md for {heartbeat_count} bots")
+            
+            console.print(f"\n[green]✓ Bot configuration files ready![/green]")
+            console.print("[dim]  - AGENTS.md: Role-specific instructions for each bot[/dim]")
+            console.print("[dim]  - HEARTBEAT.md: Periodic tasks (leave empty if not needed)[/dim]")
             
         except Exception as e:
-            console.print(f"[yellow]⚠ Could not create heartbeat files: {e}[/yellow]")
+            console.print(f"[yellow]⚠ Could not create bot files: {e}[/yellow]")
 
 
 def run_onboarding():

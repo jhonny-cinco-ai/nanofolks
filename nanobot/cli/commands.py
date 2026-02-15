@@ -389,35 +389,12 @@ def configure():
 
 
 def _create_workspace_templates(workspace: Path):
-    """Create default workspace template files."""
+    """Create default workspace template files.
+    
+    Note: AGENTS.md and SOUL.md are now per-bot, created in bots/{bot}/ directory.
+    Only shared files (USER.md, TOOLS.md) are created at workspace level.
+    """
     templates = {
-        "AGENTS.md": """# Agent Instructions
-
-You are a helpful AI assistant. Be concise, accurate, and friendly.
-
-## Guidelines
-
-- Always explain what you're doing before taking actions
-- Ask for clarification when the request is ambiguous
-- Use tools to help accomplish tasks
-- Remember important information in your memory files
-""",
-        "SOUL.md": """# Soul
-
-I am nanobot, a lightweight AI assistant.
-
-## Personality
-
-- Helpful and friendly
-- Concise and to the point
-- Curious and eager to learn
-
-## Values
-
-- Accuracy over speed
-- User privacy and safety
-- Transparency in actions
-""",
         "USER.md": """# User
 
 Information about the user goes here.
@@ -427,6 +404,83 @@ Information about the user goes here.
 - Communication style: (casual/formal)
 - Timezone: (your timezone)
 - Language: (your preferred language)
+""",
+        "TOOLS.md": """# Available Tools
+
+This document describes the tools available to nanobot.
+
+## File Operations
+
+### read_file
+Read the contents of a file.
+
+### write_file
+Write content to a file (creates parent directories if needed).
+
+### edit_file
+Edit a file by replacing specific text.
+
+### list_dir
+List contents of a directory.
+
+## Shell Execution
+
+### exec
+Execute a shell command and return output.
+
+**Safety Notes:**
+- Commands have a configurable timeout (default 60s)
+- Dangerous commands are blocked (rm -rf, format, dd, shutdown, etc.)
+- Output is truncated at 10,000 characters
+
+## Web Access
+
+### web_search
+Search the web using Brave Search API.
+
+### web_fetch
+Fetch and extract main content from a URL.
+
+## Communication
+
+### message
+Send a message to the user on chat channels.
+
+## Background Tasks
+
+### invoke
+Invoke a specialist bot to handle a task in the background.
+```
+invoke(bot_name: str, task: str, context: str = None)
+```
+
+Use for complex tasks that need specialist expertise. The bot will complete the task and report back.
+
+## Cron Reminders
+
+Use the `exec` tool to create scheduled reminders with `nanobot cron add`.
+
+---
+
+## Per-Bot Tool Permissions
+
+You can customize which tools each bot has access to by adding tool permissions to their SOUL.md or AGENTS.md files:
+
+```markdown
+## Allowed Tools
+- read_file
+- write_file
+- web_search
+
+## Denied Tools
+- exec
+- spawn
+
+## Custom Tools
+- shopify_api: Custom Shopify integration
+```
+
+If no permissions are specified, bots get access to all standard tools.
 """,
     }
     
@@ -663,15 +717,23 @@ def gateway(
         # Get work log manager for heartbeat logging
         work_log_manager = get_work_log_manager()
         
+        # Create tool registry for bots
+        from nanobot.agent.tools.factory import create_bot_registry
+        
         bots_list = [researcher, coder, social, auditor, creative, nanobot]
         for bot in bots_list:
             bot_reasoning_config = get_reasoning_config(bot.name)
+            tool_registry = create_bot_registry(
+                workspace=config.workspace_path,
+                bot_name=bot.name,
+            )
             bot.initialize_heartbeat(
                 workspace=config.workspace_path,
                 provider=provider,
                 routing_config=config.routing,
                 reasoning_config=bot_reasoning_config,
                 work_log_manager=work_log_manager,
+                tool_registry=tool_registry,
             )
         
         # Wire manager into CLI commands
@@ -2393,14 +2455,9 @@ def bot_list():
     if bot_names_file.exists():
         custom_names = json.loads(bot_names_file.read_text())
     
-    bots = [
-        ("nanobot", NANOBOT_ROLE),
-        ("researcher", RESEARCHER_ROLE),
-        ("coder", CODER_ROLE),
-        ("social", SOCIAL_ROLE),
-        ("creative", CREATIVE_ROLE),
-        ("auditor", AUDITOR_ROLE),
-    ]
+    from nanobot.models import get_bot_registry
+    registry = get_bot_registry()
+    bot_names = registry.get_bot_names()
     
     table = Table(title="Your AI Crew")
     table.add_column("Bot", style="cyan")
@@ -2408,15 +2465,19 @@ def bot_list():
     table.add_column("Domain")
     table.add_column("Status")
     
-    for bot_id, role in bots:
+    for bot_id in bot_names:
+        role_card = registry.get_role_card(bot_id)
         custom_name = custom_names.get(bot_id)
-        display = custom_name if custom_name else role.title
+        display = custom_name if custom_name else bot_id.title()
         status = "🟢 Active" if custom_name else "⚪ Default"
         
+        domain = role_card.domain.value if role_card else "unknown"
+        emoji = "🤖"
+        
         table.add_row(
-            f"{role.emoji} {bot_id}",
+            f"{emoji} {bot_id}",
             display,
-            role.domain.value,
+            domain,
             status
         )
     

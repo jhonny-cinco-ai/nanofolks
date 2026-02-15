@@ -37,7 +37,8 @@ class NanobotLeader(SpecialistBot):
         # Auto-initialize heartbeat with coordinator-specific config (30min interval)
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import COORDINATOR_CONFIG
-            self.initialize_heartbeat(config=COORDINATOR_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=COORDINATOR_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process a message as the coordinator."""
@@ -78,7 +79,8 @@ class ResearcherBot(SpecialistBot):
         # Auto-initialize heartbeat with researcher-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import RESEARCHER_CONFIG
-            self.initialize_heartbeat(config=RESEARCHER_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=RESEARCHER_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process research request."""
@@ -121,7 +123,8 @@ class CoderBot(SpecialistBot):
         # Auto-initialize heartbeat with coder-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import CODER_CONFIG
-            self.initialize_heartbeat(config=CODER_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=CODER_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process code request."""
@@ -161,7 +164,8 @@ class SocialBot(SpecialistBot):
         # Auto-initialize heartbeat with social-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import SOCIAL_CONFIG
-            self.initialize_heartbeat(config=SOCIAL_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=SOCIAL_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process community request."""
@@ -201,7 +205,8 @@ class CreativeBot(SpecialistBot):
         # Auto-initialize heartbeat with creative-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import CREATIVE_CONFIG
-            self.initialize_heartbeat(config=CREATIVE_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=CREATIVE_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process creative request."""
@@ -241,7 +246,8 @@ class AuditorBot(SpecialistBot):
         # Auto-initialize heartbeat with auditor-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import AUDITOR_CONFIG
-            self.initialize_heartbeat(config=AUDITOR_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=AUDITOR_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process audit request."""

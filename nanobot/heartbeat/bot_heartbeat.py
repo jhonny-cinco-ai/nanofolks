@@ -90,7 +90,8 @@ class BotHeartbeatService:
         work_log_manager=None,
         on_heartbeat: Callable[[str], Coroutine[Any, Any, str]] | None = None,
         on_tick_complete: Optional[Callable[[HeartbeatTick], None]] = None,
-        on_check_complete: Optional[Callable[[CheckResult], None]] = None
+        on_check_complete: Optional[Callable[[CheckResult], None]] = None,
+        tool_registry=None,
     ):
         """Initialize heartbeat service for a bot.
         
@@ -105,6 +106,7 @@ class BotHeartbeatService:
             on_heartbeat: Callback to execute heartbeat tasks via LLM
             on_tick_complete: Optional callback when a tick completes
             on_check_complete: Optional callback when a check completes
+            tool_registry: Optional tool registry for tool execution during heartbeat
         """
         self.bot = bot_instance
         self.config = config
@@ -116,6 +118,7 @@ class BotHeartbeatService:
         self.on_heartbeat = on_heartbeat
         self.on_tick_complete = on_tick_complete
         self.on_check_complete = on_check_complete
+        self.tool_registry = tool_registry
         
         # State
         self._running = False
@@ -366,14 +369,15 @@ class BotHeartbeatService:
         return await self.on_heartbeat(HEARTBEAT_PROMPT)
     
     async def _execute_via_provider(self, content: str) -> str:
-        """Execute heartbeat directly via provider with routing.
+        """Execute heartbeat directly via provider with routing and optional tools.
         
         Uses smart model selection and bot's reasoning config.
+        If tool_registry is provided, executes tools as needed.
         """
         # Select model using routing
         model = await self._select_model()
         
-        # Build messages with reasoning config
+        # Build messages
         messages = self._build_heartbeat_messages(content)
         
         # Apply reasoning config (temperature, etc.)
@@ -382,10 +386,25 @@ class BotHeartbeatService:
             extra_kwargs["temperature"] = self.reasoning_config.temperature
             extra_kwargs["max_tokens"] = self.reasoning_config.max_tokens or 4096
         
+        # Get tool definitions if registry exists
+        tool_definitions = None
+        if self.tool_registry:
+            tool_definitions = self.tool_registry.get_definitions()
+        
         logger.info(
             f"[{self.config.bot_name}] Heartbeat using model: {model}"
+            + (f" with {len(tool_definitions)} tools" if tool_definitions else "")
         )
         
+        # Execute with tool support if available
+        if tool_definitions:
+            return await self._execute_with_tools(
+                messages=messages,
+                model=model,
+                extra_kwargs=extra_kwargs,
+            )
+        
+        # Simple LLM call without tools
         response = await self.provider.chat(
             model=model,
             messages=messages,
@@ -393,6 +412,82 @@ class BotHeartbeatService:
         )
         
         return response.content or ""
+    
+    async def _execute_with_tools(
+        self,
+        messages: list[dict],
+        model: str,
+        extra_kwargs: dict,
+    ) -> str:
+        """Execute heartbeat with tool support.
+        
+        Args:
+            messages: Message list for LLM
+            model: Model to use
+            extra_kwargs: Additional kwargs (temperature, max_tokens)
+            
+        Returns:
+            Final response content
+        """
+        tool_definitions = self.tool_registry.get_definitions()
+        max_iterations = 10
+        
+        for iteration in range(max_iterations):
+            response = await self.provider.chat(
+                model=model,
+                messages=messages,
+                tools=tool_definitions,
+                **extra_kwargs
+            )
+            
+            content = response.content or ""
+            tool_calls = getattr(response, 'tool_calls', None) or []
+            
+            if not tool_calls:
+                return content
+            
+            # Execute tool calls
+            for tool_call in tool_calls:
+                tool_name = tool_call.function.name
+                tool_args = tool_call.function.arguments
+                
+                # Parse arguments
+                if isinstance(tool_args, str):
+                    import json
+                    try:
+                        tool_args = json.loads(tool_args)
+                    except json.JSONDecodeError:
+                        tool_args = {}
+                
+                logger.debug(f"[{self.config.bot_name}] Heartbeat executing: {tool_name}")
+                result = await self.tool_registry.execute(tool_name, tool_args)
+                
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "name": tool_name,
+                    "content": result,
+                })
+            
+            # Add assistant message with tool calls
+            messages.append({
+                "role": "assistant",
+                "content": content,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        }
+                    }
+                    for tc in tool_calls
+                ],
+            })
+        
+        logger.warning(f"[{self.config.bot_name}] Heartbeat max iterations reached")
+        return content
     
     async def _select_model(self) -> str:
         """Select model using smart routing.

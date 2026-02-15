@@ -4,8 +4,8 @@ Routes messages through the Leader bot first, unless user directly
 tags/mentions a specific bot or sends a DM.
 
 The Leader acts as the nexus between user and crew, with powers to:
-- Create workspaces
-- Invite bots to workspaces
+- Create rooms
+- Invite bots to rooms
 - Coordinate responses from crew members
 """
 
@@ -16,7 +16,7 @@ from enum import Enum
 
 from loguru import logger
 
-from nanobot.models.workspace import Workspace, WorkspaceType
+from nanobot.models.room import Room, RoomType
 
 
 class DispatchTarget(Enum):
@@ -32,7 +32,7 @@ class DispatchResult:
     target: DispatchTarget
     primary_bot: str                   # Who responds first
     secondary_bots: List[str]          # Who gets notified after
-    workspace_id: Optional[str] = None
+    room_id: Optional[str] = None
     reason: str = ""                   # Why this dispatch decision
 
 
@@ -61,20 +61,20 @@ class BotDispatch:
         "@team": "all",
     }
     
-    def __init__(self, leader_bot=None, workspace_manager=None):
+    def __init__(self, leader_bot=None, room_manager=None):
         """Initialize Bot Dispatch.
         
         Args:
             leader_bot: The Leader/Nanobot instance
-            workspace_manager: Manager for workspace operations
+            room_manager: Manager for room operations
         """
         self.leader_bot = leader_bot
-        self.workspace_manager = workspace_manager
+        self.room_manager = room_manager
     
     def dispatch_message(
         self,
         message: str,
-        workspace: Optional[Workspace] = None,
+        room: Optional[Room] = None,
         is_dm: bool = False,
         dm_target: Optional[str] = None,
     ) -> DispatchResult:
@@ -82,7 +82,7 @@ class BotDispatch:
         
         Args:
             message: User message content
-            workspace: Workspace context (None if DM)
+            room: Room context (None if DM)
             is_dm: Whether this is a direct message
             dm_target: If DM, which bot it was sent to
             
@@ -95,7 +95,7 @@ class BotDispatch:
                 target=DispatchTarget.DM,
                 primary_bot=dm_target,
                 secondary_bots=[],
-                workspace_id=None,
+                room_id=None,
                 reason=f"Direct message to @{dm_target}"
             )
         
@@ -103,13 +103,13 @@ class BotDispatch:
         mentioned_bot = self._extract_mention(message)
         if mentioned_bot:
             if mentioned_bot == "all":
-                # @all or @crew - notify all workspace participants
-                participants = workspace.participants if workspace else ["nanobot"]
+                # @all or @crew - notify all room participants
+                participants = room.participants if room else ["nanobot"]
                 return DispatchResult(
                     target=DispatchTarget.DIRECT_BOT,
                     primary_bot="nanobot",  # Leader coordinates
                     secondary_bots=participants,
-                    workspace_id=workspace.id if workspace else None,
+                    room_id=room.id if room else None,
                     reason="User tagged @all/@crew - leader coordinates all bots"
                 )
             else:
@@ -118,19 +118,19 @@ class BotDispatch:
                     target=DispatchTarget.DIRECT_BOT,
                     primary_bot=mentioned_bot,
                     secondary_bots=[],
-                    workspace_id=workspace.id if workspace else None,
+                    room_id=room.id if room else None,
                     reason=f"User tagged @{mentioned_bot} directly"
                 )
         
         # Case 3: Default - Route through Leader first
-        participants = workspace.participants if workspace else ["nanobot"]
+        participants = room.participants if room else ["nanobot"]
         secondary = [p for p in participants if p != "nanobot"]
         
         return DispatchResult(
             target=DispatchTarget.LEADER_FIRST,
             primary_bot="nanobot",
             secondary_bots=secondary,
-            workspace_id=workspace.id if workspace else None,
+            room_id=room.id if room else None,
             reason="Default: Leader coordinates response"
         )
     
@@ -158,27 +158,29 @@ class BotDispatch:
         
         return None
     
-    def should_leader_create_workspace(
+    def should_leader_create_room(
         self,
         message: str,
-        current_workspace: Optional[Workspace] = None,
+        current_room: Optional[Room] = None,
     ) -> Tuple[bool, Optional[str], Optional[str]]:
-        """Check if Leader should create a new workspace.
+        """Check if Leader should create a new room.
         
-        Detects workspace creation requests like:
-        - "Create a workspace for the website project"
+        Detects room creation requests like:
+        - "Create a room for the website project"
         - "New project: mobile app"
         
         Args:
             message: User message
-            current_workspace: Current workspace context
+            current_room: Current room context
             
         Returns:
-            Tuple of (should_create, workspace_name, project_type)
+            Tuple of (should_create, room_name, project_type)
         """
         creation_patterns = [
+            r"(?:create|make|start|set up)\s+(?:a\s+)?(?:new\s+)?room(?:\s+for\s+)?(?:the\s+)?(.+?)(?:\s+project)?$",
             r"(?:create|make|start|set up)\s+(?:a\s+)?(?:new\s+)?workspace(?:\s+for\s+)?(?:the\s+)?(.+?)(?:\s+project)?$",
             r"(?:create|make|start|set up)\s+(?:a\s+)?(?:new\s+)?project(?:\s+called)?\s*:?\s*(.+)",
+            r"new\s+room\s*:?\s*(.+)",
             r"new\s+workspace\s*:?\s*(.+)",
             r"new\s+project\s*:?\s*(.+)",
         ]
@@ -188,19 +190,19 @@ class BotDispatch:
         for pattern in creation_patterns:
             match = re.search(pattern, message_lower)
             if match:
-                workspace_name = match.group(1).strip()
+                room_name = match.group(1).strip()
                 # Determine project type from keywords
-                project_type = self._infer_project_type(workspace_name)
-                return True, workspace_name, project_type
+                project_type = self._infer_project_type(room_name)
+                return True, room_name, project_type
         
         return False, None, None
     
     def _infer_project_type(self, name: str) -> str:
-        """Infer project type from workspace name.
-        
+        """Infer project type from room name.
+
         Args:
-            name: Workspace/project name
-            
+            name: Room/project name
+
         Returns:
             Project type category
         """
@@ -266,8 +268,8 @@ class BotDispatch:
         if result.secondary_bots:
             lines.append(f"   Secondary: {', '.join(result.secondary_bots)}")
         
-        if result.workspace_id:
-            lines.append(f"   Workspace: {result.workspace_id}")
+        if result.room_id:
+            lines.append(f"   Room: {result.room_id}")
         
         lines.append(f"   Reason: {result.reason}")
         
@@ -275,14 +277,14 @@ class BotDispatch:
 
 
 # Convenience function
-def get_bot_dispatch(leader_bot=None, workspace_manager=None) -> BotDispatch:
+def get_bot_dispatch(leader_bot=None, room_manager=None) -> BotDispatch:
     """Get BotDispatch instance.
-    
+
     Args:
         leader_bot: Leader bot instance
-        workspace_manager: Workspace manager
-        
+        room_manager: Room manager
+
     Returns:
         BotDispatch instance
     """
-    return BotDispatch(leader_bot, workspace_manager)
+    return BotDispatch(leader_bot, room_manager)

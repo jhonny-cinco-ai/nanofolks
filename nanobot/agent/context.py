@@ -20,7 +20,8 @@ class ContextBuilder:
     into a coherent prompt for the LLM. Supports bot-specific SOUL.md loading.
     """
     
-    BOOTSTRAP_FILES = ["AGENTS.md", "SOUL.md", "USER.md", "TOOLS.md", "IDENTITY.md"]
+    # Bootstrap files - AGENTS.md and SOUL.md are loaded per-bot, not workspace-level
+    BOOTSTRAP_FILES = ["USER.md", "TOOLS.md", "IDENTITY.md"]
     
     def __init__(self, workspace: Path):
         self.workspace = workspace
@@ -52,13 +53,19 @@ class ContextBuilder:
         """
         parts = []
         
-        # Core identity
-        parts.append(self._get_identity())
+        # Core identity (pass bot_name for customization)
+        parts.append(self._get_identity(bot_name))
         
         # Bootstrap files (with optional bot-specific SOUL)
         bootstrap = self._load_bootstrap_files(bot_name=bot_name)
         if bootstrap:
             parts.append(bootstrap)
+        
+        # Tool permissions (per-bot restrictions)
+        if bot_name:
+            tool_perms = self._get_tool_permissions(bot_name)
+            if tool_perms:
+                parts.append(tool_perms)
         
         # Memory context
         if self.memory:
@@ -86,8 +93,48 @@ Skills with available="false" need dependencies installed first - you can try in
         
         return "\n\n---\n\n".join(parts)
     
-    def _get_identity(self) -> str:
-        """Get the core identity section."""
+    def _get_tool_permissions(self, bot_name: str) -> Optional[str]:
+        """Get tool permissions section for a bot.
+        
+        Args:
+            bot_name: Bot name to get permissions for
+            
+        Returns:
+            Formatted tool permissions section or None
+        """
+        from nanobot.agent.tools.permissions import (
+            get_permissions_from_soul,
+            get_permissions_from_agents,
+            merge_permissions,
+        )
+        
+        soul_perms = get_permissions_from_soul(bot_name, self.workspace)
+        agents_perms = get_permissions_from_agents(bot_name, self.workspace)
+        
+        perms = merge_permissions(soul_perms, agents_perms)
+        
+        # If no permissions defined, return None
+        if not perms.allowed_tools and not perms.denied_tools:
+            return None
+        
+        sections = []
+        
+        if perms.allowed_tools:
+            tools_list = ", ".join(sorted(perms.allowed_tools))
+            sections.append(f"## Available Tools\n\nYou have access to: {tools_list}")
+        
+        if perms.denied_tools:
+            tools_list = ", ".join(sorted(perms.denied_tools))
+            sections.append(f"## Restricted Tools\n\nYou do NOT have access to: {tools_list}")
+        
+        if perms.custom_tools:
+            custom_list = "\n".join(f"- **{name}**: {desc}" for name, desc in perms.custom_tools.items())
+            sections.append(f"## Custom Tools\n\n{custom_list}")
+        
+        return "---\n\n" + "\n\n".join(sections)
+    
+    def _get_identity(self, bot_name: Optional[str] = None) -> str:
+        """Get the core identity section customized for the bot."""
         from datetime import datetime
         import time as _time
         now = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
@@ -96,14 +143,38 @@ Skills with available="false" need dependencies installed first - you can try in
         system = platform.system()
         runtime = f"{'macOS' if system == 'Darwin' else system} {platform.machine()}, Python {platform.python_version()}"
         
-        return f"""# nanobot 🐈
+        return self._build_identity(bot_name, now, tz, workspace_path, runtime)
+    
+    def _build_identity(
+        self,
+        bot_name: Optional[str],
+        now: str,
+        tz: str,
+        workspace_path: str,
+        runtime: str,
+    ) -> str:
+        """Build identity section customized for the bot."""
+        is_leader = bot_name == "nanobot" or bot_name is None
+        
+        if is_leader:
+            # Leader (nanobot) - full capabilities
+            return f"""# nanobot 🐈
 
-You are nanobot, a helpful AI assistant. You have access to tools that allow you to:
-- Read, write, and edit files
-- Execute shell commands
-- Search the web and fetch web pages
-- Send messages to users on chat channels
-- Spawn subagents for complex background tasks
+You are nanobot, the team leader and coordinator. You help users by orchestrating specialist bots when needed.
+
+## Your Role
+You are the main interface for the user. You can:
+- Handle user requests directly for simple tasks
+- Delegate complex tasks to specialist bots (@researcher, @coder, @social, @creative, @auditor)
+- Synthesize results from multiple bots into coherent responses
+
+## Tools
+You have access to:
+- File operations (read, write, edit, list)
+- Shell commands (exec)
+- Web access (search, fetch)
+- Messaging (message)
+- Invoke specialist bots (invoke)
 
 ## Current Time
 {now} ({tz})
@@ -113,17 +184,53 @@ You are nanobot, a helpful AI assistant. You have access to tools that allow you
 
 ## Workspace
 Your workspace is at: {workspace_path}
+- Team configurations: {workspace_path}/bots/
 - SQLite memory: {workspace_path}/memory/memory.db
 - Custom skills: {workspace_path}/skills/{{skill-name}}/SKILL.md
 
-IMPORTANT: When responding to direct questions or conversations, reply directly with your text response.
-Only use the 'message' tool when you need to send a message to a specific chat channel (like WhatsApp).
-For normal conversation, just respond with text - do not call the message tool.
+## Guidelines
+- For simple tasks, respond directly
+- For complex tasks, use `invoke` to delegate to specialist bots
+- Always synthesize results when multiple bots are involved
+- Be helpful, accurate, and concise"""
+        
+        else:
+            # Specialist bot
+            bot_titles = {
+                "researcher": "Navigator",
+                "coder": "Gunner",
+                "social": "Lookout",
+                "creative": "Artist",
+                "auditor": "Quartermaster",
+            }
+            safe_bot_name = bot_name or "specialist"
+            title = bot_titles.get(safe_bot_name, safe_bot_name.title())
+            
+            return f"""# @{safe_bot_name} ({title})
 
-Always be helpful, accurate, and concise. When using tools, explain what you're doing."""
+You are @{safe_bot_name}, a specialist bot on the nanobot team.
+
+## Your Role
+You are a domain specialist. Focus on your area of expertise and provide expert responses.
+
+## Tools
+You have access to tools relevant to your role. Use them to accomplish your tasks.
+
+## Current Time
+{now} ({tz})
+
+## Workspace
+Your workspace is at: {workspace_path}/bots/{safe_bot_name}/
+- HEARTBEAT.md: Your periodic tasks
+
+## Guidelines
+- Stay focused on your domain expertise
+- Provide detailed, expert responses in your area
+- Use available tools to gather information and take actions
+- If a task is outside your expertise, suggest invoking another bot"""
     
     def _load_bootstrap_files(self, bot_name: Optional[str] = None) -> str:
-        """Load bootstrap files with bot-specific SOUL if available.
+        """Load bootstrap files with bot-specific SOUL, AGENTS, and IDENTITY if available.
         
         Args:
             bot_name: Optional bot name for personality injection.
@@ -141,6 +248,20 @@ Always be helpful, accurate, and concise. When using tools, explain what you're 
                     parts.append(soul_content)
                 continue
             
+            # Special handling for AGENTS.md with bot-specific support
+            if filename == "AGENTS.md":
+                agents_content = self._load_agents_for_bot(bot_name)
+                if agents_content:
+                    parts.append(agents_content)
+                continue
+            
+            # Special handling for IDENTITY.md with bot-specific support
+            if filename == "IDENTITY.md":
+                identity_content = self._load_identity_for_bot(bot_name)
+                if identity_content:
+                    parts.append(identity_content)
+                continue
+            
             # Other bootstrap files
             file_path = self.workspace / filename
             if file_path.exists():
@@ -149,8 +270,32 @@ Always be helpful, accurate, and concise. When using tools, explain what you're 
         
         return "\n\n".join(parts) if parts else ""
     
+    def _load_agents_for_bot(self, bot_name: Optional[str] = None) -> Optional[str]:
+        """Load AGENTS.md for a bot.
+        
+        Args:
+            bot_name: Bot name to load specific AGENTS
+        
+        Returns:
+            Formatted AGENTS content or None
+        """
+        from nanobot.soul import SoulManager
+        
+        # If no bot specified, no AGENTS content (workspace-level is deprecated)
+        if not bot_name:
+            return None
+        
+        # Load bot-specific AGENTS.md
+        soul_manager = SoulManager(self.workspace)
+        agents_content = soul_manager.get_bot_agents(bot_name)
+        
+        if agents_content:
+            return f"## AGENTS.md (Bot: {bot_name})\n\n{agents_content}"
+        
+        return None
+    
     def _load_soul_for_bot(self, bot_name: Optional[str] = None) -> Optional[str]:
-        """Load appropriate SOUL.md for bot or workspace.
+        """Load SOUL.md for a bot.
         
         Args:
             bot_name: Bot name to load specific SOUL
@@ -158,17 +303,45 @@ Always be helpful, accurate, and concise. When using tools, explain what you're 
         Returns:
             Formatted SOUL content or None
         """
-        # If bot specified, try to load bot-specific SOUL
-        if bot_name:
-            soul_content = self.soul_manager.get_bot_soul(bot_name)
-            if soul_content:
-                return f"## SOUL.md (Bot: {bot_name})\n\n{soul_content}"
+        # If no bot specified, no SOUL content (workspace-level is deprecated)
+        if not bot_name:
+            return None
         
-        # Fall back to workspace SOUL.md
-        workspace_soul = self.workspace / "SOUL.md"
-        if workspace_soul.exists():
-            content = workspace_soul.read_text(encoding="utf-8")
-            return f"## SOUL.md\n\n{content}"
+        # Load bot-specific SOUL.md
+        soul_content = self.soul_manager.get_bot_soul(bot_name)
+        if soul_content:
+            return f"## SOUL.md (Bot: {bot_name})\n\n{soul_content}"
+        
+        return None
+    
+    def _load_identity_for_bot(self, bot_name: Optional[str] = None) -> Optional[str]:
+        """Load IDENTITY.md for a bot.
+        
+        Args:
+            bot_name: Bot name to load specific IDENTITY
+        
+        Returns:
+            Formatted IDENTITY content or None
+        """
+        # If no bot specified, try workspace-level IDENTITY
+        if not bot_name:
+            identity_file = self.workspace / "IDENTITY.md"
+            if identity_file.exists():
+                content = identity_file.read_text(encoding="utf-8")
+                return f"## IDENTITY.md\n\n{content}"
+            return None
+        
+        # Load bot-specific IDENTITY.md if it exists in workspace
+        bot_identity_file = self.workspace / "bots" / bot_name / "IDENTITY.md"
+        if bot_identity_file.exists():
+            content = bot_identity_file.read_text(encoding="utf-8")
+            return f"## IDENTITY.md (Bot: {bot_name})\n\n{content}"
+        
+        # Fall back to template IDENTITY.md from theme
+        from nanobot.templates import get_identity_template_for_bot
+        template_content = get_identity_template_for_bot(bot_name)
+        if template_content:
+            return f"## IDENTITY.md (Bot: {bot_name})\n\n{template_content}"
         
         return None
     

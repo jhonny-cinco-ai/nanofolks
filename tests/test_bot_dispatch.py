@@ -2,7 +2,7 @@
 
 import pytest
 from nanobot.bots.dispatch import BotDispatch, DispatchTarget
-from nanobot.models.workspace import Workspace, WorkspaceType
+from nanobot.models.room import Room, RoomType
 
 
 @pytest.fixture
@@ -12,24 +12,24 @@ def dispatch():
 
 
 @pytest.fixture
-def sample_workspace():
-    """Create sample workspace with participants."""
-    ws = Workspace(
+def sample_room():
+    """Create sample room with participants."""
+    room = Room(
         id="test-project",
-        type=WorkspaceType.PROJECT,
+        type=RoomType.PROJECT,
         participants=["nanobot", "coder", "creative"]
     )
-    return ws
+    return room
 
 
 class TestLeaderFirstDispatch:
     """Test Leader-First dispatch logic."""
-    
-    def test_default_workspace_message_goes_to_leader(self, dispatch, sample_workspace):
+
+    def test_default_room_message_goes_to_leader(self, dispatch, sample_room):
         """Default messages in workspace go to Leader first."""
         result = dispatch.dispatch_message(
             message="Create a landing page",
-            workspace=sample_workspace,
+            room=sample_room,
             is_dm=False
         )
         
@@ -37,19 +37,19 @@ class TestLeaderFirstDispatch:
         assert result.primary_bot == "nanobot"
         assert "coder" in result.secondary_bots
         assert "creative" in result.secondary_bots
-        assert result.workspace_id == "test-project"
+        assert result.room_id == "test-project"
     
     def test_leader_alone_in_workspace(self, dispatch):
         """Leader-only workspace works correctly."""
-        ws = Workspace(
+        room = Room(
             id="leader-only",
-            type=WorkspaceType.OPEN,
+            type=RoomType.OPEN,
             participants=["nanobot"]
         )
         
         result = dispatch.dispatch_message(
             message="Hello",
-            workspace=ws,
+            room=room,
             is_dm=False
         )
         
@@ -60,11 +60,11 @@ class TestLeaderFirstDispatch:
 class TestDirectMentionDispatch:
     """Test bypassing leader with direct mentions."""
     
-    def test_mention_coder_bypasses_leader(self, dispatch, sample_workspace):
+    def test_mention_coder_bypasses_leader(self, dispatch, sample_room):
         """@Coder goes directly to Coder, bypassing Leader."""
         result = dispatch.dispatch_message(
             message="@Coder help me with this bug",
-            workspace=sample_workspace,
+            room=sample_room,
             is_dm=False
         )
         
@@ -72,21 +72,21 @@ class TestDirectMentionDispatch:
         assert result.primary_bot == "coder"
         assert result.secondary_bots == []  # Only coder
     
-    def test_mention_researcher_bypasses_leader(self, dispatch, sample_workspace):
+    def test_mention_researcher_bypasses_leader(self, dispatch, sample_room):
         """@Researcher goes directly to Researcher."""
         result = dispatch.dispatch_message(
             message="@Researcher find me some data",
-            workspace=sample_workspace,
+            room=sample_room,
             is_dm=False
         )
         
         assert result.primary_bot == "researcher"
     
-    def test_mention_all_includes_all_participants(self, dispatch, sample_workspace):
+    def test_mention_all_includes_all_participants(self, dispatch, sample_room):
         """@all includes all workspace participants."""
         result = dispatch.dispatch_message(
             message="@all meeting in 5 minutes",
-            workspace=sample_workspace,
+            room=sample_room,
             is_dm=False
         )
         
@@ -94,11 +94,11 @@ class TestDirectMentionDispatch:
         assert "coder" in result.secondary_bots
         assert "creative" in result.secondary_bots
     
-    def test_mention_case_insensitive(self, dispatch, sample_workspace):
+    def test_mention_case_insensitive(self, dispatch, sample_room):
         """Mentions are case-insensitive."""
         result = dispatch.dispatch_message(
             message="@CODER @coder @Coder",
-            workspace=sample_workspace,
+            room=sample_room,
             is_dm=False
         )
         
@@ -119,7 +119,7 @@ class TestDirectMessageDispatch:
         assert result.target == DispatchTarget.DM
         assert result.primary_bot == "coder"
         assert result.secondary_bots == []
-        assert result.workspace_id is None  # No workspace in DM
+        assert result.room_id is None  # No workspace in DM
     
     def test_dm_to_leader_still_works(self, dispatch):
         """DM to Leader works normally."""

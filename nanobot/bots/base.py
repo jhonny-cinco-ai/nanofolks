@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, Optional
 from loguru import logger
 
 from nanobot.models.role_card import RoleCard
-from nanobot.models.workspace import Workspace
+from nanobot.models.room import Room
 from nanobot.themes import ThemeManager, get_theme
 
 
@@ -62,6 +62,25 @@ class SpecialistBot(ABC):
         # Heartbeat service (initialized lazily)
         self._heartbeat = None
         self._heartbeat_config = None
+    
+    def _create_tool_registry(self, workspace: "Path | None" = None):
+        """Create a tool registry for this bot based on permissions.
+        
+        Args:
+            workspace: Path to workspace
+            
+        Returns:
+            ToolRegistry configured for this bot, or None if no workspace
+        """
+        if not workspace:
+            return None
+        
+        from nanobot.agent.tools.factory import create_bot_registry
+        
+        return create_bot_registry(
+            workspace=workspace,
+            bot_name=self.role_card.bot_name,
+        )
 
     def _apply_theme_to_role_card(self) -> None:
         """Apply current theme to role card display name and personality."""
@@ -239,7 +258,8 @@ class SpecialistBot(ABC):
         work_log_manager=None,
         on_heartbeat=None,
         on_tick_complete: Optional[Callable] = None,
-        on_check_complete: Optional[Callable] = None
+        on_check_complete: Optional[Callable] = None,
+        tool_registry=None,
     ) -> None:
         """Initialize bot's autonomous heartbeat.
         
@@ -253,6 +273,7 @@ class SpecialistBot(ABC):
             on_heartbeat: Callback to execute HEARTBEAT.md tasks via LLM
             on_tick_complete: Callback when tick completes
             on_check_complete: Callback when individual check completes
+            tool_registry: Optional tool registry for tool execution during heartbeat
         """
         if config is None:
             # Load default config for this bot type
@@ -285,7 +306,8 @@ class SpecialistBot(ABC):
             work_log_manager=work_log_manager,
             on_heartbeat=on_heartbeat,
             on_tick_complete=tick_callback,
-            on_check_complete=check_callback
+            on_check_complete=check_callback,
+            tool_registry=tool_registry,
         )
         
         logger.info(

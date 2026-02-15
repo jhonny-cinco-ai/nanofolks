@@ -59,6 +59,7 @@ class AgentLoop:
         allowed_paths: list[str] | None = None,
         protected_paths: list[str] | None = None,
         memory_config: "MemoryConfig | None" = None,
+        bot_name: str = "nanobot",
     ):
         from nanobot.config.schema import ExecToolConfig
         from nanobot.cron.service import CronService
@@ -66,7 +67,7 @@ class AgentLoop:
         self.provider = provider
         self.workspace = workspace
         self.workspace_id = str(workspace)  # For Learning Exchange
-        self.bot_name = "nanobot"  # Identity of this bot instance
+        self.bot_name = bot_name  # Identity of this bot (nanobot is the leader)
         
         # Initialize reasoning configuration for this bot
         self.reasoning_config = get_reasoning_config(self.bot_name)
@@ -271,7 +272,7 @@ class AgentLoop:
     def _apply_theme_if_needed(self) -> None:
         """Apply the selected theme to all team members' SOUL files on first start.
         
-        This ensures all bots are ready to use immediately, whether in workspaces or via DM.
+        This ensures all bots are ready to use immediately, whether in rooms or via DM.
         Team includes: nanobot (Leader), researcher, coder, social, creative, auditor
         """
         try:
@@ -312,7 +313,7 @@ class AgentLoop:
             # Show which bots are ready
             for bot_name, success in results.items():
                 if success:
-                    logger.debug(f"  ✓ {bot_name} ready for use (DM or workspace)")
+                    logger.debug(f"  ✓ {bot_name} ready for use (DM or room)")
                 else:
                     logger.warning(f"  ✗ {bot_name} SOUL initialization failed")
             
@@ -391,6 +392,34 @@ class AgentLoop:
         for tool in security_tools:
             self.tools.register(tool)
         logger.info(f"Registered {len(security_tools)} security tools")
+        
+        # Apply tool permissions based on bot's SOUL.md/AGENTS.md
+        self._apply_tool_permissions()
+    
+    def _apply_tool_permissions(self) -> None:
+        """Apply tool permissions from bot's SOUL.md/AGENTS.md files."""
+        from nanobot.agent.tools.permissions import (
+            get_permissions_from_soul,
+            get_permissions_from_agents,
+            merge_permissions,
+            filter_registry,
+        )
+        
+        soul_perms = get_permissions_from_soul(self.bot_name, self.workspace)
+        agents_perms = get_permissions_from_agents(self.bot_name, self.workspace)
+        permissions = merge_permissions(soul_perms, agents_perms)
+        
+        if not permissions.allowed_tools and not permissions.denied_tools:
+            logger.debug(f"[{self.bot_name}] No tool permissions defined")
+            return
+        
+        filtered = filter_registry(self.tools, permissions)
+        if len(filtered) != len(self.tools):
+            logger.info(
+                f"[{self.bot_name}] Tool permissions applied: "
+                f"{len(self.tools)} -> {len(filtered)} tools"
+            )
+            self.tools = filtered
     
     async def run(self) -> None:
         """Run the agent loop, processing messages from the bus."""
@@ -753,6 +782,7 @@ class AgentLoop:
             channel=msg.channel,
             chat_id=msg.chat_id,
             memory_context=memory_context if memory_context else None,
+            bot_name=self.bot_name,
         )
         
         # Select model using smart routing
@@ -994,6 +1024,7 @@ class AgentLoop:
             current_message=msg.content,
             channel=origin_channel,
             chat_id=origin_chat_id,
+            bot_name=self.bot_name,
         )
         
         # Select model using smart routing

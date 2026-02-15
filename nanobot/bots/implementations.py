@@ -1,15 +1,8 @@
 """Concrete bot implementations."""
 
 from nanobot.bots.base import SpecialistBot
-from nanobot.bots.definitions import (
-    NANOBOT_ROLE,
-    RESEARCHER_ROLE,
-    CODER_ROLE,
-    SOCIAL_ROLE,
-    CREATIVE_ROLE,
-    AUDITOR_ROLE,
-)
-from nanobot.models.workspace import Workspace
+from nanobot.models.room import Room
+from nanobot.models import get_role_card
 
 
 class NanobotLeader(SpecialistBot):
@@ -23,13 +16,13 @@ class NanobotLeader(SpecialistBot):
 
         Args:
             bus: InterBotBus for communication with team
-            workspace_id: Workspace context ID
+            workspace_id: Room context ID
             workspace: Path to workspace (for HEARTBEAT.md)
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
             theme_manager: Optional theme manager for applying themed display names
             custom_name: Optional custom display name (overrides theme)
         """
-        super().__init__(NANOBOT_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
+        super().__init__(get_role_card("nanobot"), bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.authority_level = "high"
         self.can_create_workspaces = True
         self.can_recruit_bots = True
@@ -37,14 +30,15 @@ class NanobotLeader(SpecialistBot):
         # Auto-initialize heartbeat with coordinator-specific config (30min interval)
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import COORDINATOR_CONFIG
-            self.initialize_heartbeat(config=COORDINATOR_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=COORDINATOR_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
-    async def process_message(self, message: str, workspace: Workspace) -> str:
+    async def process_message(self, message: str, workspace: Room) -> str:
         """Process a message as the coordinator."""
         # TODO: Integrate with LLM
         return f"nanobot: I received your message in {workspace.id}"
 
-    async def execute_task(self, task: str, workspace: Workspace) -> dict:
+    async def execute_task(self, task: str, workspace: Room) -> dict:
         """Execute coordination tasks."""
         return {
             "status": "pending",
@@ -65,27 +59,28 @@ class ResearcherBot(SpecialistBot):
 
         Args:
             bus: InterBotBus for communication with coordinator
-            workspace_id: Workspace context ID
+            workspace_id: Room context ID
             workspace: Path to workspace (for HEARTBEAT.md)
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
             theme_manager: Optional theme manager for applying themed display names
             custom_name: Optional custom display name (overrides theme)
         """
-        super().__init__(RESEARCHER_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
+        super().__init__(get_role_card("researcher"), bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("data_analysis")
         self.add_expertise("web_research")
         
         # Auto-initialize heartbeat with researcher-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import RESEARCHER_CONFIG
-            self.initialize_heartbeat(config=RESEARCHER_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=RESEARCHER_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
-    async def process_message(self, message: str, workspace: Workspace) -> str:
+    async def process_message(self, message: str, workspace: Room) -> str:
         """Process research request."""
         # TODO: Integrate with LLM
         return f"researcher: Analyzing request in {workspace.id}"
 
-    async def execute_task(self, task: str, workspace: Workspace) -> dict:
+    async def execute_task(self, task: str, workspace: Room) -> dict:
         """Execute research task."""
         return {
             "status": "pending",
@@ -107,13 +102,13 @@ class CoderBot(SpecialistBot):
 
         Args:
             bus: InterBotBus for communication with coordinator
-            workspace_id: Workspace context ID
+            workspace_id: Room context ID
             workspace: Path to workspace (for HEARTBEAT.md)
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
             theme_manager: Optional theme manager for applying themed display names
             custom_name: Optional custom display name (overrides theme)
         """
-        super().__init__(CODER_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
+        super().__init__(get_role_card("coder"), bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("python")
         self.add_expertise("testing")
         self.add_expertise("refactoring")
@@ -121,14 +116,15 @@ class CoderBot(SpecialistBot):
         # Auto-initialize heartbeat with coder-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import CODER_CONFIG
-            self.initialize_heartbeat(config=CODER_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=CODER_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
-    async def process_message(self, message: str, workspace: Workspace) -> str:
+    async def process_message(self, message: str, workspace: Room) -> str:
         """Process code request."""
         # TODO: Integrate with LLM
         return f"coder: Ready to implement in {workspace.id}"
 
-    async def execute_task(self, task: str, workspace: Workspace) -> dict:
+    async def execute_task(self, task: str, workspace: Room) -> dict:
         """Execute code task."""
         return {
             "status": "pending",
@@ -150,25 +146,26 @@ class SocialBot(SpecialistBot):
 
         Args:
             bus: InterBotBus for communication with coordinator
-            workspace_id: Workspace context ID
+            workspace_id: Room context ID
             workspace: Path to workspace (for HEARTBEAT.md)
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
         """
-        super().__init__(SOCIAL_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
+        super().__init__(get_role_card("social"), bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("community_management")
         self.add_expertise("social_media")
 
         # Auto-initialize heartbeat with social-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import SOCIAL_CONFIG
-            self.initialize_heartbeat(config=SOCIAL_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=SOCIAL_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
-    async def process_message(self, message: str, workspace: Workspace) -> str:
+    async def process_message(self, message: str, workspace: Room) -> str:
         """Process community request."""
         # TODO: Integrate with LLM
         return f"social: Engaging community in {workspace.id}"
 
-    async def execute_task(self, task: str, workspace: Workspace) -> dict:
+    async def execute_task(self, task: str, workspace: Room) -> dict:
         """Execute social task."""
         return {
             "status": "pending",
@@ -190,25 +187,26 @@ class CreativeBot(SpecialistBot):
 
         Args:
             bus: InterBotBus for communication with coordinator
-            workspace_id: Workspace context ID
+            workspace_id: Room context ID
             workspace: Path to workspace (for HEARTBEAT.md)
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
         """
-        super().__init__(CREATIVE_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
+        super().__init__(get_role_card("creative"), bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("visual_design")
         self.add_expertise("content_creation")
 
         # Auto-initialize heartbeat with creative-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import CREATIVE_CONFIG
-            self.initialize_heartbeat(config=CREATIVE_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=CREATIVE_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
-    async def process_message(self, message: str, workspace: Workspace) -> str:
+    async def process_message(self, message: str, workspace: Room) -> str:
         """Process creative request."""
         # TODO: Integrate with LLM
         return f"creative: Creating content in {workspace.id}"
 
-    async def execute_task(self, task: str, workspace: Workspace) -> dict:
+    async def execute_task(self, task: str, workspace: Room) -> dict:
         """Execute creative task."""
         return {
             "status": "pending",
@@ -230,25 +228,26 @@ class AuditorBot(SpecialistBot):
 
         Args:
             bus: InterBotBus for communication with coordinator
-            workspace_id: Workspace context ID
+            workspace_id: Room context ID
             workspace: Path to workspace (for HEARTBEAT.md)
             auto_init_heartbeat: Whether to auto-initialize heartbeat on creation
         """
-        super().__init__(AUDITOR_ROLE, bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
+        super().__init__(get_role_card("auditor"), bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("quality_assurance")
         self.add_expertise("compliance")
 
         # Auto-initialize heartbeat with auditor-specific config
         if auto_init_heartbeat:
             from nanobot.bots.heartbeat_configs import AUDITOR_CONFIG
-            self.initialize_heartbeat(config=AUDITOR_CONFIG, workspace=workspace)
+            tool_registry = self._create_tool_registry(workspace) if workspace else None
+            self.initialize_heartbeat(config=AUDITOR_CONFIG, workspace=workspace, tool_registry=tool_registry)
 
-    async def process_message(self, message: str, workspace: Workspace) -> str:
+    async def process_message(self, message: str, workspace: Room) -> str:
         """Process audit request."""
         # TODO: Integrate with LLM
         return f"auditor: Reviewing work in {workspace.id}"
 
-    async def execute_task(self, task: str, workspace: Workspace) -> dict:
+    async def execute_task(self, task: str, workspace: Room) -> dict:
         """Execute audit task."""
         return {
             "status": "pending",

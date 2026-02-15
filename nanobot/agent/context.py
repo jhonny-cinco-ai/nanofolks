@@ -269,11 +269,14 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/
                     parts.append(identity_content)
                 continue
             
-            # Other bootstrap files
+            # Other bootstrap files (USER.md, TOOLS.md)
             file_path = self.workspace / filename
             if file_path.exists():
+                from nanobot.utils.markdown_cleaner import clean_markdown_content
                 content = file_path.read_text(encoding="utf-8")
-                parts.append(f"## {filename}\n\n{content}")
+                # Clean markdown to reduce tokens while preserving meaning
+                cleaned_content = clean_markdown_content(content, aggressive=False)
+                parts.append(f"## {filename}\n\n{cleaned_content}")
         
         return "\n\n".join(parts) if parts else ""
     
@@ -287,6 +290,7 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/
             Formatted AGENTS content or None
         """
         from nanobot.soul import SoulManager
+        from nanobot.utils.markdown_cleaner import compact_agents_content
         
         # If no bot specified, no AGENTS content (workspace-level is deprecated)
         if not bot_name:
@@ -297,7 +301,9 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/
         agents_content = soul_manager.get_bot_agents(bot_name)
         
         if agents_content:
-            return f"## AGENTS.md (Bot: {bot_name})\n\n{agents_content}"
+            # Clean markdown to reduce tokens while preserving meaning
+            cleaned_content = compact_agents_content(agents_content)
+            return f"## AGENTS.md (Bot: {bot_name})\n\n{cleaned_content}"
         
         return None
     
@@ -310,6 +316,8 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/
         Returns:
             Formatted SOUL content or None
         """
+        from nanobot.utils.markdown_cleaner import compact_soul_content
+        
         # If no bot specified, no SOUL content (workspace-level is deprecated)
         if not bot_name:
             return None
@@ -317,7 +325,9 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/
         # Load bot-specific SOUL.md
         soul_content = self.soul_manager.get_bot_soul(bot_name)
         if soul_content:
-            return f"## SOUL.md (Bot: {bot_name})\n\n{soul_content}"
+            # Clean markdown to reduce tokens while preserving meaning
+            cleaned_content = compact_soul_content(soul_content)
+            return f"## SOUL.md (Bot: {bot_name})\n\n{cleaned_content}"
         
         return None
     
@@ -330,25 +340,33 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/
         Returns:
             Formatted IDENTITY content or None
         """
+        from nanobot.utils.markdown_cleaner import compact_soul_content
+        
         # If no bot specified, try workspace-level IDENTITY
         if not bot_name:
             identity_file = self.workspace / "IDENTITY.md"
             if identity_file.exists():
                 content = identity_file.read_text(encoding="utf-8")
-                return f"## IDENTITY.md\n\n{content}"
+                # Clean markdown to reduce tokens while preserving meaning
+                cleaned_content = compact_soul_content(content)
+                return f"## IDENTITY.md\n\n{cleaned_content}"
             return None
         
         # Load bot-specific IDENTITY.md if it exists in workspace
         bot_identity_file = self.workspace / "bots" / bot_name / "IDENTITY.md"
         if bot_identity_file.exists():
             content = bot_identity_file.read_text(encoding="utf-8")
-            return f"## IDENTITY.md (Bot: {bot_name})\n\n{content}"
+            # Clean markdown to reduce tokens while preserving meaning
+            cleaned_content = compact_soul_content(content)
+            return f"## IDENTITY.md (Bot: {bot_name})\n\n{cleaned_content}"
         
         # Fall back to template IDENTITY.md from theme
         from nanobot.templates import get_identity_template_for_bot
         template_content = get_identity_template_for_bot(bot_name)
         if template_content:
-            return f"## IDENTITY.md (Bot: {bot_name})\n\n{template_content}"
+            # Clean markdown to reduce tokens while preserving meaning
+            cleaned_content = compact_soul_content(template_content)
+            return f"## IDENTITY.md (Bot: {bot_name})\n\n{cleaned_content}"
         
         return None
     

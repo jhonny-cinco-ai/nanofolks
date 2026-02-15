@@ -1,6 +1,7 @@
 """Agent loop: the core processing engine."""
 
 import asyncio
+from contextlib import AsyncExitStack
 import json
 import json_repair
 from pathlib import Path
@@ -62,6 +63,7 @@ class AgentLoop:
         protected_paths: list[str] | None = None,
         memory_config: "MemoryConfig | None" = None,
         bot_name: str = "leader",
+        mcp_servers: dict | None = None,
     ):
         from nanobot.config.schema import ExecToolConfig
         from nanobot.cron.service import CronService
@@ -274,6 +276,9 @@ class AgentLoop:
         self._apply_theme_if_needed()
         
         self._running = False
+        self._mcp_servers = mcp_servers or {}
+        self._mcp_stack: AsyncExitStack | None = None
+        self._mcp_connected = False
         self._register_default_tools()
     
     def _apply_theme_if_needed(self) -> None:
@@ -431,6 +436,7 @@ class AgentLoop:
     async def run(self) -> None:
         """Run the agent loop, processing messages from the bus."""
         self._running = True
+        await self._connect_mcp()
         logger.info("Agent loop started")
         
         # Start background processor if memory is enabled
@@ -469,7 +475,27 @@ class AgentLoop:
         if self.background_processor:
             await self.background_processor.stop()
         
+        await self.close_mcp()
         logger.info("Agent loop stopping")
+    
+    async def _connect_mcp(self) -> None:
+        """Connect to configured MCP servers (one-time, lazy)."""
+        if self._mcp_connected or not self._mcp_servers:
+            return
+        self._mcp_connected = True
+        from nanobot.agent.tools.mcp import connect_mcp_servers
+        self._mcp_stack = AsyncExitStack()
+        await self._mcp_stack.__aenter__()
+        await connect_mcp_servers(self._mcp_servers, self.tools, self._mcp_stack)
+
+    async def close_mcp(self) -> None:
+        """Close MCP connections."""
+        if self._mcp_stack:
+            try:
+                await self._mcp_stack.aclose()
+            except (RuntimeError, BaseExceptionGroup):
+                pass  # MCP SDK cancel scope cleanup is noisy but harmless
+            self._mcp_stack = None
     
     async def _select_model(self, msg: InboundMessage, session: Session) -> str:
         """
@@ -1137,6 +1163,8 @@ class AgentLoop:
         )
         
         try:
+            await self._connect_mcp()
+            
             msg = InboundMessage(
                 channel=channel,
                 sender_id="user",

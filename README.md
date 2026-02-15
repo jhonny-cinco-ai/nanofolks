@@ -1170,6 +1170,38 @@ See [ROUTING.md](docs/ROUTING.md) for detailed configuration and customization.
 </details>
 
 
+### MCP (Model Context Protocol)
+
+> [!TIP]
+> The config format is compatible with Claude Desktop / Cursor. You can copy MCP server configs directly from any MCP server's README.
+
+nanobot supports [MCP](https://modelcontextprotocol.io/) — connect external tool servers and use them as native agent tools.
+
+Add MCP servers to your `config.json`:
+
+```json
+{
+  "tools": {
+    "mcp_servers": {
+      "filesystem": {
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]
+      }
+    }
+  }
+}
+```
+
+Two transport modes are supported:
+
+| Mode | Config | Example |
+|------|--------|---------|
+| **Stdio** | `command` + `args` | Local process via `npx` / `uvx` |
+| **HTTP** | `url` | Remote endpoint (`https://mcp.example.com/sse`) |
+
+MCP tools are automatically discovered and registered on startup. The LLM can use them alongside built-in tools — no extra configuration needed.
+
+
 ### Interactive Configuration Wizard ⭐ NEW
 
 **Two ways to configure nanobot:**

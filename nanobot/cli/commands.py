@@ -634,6 +634,7 @@ def gateway(
         evolutionary=config.tools.evolutionary,
         allowed_paths=config.tools.allowed_paths,
         protected_paths=config.tools.protected_paths,
+        mcp_servers=config.tools.mcp_servers,
     )
 
     # Set cron callback (needs agent)
@@ -1245,6 +1246,7 @@ def agent(
         evolutionary=config.tools.evolutionary,
         allowed_paths=config.tools.allowed_paths,
         protected_paths=config.tools.protected_paths,
+        mcp_servers=config.tools.mcp_servers,
     )
 
     # Show spinner when logs are off (no output to miss); skip when logs are on
@@ -1258,9 +1260,12 @@ def agent(
     if message:
         # Single message mode
         async def run_once():
-            with _thinking_ctx():
-                response = await agent_loop.process_direct(message, session_id, room_id=room)
-            _print_agent_response(response, render_markdown=markdown)
+            try:
+                with _thinking_ctx():
+                    response = await agent_loop.process_direct(message, session_id, room_id=room)
+                _print_agent_response(response, render_markdown=markdown)
+            finally:
+                await agent_loop.close_mcp()
         
         asyncio.run(run_once())
     else:
@@ -1699,7 +1704,13 @@ def agent(
                     console.print("\nGoodbye!")
                     break
         
-        asyncio.run(run_interactive())
+        async def run_with_cleanup():
+            try:
+                await run_interactive()
+            finally:
+                await agent_loop.close_mcp()
+        
+        asyncio.run(run_with_cleanup())
 
 
 # ============================================================================

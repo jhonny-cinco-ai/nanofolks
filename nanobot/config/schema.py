@@ -214,6 +214,14 @@ class ExecToolConfig(BaseModel):
     timeout: int = 60
 
 
+class MCPServerConfig(BaseModel):
+    """MCP server connection configuration (stdio or HTTP)."""
+    command: str = ""  # Stdio: command to run (e.g. "npx")
+    args: list[str] = Field(default_factory=list)  # Stdio: command arguments
+    env: dict[str, str] = Field(default_factory=dict)  # Stdio: extra env vars
+    url: str = ""  # HTTP: streamable HTTP endpoint URL
+
+
 class ToolsConfig(BaseModel):
     """Tools configuration."""
     web: WebToolsConfig = Field(default_factory=WebToolsConfig)
@@ -222,6 +230,7 @@ class ToolsConfig(BaseModel):
     evolutionary: bool = False  # If true, use allowed_paths whitelist instead of restrict_to_workspace
     allowed_paths: list[str] = Field(default_factory=list)  # Paths allowed when evolutionary mode is enabled (e.g., ["/projects/nanobot-turbo", "~/.nanobot"])
     protected_paths: list[str] = Field(default_factory=lambda: ["~/.nanobot/config.json"])  # Paths that are always blocked, even within allowed_paths (e.g., config files with secrets)
+    mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)  # MCP server configurations
 
 
 class RoutingTierConfig(BaseModel):

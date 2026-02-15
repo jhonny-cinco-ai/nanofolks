@@ -24,7 +24,14 @@ from prompt_toolkit.patch_stdout import patch_stdout
 from nanobot import __logo__
 from nanobot.config.loader import load_config, get_data_dir
 from nanobot.config.schema import MemoryConfig
-from nanobot.cli.room_ui import TeamRoster
+from nanobot.cli.room_ui import TeamRoster, RoomList, StatusBar
+from nanobot.cli.advanced_layout import (
+    AdvancedLayout,
+    LayoutManager,
+    SidebarManager,
+    TransitionEffect,
+    ResponsiveLayout,
+)
 
 # Initialize Rich console
 console = Console()
@@ -1001,6 +1008,29 @@ def _looks_like_room_creation_request(user_message: str) -> bool:
     return any(pattern in message_lower for pattern in create_patterns)
 
 
+def _display_room_context(room, room_manager=None) -> None:
+    """Display current room context (status bar + team roster).
+    
+    This is a Phase 2 improvement that shows room status and team
+    whenever the user enters a room or performs room-related actions.
+    
+    Args:
+        room: Room object to display
+        room_manager: RoomManager instance (optional, for future enhancements)
+    """
+    # Display status bar with room info
+    status_bar = StatusBar()
+    bot_emojis = TeamRoster().render_compact_inline(room.participants)
+    status = status_bar.render(room.id, len(room.participants), bot_emojis)
+    console.print(f"{status}\n")
+    
+    # Display team roster
+    roster = TeamRoster()
+    roster_display = roster.render(room.participants, compact=False)
+    console.print(roster_display)
+    console.print()
+
+
 async def _detect_room_creation_intent(user_message: str, config) -> Optional[dict]:
     """Use LLM to detect if user wants to create a room and recommend bots.
     
@@ -1123,20 +1153,24 @@ async def _handle_room_creation_intent(
         console.print("[yellow]Room creation cancelled.[/yellow]\n")
         return None
     
-    # Create room
+    # Create room with visual feedback (Phase 2 improvement)
     try:
-        new_room = room_manager.create_room(
-            name=room_name,
-            room_type=RoomType(room_type),
-            participants=["leader"]
-        )
-        console.print(f"\n✅ Created room [bold cyan]#{new_room.id}[/bold cyan] ({room_type})")
+        with console.status(f"[cyan]Creating room #{room_name}...[/cyan]", spinner="dots"):
+            new_room = room_manager.create_room(
+                name=room_name,
+                room_type=RoomType(room_type),
+                participants=["leader"]
+            )
+        console.print(f"\n✅ Created room [bold cyan]#{new_room.id}[/bold cyan] ({room_type})\n")
         
         # Invite recommended bots with themed names
         invited = []
         for bot in intent.get("recommended_bots", []):
             bot_name = bot.get("name", "")
-            if room_manager.invite_bot(new_room.id, bot_name):
+            with console.status(f"[cyan]Inviting @{bot_name}...[/cyan]", spinner="dots"):
+                invite_success = room_manager.invite_bot(new_room.id, bot_name)
+            
+            if invite_success:
                 # Get themed info (returns dict)
                 theming = theme_manager.get_bot_theming(bot_name)
                 if theming and isinstance(theming, dict):
@@ -1151,7 +1185,10 @@ async def _handle_room_creation_intent(
                     invited.append(bot_name)
         
         if invited:
-            console.print(f"\n[green]Team assembled: {', '.join(['@' + n for n in invited])}[/green]")
+            console.print(f"\n[green]Team assembled: {', '.join(['@' + n for n in invited])}[/green]\n")
+        
+        # Display the room context (status bar + team roster) - Phase 2 improvement
+        _display_room_context(new_room, room_manager)
         
         return (new_room, True)
         
@@ -1269,8 +1306,76 @@ def agent(
 
         signal.signal(signal.SIGINT, _exit_on_sigint)
         
+        def _redraw_layout(layout_manager, current_room, sidebar_manager) -> None:
+            """Redraw layout after terminal resize.
+            
+            Args:
+                layout_manager: LayoutManager instance
+                current_room: Current Room object
+                sidebar_manager: SidebarManager instance
+            """
+            try:
+                # Regenerate all content
+                roster_display = TeamRoster().render(
+                    current_room.participants,
+                    compact=False
+                )
+                
+                # Update layout sections
+                status_bar = StatusBar()
+                bot_emojis = TeamRoster().render_compact_inline(current_room.participants)
+                header = status_bar.render(current_room.id, len(current_room.participants), bot_emojis)
+                
+                # Update sidebar
+                sidebar_manager.update_team_roster(roster_display)
+                
+                # Redraw
+                layout_manager.update(
+                    header=header,
+                    sidebar=sidebar_manager.get_content()
+                )
+            except Exception as e:
+                logger.debug(f"Layout redraw failed: {e}")
+        
         async def run_interactive():
             nonlocal current_room  # Allow updating current_room
+            
+            # Phase 3: Initialize advanced layout
+            layout_manager = None
+            sidebar_manager = None
+            advanced_layout = AdvancedLayout()
+            
+            # Check if we can use advanced layout
+            if ResponsiveLayout.get_layout_mode(advanced_layout._get_terminal_width()) != "minimal":
+                try:
+                    layout_manager = LayoutManager()
+                    sidebar_manager = SidebarManager()
+                    
+                    layout_manager.start()
+                    
+                    # Initialize sidebar content
+                    roster_display = TeamRoster().render(
+                        current_room.participants,
+                        compact=False
+                    )
+                    rooms_list = room_manager.list_rooms()
+                    room_list_display = RoomList().render(
+                        rooms_list,
+                        current_room.id
+                    )
+                    
+                    sidebar_manager.update_team_roster(roster_display)
+                    sidebar_manager.update_room_list(room_list_display)
+                    
+                    # Register resize callback
+                    advanced_layout.on_resize(lambda: _redraw_layout(
+                        layout_manager, current_room, sidebar_manager
+                    ))
+                except Exception as e:
+                    logger.debug(f"Could not initialize advanced layout: {e}")
+                    layout_manager = None
+                    sidebar_manager = None
+            
             while True:
                 try:
                     _flush_pending_tty_input()
@@ -1280,9 +1385,13 @@ def agent(
                         continue
 
                     if _is_exit_command(command):
-                        _restore_terminal()
-                        console.print("\nGoodbye!")
-                        break
+                         # Phase 3: Stop layout monitoring
+                         if layout_manager:
+                             layout_manager.stop()
+                         
+                         _restore_terminal()
+                         console.print("\nGoodbye!")
+                         break
                     
                     # Handle work log commands in interactive mode
                     if command == "/explain":
@@ -1357,14 +1466,29 @@ def agent(
                         
                         try:
                             room_manager = get_room_manager()
-                            new_room = room_manager.create_room(
-                                name=room_name,
-                                room_type=RoomType(room_type),
-                                participants=["leader"]
-                            )
-                            console.print(f"\n✅ Created room #{new_room.id} ({room_type})")
-                            console.print(f"   Use: /invite <bot> to add bots")
-                            console.print(f"   Use: /switch {new_room.id} to join\n")
+                            
+                            # Create room with spinner - Phase 2 improvement
+                            with console.status(f"[cyan]Creating room #{room_name}...[/cyan]", spinner="dots"):
+                                new_room = room_manager.create_room(
+                                    name=room_name,
+                                    room_type=RoomType(room_type),
+                                    participants=["leader"]
+                                )
+                            
+                            console.print(f"\n✅ Created room [bold cyan]#{new_room.id}[/bold cyan] ({room_type})\n")
+                            console.print(f"   💡 Use: /invite <bot> to add bots")
+                            console.print(f"   💡 Use: /switch {new_room.id} to join\n")
+                            
+                            # Display room context - Phase 2 improvement
+                            _display_room_context(new_room, room_manager)
+                            
+                            # Phase 3: Update sidebar if layout is active
+                            if layout_manager:
+                                rooms_list = room_manager.list_rooms()
+                                room_list_display = RoomList().render(rooms_list, new_room.id)
+                                sidebar_manager.update_room_list(room_list_display)
+                                layout_manager.update(sidebar=sidebar_manager.get_content())
+                                TransitionEffect.highlight("✅ Room added to sidebar!")
                         except ValueError as e:
                             console.print(f"\n[red]❌ {e}[/red]\n")
                         continue
@@ -1382,12 +1506,25 @@ def agent(
                             continue
                         
                         room_manager = get_room_manager()
-                        if room_manager.invite_bot(room, bot_name):
+                        
+                        # Invite bot with spinner - Phase 2 improvement
+                        with console.status(f"[cyan]Inviting @{bot_name}...[/cyan]", spinner="dots"):
+                            invite_success = room_manager.invite_bot(room, bot_name)
+                        
+                        if invite_success:
                             updated_room = room_manager.get_room(room)
-                            console.print(f"\n✅ {bot_name} invited to #{room}")
-                            console.print(f"   Participants ({len(updated_room.participants)}): " + 
-                                         ", ".join(updated_room.participants) + "\n")
+                            console.print(f"\n✅ @{bot_name} invited to #{room}\n")
                             current_room = updated_room
+                            
+                            # Display room context after invite - Phase 2 improvement
+                            _display_room_context(current_room, room_manager)
+                            
+                            # Phase 3: Update sidebar if layout is active
+                            if layout_manager:
+                                roster_display = TeamRoster().render(current_room.participants, compact=False)
+                                sidebar_manager.update_team_roster(roster_display)
+                                layout_manager.update(sidebar=sidebar_manager.get_content())
+                                TransitionEffect.highlight("✅ Team updated!")
                         else:
                             console.print(f"\n[yellow]⚠ Could not invite {bot_name}[/yellow]\n")
                         continue
@@ -1399,11 +1536,24 @@ def agent(
                         new_room_id = command[8:].strip().lower()
                         
                         if not new_room_id:
-                            console.print("[yellow]Usage: /switch <room>[/yellow]")
+                            # Show available rooms if no argument provided
+                            room_manager = get_room_manager()
+                            rooms = room_manager.list_rooms()
+                            
+                            if rooms:
+                                room_list_ui = RoomList()
+                                console.print("\n[bold cyan]Available Rooms:[/bold cyan]")
+                                console.print(room_list_ui.render(rooms, room))
+                                console.print("[dim]Usage: /switch <room-name>[/dim]\n")
+                            else:
+                                console.print("[yellow]No rooms available[/yellow]\n")
                             continue
                         
                         room_manager = get_room_manager()
-                        new_room = room_manager.get_room(new_room_id)
+                        
+                        # Show switching spinner - Phase 2 improvement
+                        with console.status(f"[cyan]Switching to #{new_room_id}...[/cyan]", spinner="dots"):
+                            new_room = room_manager.get_room(new_room_id)
                         
                         if not new_room:
                             console.print(f"\n[red]❌ Room '{new_room_id}' not found[/red]\n")
@@ -1413,9 +1563,29 @@ def agent(
                         room = new_room_id
                         current_room = new_room
                         
-                        console.print(f"\n🔀 Switched to #{new_room_id}\n")
-                        console.print(_format_room_status(current_room))
-                        console.print(f"\nParticipants: {', '.join(current_room.participants)}\n")
+                        console.print(f"\n✅ Switched to [bold cyan]#{new_room_id}[/bold cyan]\n")
+                        
+                        # Display room context using helper function - Phase 2 improvement
+                        _display_room_context(current_room, room_manager)
+                        
+                        # Phase 3: Update layout if active
+                        if layout_manager:
+                            roster_display = TeamRoster().render(current_room.participants, compact=False)
+                            rooms_list = room_manager.list_rooms()
+                            room_list_display = RoomList().render(rooms_list, current_room.id)
+                            
+                            sidebar_manager.update_team_roster(roster_display)
+                            sidebar_manager.update_room_list(room_list_display)
+                            
+                            status_bar = StatusBar()
+                            bot_emojis = TeamRoster().render_compact_inline(current_room.participants)
+                            header = status_bar.render(current_room.id, len(current_room.participants), bot_emojis)
+                            
+                            layout_manager.update(
+                                header=header,
+                                sidebar=sidebar_manager.get_content()
+                            )
+                            TransitionEffect.slide_in(f"✅ Switched to #{current_room.id}")
                         continue
                     
                     # Handle /list-rooms command
@@ -1442,6 +1612,61 @@ def agent(
                         
                         console.print(f"\n{table}\n")
                         console.print("[dim]Use /switch <room> to join a room[/dim]\n")
+                        continue
+                    
+                    # Handle /help command - show available room commands
+                    if command in ["/help", "/help-rooms", "/?", "/commands"]:
+                        console.print("\n[bold cyan]Available Room Commands:[/bold cyan]")
+                        console.print()
+                        console.print("  [bold]/create <name> [type][/bold]")
+                        console.print("    Create a new room. Types: project, direct, coordination")
+                        console.print("    Example: [dim]/create website-design project[/dim]")
+                        console.print()
+                        console.print("  [bold]/invite <bot> [reason][/bold]")
+                        console.print("    Invite a bot to the current room")
+                        console.print("    Bots: researcher, coder, creative, social, auditor, leader")
+                        console.print("    Example: [dim]/invite coder help with backend[/dim]")
+                        console.print()
+                        console.print("  [bold]/switch [room][/bold]")
+                        console.print("    Switch to a different room. Shows list if no room specified")
+                        console.print("    Example: [dim]/switch website-design[/dim]")
+                        console.print()
+                        console.print("  [bold]/list-rooms[/bold]")
+                        console.print("    Show all available rooms")
+                        console.print()
+                        console.print("  [bold]/status or /info[/bold]")
+                        console.print("    Show current room details and team roster")
+                        console.print()
+                        console.print("  [bold]/help[/bold]")
+                        console.print("    Show this help message")
+                        console.print()
+                        continue
+                    
+                    # Handle /status command - show current room info and team
+                    if command in ["/status", "/info"]:
+                        from nanobot.bots.room_manager import get_room_manager
+                        
+                        room_manager = get_room_manager()
+                        
+                        # Display status bar
+                        status_bar = StatusBar()
+                        bot_emojis = TeamRoster().render_compact_inline(current_room.participants)
+                        status_text = status_bar.render(room, len(current_room.participants), bot_emojis)
+                        console.print(f"\n{status_text}\n")
+                        
+                        # Display room info
+                        console.print(f"[bold cyan]Room Details:[/bold cyan]")
+                        console.print(f"  Name: #{current_room.id}")
+                        console.print(f"  Type: {current_room.type.value}")
+                        console.print(f"  Owner: {current_room.owner}")
+                        console.print(f"  Created: {current_room.created_at.strftime('%Y-%m-%d %H:%M')}")
+                        
+                        # Display team roster
+                        console.print()
+                        roster_ui = TeamRoster()
+                        roster_display = roster_ui.render(current_room.participants, compact=False)
+                        console.print(roster_display)
+                        console.print()
                         continue
                     
                     # AI-assisted room creation detection

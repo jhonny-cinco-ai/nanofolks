@@ -3,6 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from nanofolks.security.symbolic_converter import get_symbolic_converter
+
 
 class Tool(ABC):
     """
@@ -58,6 +60,35 @@ class Tool(ABC):
         if schema.get("type", "object") != "object":
             raise ValueError(f"Schema must be object type, got {schema.get('type')!r}")
         return self._validate(params, {**schema, "type": "object"}, "")
+    
+    def resolve_symbolic_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Resolve symbolic references in parameters to actual values.
+        
+        This is called before tool execution to resolve any {{symbolic_refs}}
+        to their actual values from the KeyVault.
+        
+        Args:
+            params: The parameters passed to the tool
+            
+        Returns:
+            Parameters with symbolic references resolved
+        """
+        converter = get_symbolic_converter()
+        resolved = {}
+        
+        for key, value in params.items():
+            if isinstance(value, str) and converter.is_symbolic_ref(value):
+                # Resolve symbolic reference
+                actual_value = converter.resolve(value)
+                if actual_value:
+                    resolved[key] = actual_value
+                else:
+                    # Keep original if not found (might be literal)
+                    resolved[key] = value
+            else:
+                resolved[key] = value
+        
+        return resolved
 
     def _validate(self, val: Any, schema: dict[str, Any], path: str) -> list[str]:
         t, label = schema.get("type"), path or "parameter"

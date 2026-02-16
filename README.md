@@ -18,6 +18,7 @@ From pirate captains to space explorers to creative misfits, your companions don
 
 Pick the kind of crew that fits you.
 
+
 ## What Makes Nanofolks Different?
 
 | | |
@@ -39,6 +40,7 @@ One that can help with:
 
 and so much more!
 
+
 ## Built to work in real life.
 
 Nanofolks provides a flexible architecture for:
@@ -57,571 +59,9 @@ Nanofolks provides a flexible architecture for:
 
 ---
 
-# Core Concepts
-
-This section explains the architectural concepts behind Nanofolks. Understanding these will help you configure and customize your crew.
-
-## 🧠 Memory System
-
-Nanofolks has a production-hardened memory system that learns from every conversation.
-
-### How It Works
-
-| Phase | Description |
-|-------|-------------|
-| **Event Logging** | Every message (user and assistant) is stored in a local SQLite database with full conversation context |
-| **Entity Extraction** | The system automatically identifies people, places, organizations, and concepts mentioned in conversations |
-| **Knowledge Graph** | Entities are connected through relationships, creating a map of what you've discussed |
-| **Preference Learning** | Nanofolks detects feedback patterns and learns your communication style, preferences, and habits over time |
-| **Context Assembly** | When you send a message, Nanofolks retrieves relevant memories and assembles them into context |
-
-### Why It Matters
-
-Unlike simple chat histories, Nanofolks builds a persistent knowledge base that:
-- Survives restarts and new conversations
-- Connects related information across time
-- Improves the more you use it
-
----
-
-## 🔐 Secret Sanitizer (Secondary Defense)
-
-> [!NOTE]
-> The Secret Sanitizer is now a **secondary** security layer. The primary defense is the Advanced Security Architecture (KeyVault, OS Keyring, SecureMemory) which prevents keys from ever reaching the LLM.
-
-The sanitizer intercepts content as a backup defense:
-
-### What It Detects
-
-| Pattern | Examples |
-|---------|----------|
-| API keys | OpenRouter, Anthropic, OpenAI, Groq |
-| Tokens | Bearer tokens, JWTs |
-| Credentials | Passwords, database strings |
-| Keys | Private keys, SSH credentials |
-
-### Where It Applies
-
-The sanitizer intercepts content at multiple points:
-
-| Location | Protection |
-|----------|------------|
-| **AI Messages** | Secrets masked before reaching the LLM |
-| **Log Files** | Nothing sensitive written to disk |
-| **Session History** | Stored conversations have secrets removed |
-| **Tool Outputs** | Results screened before display |
-
-### Example
-
-```
-Input:  "My API key is sk-or-v1-abc123..."
-Output: "My API key is sk-or-v1-ab***..." (masked)
-```
-
----
-
-## 🛡️ Advanced Security Architecture
-
-Nanofolks implements defense-in-depth security with multiple layers of protection for your API keys and sensitive data.
-
-### Security Layers
-
-| Layer | Protection | Implementation |
-|-------|------------|----------------|
-| **1. OS Keyring** | Keys stored in OS credential manager | macOS Keychain, Windows Credential Manager, Linux Secret Service |
-| **2. Symbolic References** | Keys never exposed to LLM | `{{openrouter_key}}` resolved at runtime |
-| **3. Secure Memory** | Memory locking and wiping | Keys protected in locked memory pages |
-| **4. Audit Logging** | Symbolic-only logging | Actual keys never written to logs |
-
-### How It Works
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  LLM SEES: {{openrouter_key}}, {{brave_key}}             │
-│  (symbolic references only - no actual keys)               │
-└─────────────────────────────────────────────────────────────┘
-                           ↓
-┌─────────────────────────────────────────────────────────────┐
-│  TOOL EXECUTION: KeyVault resolves at runtime              │
-│  openrouter_key → sk-or-v1-abc123... (briefly in memory)  │
-└─────────────────────────────────────────────────────────────┘
-                           ↓
-┌─────────────────────────────────────────────────────────────┐
-│  AUDIT LOG: "{{openrouter_key}}" (reference only)         │
-│  (actual key never appears in logs)                        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### CLI Commands
-
-```bash
-# Check keyring status
-nanofolks security status
-
-# List all API keys and their storage location
-nanofolks security list
-
-# Add a key to the OS keyring
-nanofolks security add openrouter
-
-# Migrate existing keys from config to keyring
-nanofolks security migrate-to-keyring
-
-# Remove a key from keyring
-nanofolks security remove openrouter
-```
-
-### Benefits
-
-- **API keys never in config file**: Stored in OS keyring instead of plain JSON
-- **LLM never sees keys**: Only symbolic references like `{{openrouter_key}}`
-- **Memory protection**: Keys locked in memory and wiped after use
-- **Safe logging**: Audit logs contain only references, never actual keys
-- **Anomaly detection**: Monitors for suspicious usage patterns
-
-> [!NOTE]
-> The legacy Secret Sanitizer (regex-based masking) still works as a secondary layer of defense.
-
----
-
-## 🛡️ Skill Verification Flow
-
-Skills extend Nanofolks' capabilities. Before any skill is used, it goes through security verification.
-
-### The Workflow
-
-```
-┌─────────────────┐
-│ 1. Auto-Detect │
-│   New skills   │
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│ 2. Risk Scoring │
-│   Analyze code │
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│ 3. Approval     │
-│   Block if risk │
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│ 4. Runtime      │
-│   Verification  │
-└─────────────────┘
-```
-
-### Risk Levels
-
-| Level | Icon | Examples |
-|-------|------|----------|
-| **Critical** | 🚫 | Credential theft, malware |
-| **High** | ⚠️ | Shell injection, system mods |
-| **Medium** | ⚡ | Obfuscation, suspicious downloads |
-| **Low** | ℹ️ | Binary execution, external URLs |
-
----
-
-## 💭 Chain of Thought
-
-Nanofolks doesn't just respond. It thinks through problems.
-
-### The Pattern
-
-```
-Observation → Thought → Action → Observation → Thought → (repeat)
-```
-
-### Multi-Turn Reasoning
-
-For complex tasks, Nanofolks can:
-- Break down problems into steps
-- Plan before executing
-- Reflect on intermediate results
-- Correct mistakes mid-process
-
-### Tool Execution Loop
-
-When tools are needed, Nanofolks:
-1. Decides which tool to use
-2. Executes the tool
-3. Observes the result
-4. Incorporates results into thinking
-5. Continues or responds
-
----
-
-## 📦 Context Compaction
-
-Long conversations can exceed AI model limits. Nanofolks intelligently manages this.
-
-### The Problem
-
-AI models have maximum context windows (typically 8K-200K tokens). Without management:
-- Conversations eventually hit the limit
-- Old context gets dropped
-- Nanofolks "forgets" earlier parts of the conversation
-
-### How Compaction Works
-
-| Step | Description |
-|------|-------------|
-| **Token Tracking** | Real-time counting using tiktoken (not estimates) |
-| **Threshold Warning** | 70% → shows warning in response |
-| **Compaction Trigger** | 80% → triggers smart compression |
-| **Tool Chain Safety** | Never separates tool calls from results |
-
-### Compaction Modes
-
-| Mode | When to Use |
-|------|-------------|
-| **Summary** | Default - AI generates smart summaries |
-| **Token-Limit** | Emergency - preserves recent messages only |
-| **Off** | Manual - you control when to compact |
-
-### Large Output Handling
-
-Tool outputs over 10KB are stored separately in SQLite to prevent:
-- API errors from oversized payloads
-- Context pollution
-- Cost overruns
-
----
-
-## 🎯 Tier-Aware Routing
-
-Not every message needs the most powerful (and expensive) AI model. Nanofolks intelligently routes messages to appropriate models.
-
-### The Two-Layer System
-
-```
-User Message
-    ↓
-Layer 1: Client-Side Classification (~1ms)
-  → Fast heuristic analysis
-  → Handles ~85% of messages instantly
-    ↓ (if ambiguous)
-Layer 2: LLM-Assisted Classification (~200ms)
-  → More accurate edge case handling
-    ↓
-Execute with Selected Model
-```
-
-### Tiers
-
-| Tier | When Used | Example |
-|------|-----------|---------|
-| **Simple** | Quick questions | "What's the weather?" |
-| **Medium** | General tasks | "Write me an email" |
-| **Complex** | Detailed work | "Analyze this data" |
-| **Reasoning** | Logic problems | "Prove this theorem" |
-| **Coding** | Programming | "Debug this function" |
-
-### Sticky Routing
-
-Once a tier is selected, it "sticks" for the conversation context:
-- Consistent responses
-- Cost predictability
-- Better coherence
-
-### Cost Savings
-
-> [!NOTE]
-> These figures are estimates based on typical usage patterns. Actual savings depend on your message distribution and model selection. Run `nanofolks routing analytics` to see your real cost data.
-
-Typical usage (45% simple, 35% medium, 15% complex, 5% reasoning):
-
-| Scenario | Cost per Million Tokens |
-|----------|------------------------|
-| **Without routing** | $75.00 (always best model) |
-| **With routing** | $3.17 (blended) |
-| **Savings** | **Up to 96%** 🎉 |
-
----
-
-## 💓 Multi-Heartbeat System
-
-Nanofolks doesn't just wait for you to message it. It can proactively act.
-
-### Scheduled Tasks (Cron)
-
-```bash
-# Every morning at 9am
-nanofolks cron add --name "morning" --message "What's on my calendar?" --cron "0 9 * * *"
-
-# Hourly health checks
-nanofolks cron add --name "hourly" --message "Check system status" --every 3600
-```
-
-### Proactive Wake-Up
-
-The heartbeat system:
-- Wakes Nanofolks at scheduled times
-- Runs background tasks
-- Can message you proactively
-- Maintains state between runs
-
-### Activity Tracking
-
-Monitors when you're active to:
-- Determine when to run background processing
-- Avoid interrupting conversations
-- Optimize memory extraction timing
-
----
-
-## 📝 Work Logs
-
-Nanofolks maintains persistent logs of completed work for future reference.
-
-### What Gets Logged
-
-| Type | Examples |
-|------|----------|
-| Task completions | Timestamps, outcomes |
-| Tool executions | Results, errors |
-| Research | Findings, sources |
-| Artifacts | Generated files, code |
-
-### Why It Matters
-
-Work logs enable:
-- **Audit trail** - Know what was done and when
-- **Context continuity** - Pick up where you left off
-- **Reference** - Look back at previous solutions
-- **Learning** - Nanofolks improves from past work
-
-### Access
-
-Work logs are stored in the workspace and can be:
-- Searched via memory commands
-- Referenced in conversations
-- Exported for external use
-
----
-
-## 🤖 Multi-Bot Architecture
-
-Nanofolks supports multiple AI characters working together as a crew.
-
-### The Crew Concept
-
-A "crew" is a group of 6 AI characters, each with:
-
-- **Personality** - How they respond (from the theme)
-- **Role** - What they're good at
-- **Expertise** - Specific knowledge domains
-
-### Your Team
-
-Each Nanofolks crew has 6 bots:
-
-| Bot | Role | Expertise |
-|-----|------|-----------|
-| **Leader** (@leader) | Coordinates the crew | Planning, delegation, decision-making |
-| **Researcher** (@researcher) | Deep research | Analysis, information gathering |
-| **Coder** (@coder) | Technical implementation | Code, debugging, architecture |
-| **Social** (@social) | Community engagement | Communication, user relations |
-| **Creative** (@creative) | Creative work | Design, brainstorming, content |
-| **Auditor** (@auditor) | Quality review | Validation, compliance, testing |
-
-### How It Works
-
-```
-Workspace/
-├── bots/
-│   ├── leader.yaml      # Primary bot
-│   ├── specialist.yaml # Additional bots
-│   └── creative.yaml
-├── memory/             # Shared knowledge
-├── skills/             # Crew skills
-└── config.yaml         # Crew configuration
-```
-
-### Single Bot Mode
-
-Not ready for a full crew? Nanofolks works perfectly as a single assistant:
-- Default workspace has one bot
-- Works in DM mode
-- Same memory and learning capabilities
-- Easy to add more bots later
-
-### Why Multiple Bots?
-
-| Benefit | Example |
-|---------|---------|
-| **Specialization** | Coding bot, research bot |
-| **Personality** | Different characters for moods |
-| **Collaboration** | Bots discuss and debate |
-| **Reliability** | Backup if one is unavailable |
-
----
-
-## 🏠 Rooms & Collaboration
-
-Nanofolks uses **rooms** as collaboration spaces where your crew works together. Think of rooms as dedicated spaces for different projects, topics, or conversation types.
-
-### What Are Rooms?
-
-A **room** is a conversation context where:
-- Multiple bots can participate together
-- Context is shared among all participants
-- Bots can @mention each other to collaborate
-- Work gets coordinated through the Leader
-
-### Room Types
-
-| Type | Description | Use Case |
-|------|-------------|----------|
-| **OPEN** | General discussion room | Casual chat, #general |
-| **PROJECT** | Focused team workspace | Specific projects with deadlines |
-| **DIRECT** | 1-on-1 with a bot | Private DM with @researcher |
-| **COORDINATION** | Leader-managed room | Autonomous coordination mode |
-
-### Creating and Managing Rooms
-
-Create rooms for different projects or contexts:
-
-```bash
-# Create a new project room
-nanofolks room create project-alpha
-
-# Invite bots to the room
-nanofolks room invite project-alpha researcher
-nanofolks room invite project-alpha coder
-nanofolks room invite project-alpha creative
-
-# See who's in the room
-nanofolks room show project-alpha
-
-# List all your rooms
-nanofolks room list
-```
-
-### The @ Mention System
-
-Use **@** to direct messages to specific bots or the entire crew:
-
-#### Direct to a Bot
-```
-@researcher analyze market trends for Q3
-→ ResearcherBot responds with analysis
-
-@coder implement user authentication
-→ CoderBot writes the code
-
-@creative design a landing page hero
-→ CreativeBot creates concepts
-```
-
-#### Broadcast to All
-```
-@all review this architecture proposal
-→ All bots in the room respond with feedback
-
-@crew brainstorm marketing ideas
-→ Entire crew collaborates on ideas
-```
-
-#### Leader Coordination (Default)
-```
-I need help planning the product launch
-→ Leader coordinates which bots should help
-→ May involve researcher (market), creative (branding), coder (landing page)
-```
-
-### How @ Routing Works
-
-When you send a message, Nanofolks intelligently routes it:
-
-1. **@botname mentioned?** → Goes directly to that bot
-2. **@all or @crew mentioned?** → Broadcast to all room participants
-3. **No mention?** → Leader analyzes and coordinates response
-
-```
-You: @researcher find competitors in the AI space
-    ↓
-ResearcherBot: Here's what I found...
-
-You: @all what do you think of this strategy?
-    ↓
-ResearcherBot: From a data perspective...
-CreativeBot: The branding approach should be...
-CoderBot: Technically, we could implement...
-Leader: Let me synthesize these perspectives...
-```
-
-### Direct Messages (DMs)
-
-Chat with a single bot privately without room context:
-
-```bash
-# DM a specific bot
-nanofolks agent -m "@researcher analyze this data privately"
-
-# Or enter interactive mode and use @ mentions
-nanofolks agent
-> @researcher what are the latest trends?
-```
-
-**DMs vs Rooms:**
-- **DMs** → Private 1-on-1, bot's individual expertise
-- **Rooms** → Collaborative, shared context, multiple perspectives
-
-### Room Creation by Leader
-
-The Leader can create rooms automatically when you ask:
-
-```
-You: Create a room for the website redesign project
-Leader: Created room 'website-redesign' with appropriate team members
-
-You: Set up a space for the Q4 planning
-Leader: Created 'q4-planning' room with researcher and creative
-```
-
-### Shared Context
-
-Rooms maintain shared context across the conversation:
-
-```
-You: @researcher find data on renewable energy
-ResearcherBot: [shares findings]
-
-You: @creative use that data for an infographic
-CreativeBot: [accesses the same research context]
-
-You: @coder build a dashboard with those stats
-CoderBot: [references previous findings]
-```
-
-### CLI Commands for Rooms
-
-| Command | Description |
-|---------|-------------|
-| `nanofolks room list` | Show all rooms |
-| `nanofolks room create <name>` | Create new room |
-| `nanofolks room invite <room> <bot>` | Add bot to room |
-| `nanofolks room remove <room> <bot>` | Remove bot from room |
-| `nanofolks room show <room>` | Show room details |
-
-### Best Practices
-
-**When to use @mentions:**
-- ✅ Use `@botname` when you know exactly who should help
-- ✅ Use `@all` for brainstorming or decisions needing multiple perspectives
-- ✅ No mention for general questions (Leader coordinates)
-
-**Room organization:**
-- Create PROJECT rooms for specific initiatives
-- Keep #general as OPEN for casual chat
-- Use DIRECT when you need a bot's specific expertise privately
-- Leader can auto-create rooms when you describe a project
-
----
 
 # Quick Start
+
 
 ## Installation
 
@@ -650,6 +90,7 @@ pip install nanofolks
 ```bash
 docker build -t nanofolks .
 ```
+
 
 ## Setup
 
@@ -684,6 +125,7 @@ Each Nanofolks crew has 6 bots:
 
 That's it! Your crew is ready to go!
 
+
 ## Start Chatting
 
 ```bash
@@ -697,6 +139,7 @@ nanofolks agent
 ```
 
 ---
+
 
 # Chat Apps
 
@@ -820,7 +263,360 @@ Requires Node.js ≥18.
 
 ---
 
+
+# Core Concepts
+
+This section explains the architectural concepts behind Nanofolks. Understanding these will help you configure and customize your crew.
+
+
+## 🧠 Memory System
+
+Nanofolks has a production-hardened memory system that learns from every conversation.
+
+### How It Works
+
+| Phase | Description |
+|-------|-------------|
+| **Event Logging** | Every message (user and assistant) is stored in a local SQLite database with full conversation context |
+| **Entity Extraction** | The system automatically identifies people, places, organizations, and concepts mentioned in conversations |
+| **Knowledge Graph** | Entities are connected through relationships, creating a map of what you've discussed |
+| **Preference Learning** | Nanofolks detects feedback patterns and learns your communication style, preferences, and habits over time |
+| **Context Assembly** | When you send a message, Nanofolks retrieves relevant memories and assembles them into context |
+
+### Why It Matters
+
+Unlike simple chat histories, Nanofolks builds a persistent knowledge base that:
+- Survives restarts and new conversations
+- Connects related information across time
+- Improves the more you use it
+
+---
+
+
+## 💭 Chain of Thought
+
+Nanofolks doesn't just respond. It thinks through problems.
+
+### The Pattern
+
+```
+Observation → Thought → Action → Observation → Thought → (repeat)
+```
+
+### Multi-Turn Reasoning
+
+For complex tasks, Nanofolks can:
+- Break down problems into steps
+- Plan before executing
+- Reflect on intermediate results
+- Correct mistakes mid-process
+
+### Tool Execution Loop
+
+When tools are needed, Nanofolks:
+1. Decides which tool to use
+2. Executes the tool
+3. Observes the result
+4. Incorporates results into thinking
+5. Continues or responds
+
+---
+
+
+## 📦 Context Compaction
+
+Long conversations can exceed AI model limits. Nanofolks intelligently manages this.
+
+### The Problem
+
+AI models have maximum context windows (typically 8K-200K tokens). Without management:
+- Conversations eventually hit the limit
+- Old context gets dropped
+- Nanofolks "forgets" earlier parts of the conversation
+
+### How Compaction Works
+
+| Step | Description |
+|------|-------------|
+| **Token Tracking** | Real-time counting using tiktoken (not estimates) |
+| **Threshold Warning** | 70% → shows warning in response |
+| **Compaction Trigger** | 80% → triggers smart compression |
+| **Tool Chain Safety** | Never separates tool calls from results |
+
+### Compaction Modes
+
+| Mode | When to Use |
+|------|-------------|
+| **Summary** | Default - AI generates smart summaries |
+| **Token-Limit** | Emergency - preserves recent messages only |
+| **Off** | Manual - you control when to compact |
+
+### Large Output Handling
+
+Tool outputs over 10KB are stored separately in SQLite to prevent:
+- API errors from oversized payloads
+- Context pollution
+- Cost overruns
+
+---
+
+
+## 🎯 Tier-Aware Routing
+
+Not every message needs the most powerful (and expensive) AI model. Nanofolks intelligently routes messages to appropriate models.
+
+### The Two-Layer System
+
+```
+User Message
+    ↓
+Layer 1: Client-Side Classification (~1ms)
+  → Fast heuristic analysis
+  → Handles ~85% of messages instantly
+    ↓ (if ambiguous)
+Layer 2: LLM-Assisted Classification (~200ms)
+  → More accurate edge case handling
+    ↓
+Execute with Selected Model
+```
+
+### Tiers
+
+| Tier | When Used | Example |
+|------|-----------|---------|
+| **Simple** | Quick questions | "What's the weather?" |
+| **Medium** | General tasks | "Write me an email" |
+| **Complex** | Detailed work | "Analyze this data" |
+| **Reasoning** | Logic problems | "Prove this theorem" |
+| **Coding** | Programming | "Debug this function" |
+
+### Sticky Routing
+
+Once a tier is selected, it "sticks" for the conversation context:
+- Consistent responses
+- Cost predictability
+- Better coherence
+
+### Cost Savings
+
+> [!NOTE]
+> These figures are estimates based on typical usage patterns. Actual savings depend on your message distribution and model selection. Run `nanofolks routing analytics` to see your real cost data.
+
+Typical usage (45% simple, 35% medium, 15% complex, 5% reasoning):
+
+| Scenario | Cost per Million Tokens |
+|----------|------------------------|
+| **Without routing** | $75.00 (always best model) |
+| **With routing** | $3.17 (blended) |
+| **Savings** | **Up to 96%** 🎉 |
+
+---
+
+
+## 🛡️ Unified Security Architecture
+
+Nanofolks implements a unified security architecture that protects credentials across all entry points - from user chat input to automated tasks like heartbeat and skill loading.
+
+### Core Protection Layers
+
+| Layer | What It Protects | Implementation |
+|-------|------------------|----------------|
+| **1. Secure Storage** | Keys at rest | OS Keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service) |
+| **2. Symbolic References** | Keys in transit | `{{key_name}}` resolved at execution time, never sent to LLM |
+| **3. Credential Detection** | Keys in user input | Auto-detects API keys/tokens before they reach LLM |
+| **4. Runtime Resolution** | Keys at execution | KeyVault resolves refs only when tools actually run |
+| **5. Safe Logging** | Keys in logs | Audit logs contain only references, never actual keys |
+| **6. Defense in Depth** | Keys in edge cases | Secret Sanitizer (regex masking) as final fallback |
+
+#### Layer 6: Secret Sanitizer (Defense in Depth)
+
+The Secret Sanitizer serves as the final safety net, catching any credentials that might slip through the primary layers:
+
+**What It Detects:**
+- API keys (OpenRouter, Anthropic, OpenAI, Groq, etc.)
+- Tokens (Bearer tokens, JWTs)
+- Credentials (Passwords, database strings)
+- Keys (Private keys, SSH credentials)
+
+**Where It Applies:**
+
+| Location | Protection |
+|----------|------------|
+| **AI Messages** | Secrets masked before reaching the LLM |
+| **Log Files** | Nothing sensitive written to disk |
+| **Session History** | Stored conversations have secrets removed |
+| **Tool Outputs** | Results screened before display |
+
+**Example:**
+```
+Input:  "My API key is sk-or-v1-abc123..."
+Output: "My API key is sk-or-v1-ab***..." (masked)
+```
+
+> [!NOTE]
+> The Secret Sanitizer is a **secondary** defense layer. The primary protection is the symbolic reference system (Layers 1-5) which prevents keys from ever being exposed.
+
+### How It Works: The Security Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 1. USER INPUT                                                 │
+│ "Create PR using token ghp_abc123xyz"                        │
+└──────────────────────────┬────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 2. CREDENTIAL DETECTION                                       │
+│ Detects: ghp_abc123xyz → github_token                        │
+│ Converts to: "Create PR using token {{github_token}}"       │
+└──────────────────────────┬────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 3. LLM PROCESSES (symbolic refs only)                        │
+│ LLM sees: {{github_token}}                                   │
+└──────────────────────────┬────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 4. TOOL EXECUTION                                             │
+│ ToolRegistry.resolve_symbolic_params() → KeyVault.get()      │
+│ {{github_token}} → ghp_abc123xyz (briefly in memory)       │
+└──────────────────────────┬────────────────────────────────────┘
+                           ↓
+┌─────────────────────────────────────────────────────────────┐
+│ 5. AUDIT LOG                                                  │
+│ Logged: "Used {{github_token}}" (never the actual key)     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### CLI Commands
+
+```bash
+
+## 🤖 Multi-Bot Architecture
+
+Nanofolks supports multiple AI characters working together as a crew.
+
+### The Crew Concept
+
+A "crew" is a group of 6 AI characters, each with:
+
+- **Personality** - How they respond (from the theme)
+- **Role** - What they're good at
+- **Expertise** - Specific knowledge domains
+
+### Your Team
+
+Each Nanofolks crew has 6 bots:
+
+| Bot | Role | Expertise |
+|-----|------|-----------|
+| **Leader** (@leader) | Coordinates the crew | Planning, delegation, decision-making |
+| **Researcher** (@researcher) | Deep research | Analysis, information gathering |
+| **Coder** (@coder) | Technical implementation | Code, debugging, architecture |
+| **Social** (@social) | Community engagement | Communication, user relations |
+| **Creative** (@creative) | Creative work | Design, brainstorming, content |
+| **Auditor** (@auditor) | Quality review | Validation, compliance, testing |
+
+### How It Works
+
+```
+Workspace/
+├── bots/
+│   ├── leader.yaml      # Primary bot
+│   ├── specialist.yaml # Additional bots
+│   └── creative.yaml
+├── memory/             # Shared knowledge
+├── skills/             # Crew skills
+└── config.yaml         # Crew configuration
+```
+
+### Single Bot Mode
+
+Not ready for a full crew? Nanofolks works perfectly as a single assistant:
+- Default workspace has one bot
+- Works in DM mode
+- Same memory and learning capabilities
+- Easy to add more bots later
+
+### Why Multiple Bots?
+
+| Benefit | Example |
+|---------|---------|
+| **Specialization** | Coding bot, research bot |
+| **Personality** | Different characters for moods |
+| **Collaboration** | Bots discuss and debate |
+| **Reliability** | Backup if one is unavailable |
+
+---
+
+
+## 🏠 Rooms & Collaboration
+
+Nanofolks uses **rooms** as collaboration spaces where your crew works together. Think of rooms as dedicated spaces for different projects, topics, or conversation types.
+
+### What Are Rooms?
+
+A **room** is a conversation context where:
+- Multiple bots can participate together
+- Context is shared among all participants
+- Bots can @mention each other to collaborate
+- Work gets coordinated through the Leader
+
+### Room Types
+
+| Type | Description | Use Case |
+|------|-------------|----------|
+| **OPEN** | General discussion room | Casual chat, #general |
+| **PROJECT** | Focused team workspace | Specific projects with deadlines |
+| **DIRECT** | 1-on-1 with a bot | Private DM with @researcher |
+| **COORDINATION** | Leader-managed room | Autonomous coordination mode |
+
+### Creating and Managing Rooms
+
+Create rooms for different projects or contexts:
+
+```bash
+
+## 💓 Multi-Heartbeat System
+
+Nanofolks doesn't just wait for you to message it. It can proactively act.
+
+### Scheduled Tasks (Cron)
+
+```bash
+
+## 📝 Work Logs
+
+Nanofolks maintains persistent logs of completed work for future reference.
+
+### What Gets Logged
+
+| Type | Examples |
+|------|----------|
+| Task completions | Timestamps, outcomes |
+| Tool executions | Results, errors |
+| Research | Findings, sources |
+| Artifacts | Generated files, code |
+
+### Why It Matters
+
+Work logs enable:
+- **Audit trail** - Know what was done and when
+- **Context continuity** - Pick up where you left off
+- **Reference** - Look back at previous solutions
+- **Learning** - Nanofolks improves from past work
+
+### Access
+
+Work logs are stored in the workspace and can be:
+- Searched via memory commands
+- Referenced in conversations
+- Exported for external use
+
+---
+
+
 # Configuration
+
 
 ## Providers
 
@@ -835,6 +631,7 @@ Nanofolks supports multiple AI providers:
 | **Groq** | Fast inference + voice | [console.groq.com](https://console.groq.com) |
 | **Gemini** | Google AI | [aistudio.google.com](https://aistudio.google.com) |
 | **vLLM** | Local models | Run your own server |
+
 
 ## Smart Routing
 
@@ -854,6 +651,7 @@ Enable automatic model selection:
 }
 ```
 
+
 ## Environment Variables
 
 Nanofolks also respects these env vars:
@@ -865,7 +663,9 @@ Nanofolks also respects these env vars:
 
 ---
 
+
 # CLI Commands
+
 
 ## Essential Commands
 
@@ -877,6 +677,7 @@ Nanofolks also respects these env vars:
 | `nanofolks agent` | Interactive chat mode |
 | `nanofolks gateway` | Start multi-channel gateway |
 
+
 ## Memory & Session
 
 ```bash
@@ -886,6 +687,7 @@ nanofolks session status     # Show context usage
 nanofolks session compact    # Manual compaction
 ```
 
+
 ## Routing
 
 ```bash
@@ -894,6 +696,7 @@ nanofolks routing test "msg" # Test classification
 nanofolks routing analytics  # Show cost savings
 ```
 
+
 ## Skills
 
 ```bash
@@ -901,6 +704,7 @@ nanofolks skills list        # List all skills
 nanofolks skills scan ./skill  # Security scan
 nanofolks skills approve name # Approve skill
 ```
+
 
 ## Scheduled Tasks
 
@@ -912,20 +716,13 @@ nanofolks cron remove <id>
 
 ---
 
+
 # Docker
+
 
 ## Basic Usage
 
 ```bash
-# Build
-docker build -t nanofolks .
-
-# Initialize config
-docker run -v ~/.nanofolks:/root/.nanofolks --rm nanofolks onboard
-
-# Run gateway
-docker run -v ~/.nanofolks:/root/.nanofolks -p 18790:18790 nanofolks gateway
-```
 
 ## Persisting Data
 
@@ -933,6 +730,7 @@ docker run -v ~/.nanofolks:/root/.nanofolks -p 18790:18790 nanofolks gateway
 > The `-v ~/.nanofolks:/root/.nanofolks` flag mounts your config directory, so your settings and memory persist across restarts.
 
 ---
+
 
 # Philosophy
 
@@ -948,6 +746,7 @@ We believe AI should:
 
 ---
 
+
 # Links & Resources
 
 | | |
@@ -958,6 +757,7 @@ We believe AI should:
 | ⭐ | **Star us**: [GitHub](https://github.com/nanofolks/nanofolks) |
 
 ---
+
 
 # Credits
 
@@ -970,3 +770,301 @@ This project is for educational, research, and technical exchange purposes only.
 <p align="center">
   <em>Your crew's already on it.</em>
 </p>
+
+# Check keyring status
+nanofolks security status
+
+
+# List all API keys and their storage location
+nanofolks security list
+
+
+# Add a key to the OS keyring
+nanofolks security add openrouter
+
+
+# Migrate existing keys from config to keyring
+nanofolks security migrate-to-keyring
+
+
+# Remove a key from keyring
+nanofolks security remove openrouter
+```
+
+### Benefits
+
+- **API keys never in config file**: Stored in OS keyring instead of plain JSON
+- **LLM never sees keys**: Only symbolic references like `{{openrouter_key}}`
+- **Memory protection**: Keys locked in memory and wiped after use
+- **Safe logging**: Audit logs contain only references, never actual keys
+- **Anomaly detection**: Monitors for suspicious usage patterns
+
+> [!NOTE]
+> The legacy Secret Sanitizer (regex-based masking) still works as a secondary layer of defense.
+
+### Skills Security & Verification
+
+Skills extend Nanofolks' capabilities. Before any skill is used, it goes through security verification.
+
+#### Security Scanning Process
+
+```
+┌─────────────────┐
+│ 1. Auto-Detect │
+│   New skills   │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│ 2. Risk Scoring │
+│   Analyze code │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│ 3. Approval     │
+│   Block if risk │
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│ 4. Runtime      │
+│   Verification  │
+└─────────────────┘
+```
+
+#### Risk Levels
+
+| Level | Icon | Examples |
+|-------|------|----------|
+| **Critical** | 🚫 | Credential theft, malware |
+| **High** | ⚠️ | Shell injection, system mods |
+| **Medium** | ⚡ | Obfuscation, suspicious downloads |
+| **Low** | ℹ️ | Binary execution, external URLs |
+
+### Contextual Protections
+
+#### HEARTBEAT.md Security
+
+When heartbeat tasks read `HEARTBEAT.md`:
+
+1. **Automatic scanning** - Credentials detected when file is read
+2. **Warning system** - Users alerted if secrets found
+3. **Automatic conversion** - Keys converted to `{{symbolic_ref}}` before LLM
+4. **Chat remediation** - "Please secure the keys in HEARTBEAT.md" → agent fixes it
+
+Example workflow:
+```
+You: "Please secure the keys in HEARTBEAT.md"
+Agent: Uses secure_remediate tool → Stores keys → Updates file with {{symbolic_ref}}
+```
+
+#### MCP Server Security
+
+MCP servers support symbolic references in environment variables:
+
+```yaml
+
+# config.yaml
+mcp_servers:
+  my_server:
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/path"]
+    env:
+      OPENAI_API_KEY: "{{openai_key}}"  # Resolved from KeyVault
+```
+
+#### Chat-Based Remediation
+
+The `secure_remediate` tool helps users fix security issues directly in chat:
+
+```bash
+
+# Agent can use these tools:
+- secure_remediate(file_path="HEARTBEAT.md", action="scan")     # Scan for credentials
+- secure_remediate(file_path="HEARTBEAT.md", action="store_and_fix", key_type="github_token", api_key="...")
+```
+
+Users can simply say: "Please secure the keys in HEARTBEAT.md" and the agent will help fix it.
+
+---
+
+
+# Every morning at 9am
+nanofolks cron add --name "morning" --message "What's on my calendar?" --cron "0 9 * * *"
+
+
+# Hourly health checks
+nanofolks cron add --name "hourly" --message "Check system status" --every 3600
+```
+
+### Proactive Wake-Up
+
+The heartbeat system:
+- Wakes Nanofolks at scheduled times
+- Runs background tasks
+- Can message you proactively
+- Maintains state between runs
+
+### Activity Tracking
+
+Monitors when you're active to:
+- Determine when to run background processing
+- Avoid interrupting conversations
+- Optimize memory extraction timing
+
+---
+
+
+# Create a new project room
+nanofolks room create project-alpha
+
+
+# Invite bots to the room
+nanofolks room invite project-alpha researcher
+nanofolks room invite project-alpha coder
+nanofolks room invite project-alpha creative
+
+
+# See who's in the room
+nanofolks room show project-alpha
+
+
+# List all your rooms
+nanofolks room list
+```
+
+### The @ Mention System
+
+Use **@** to direct messages to specific bots or the entire crew:
+
+#### Direct to a Bot
+```
+@researcher analyze market trends for Q3
+→ ResearcherBot responds with analysis
+
+@coder implement user authentication
+→ CoderBot writes the code
+
+@creative design a landing page hero
+→ CreativeBot creates concepts
+```
+
+#### Broadcast to All
+```
+@all review this architecture proposal
+→ All bots in the room respond with feedback
+
+@crew brainstorm marketing ideas
+→ Entire crew collaborates on ideas
+```
+
+#### Leader Coordination (Default)
+```
+I need help planning the product launch
+→ Leader coordinates which bots should help
+→ May involve researcher (market), creative (branding), coder (landing page)
+```
+
+### How @ Routing Works
+
+When you send a message, Nanofolks intelligently routes it:
+
+1. **@botname mentioned?** → Goes directly to that bot
+2. **@all or @crew mentioned?** → Broadcast to all room participants
+3. **No mention?** → Leader analyzes and coordinates response
+
+```
+You: @researcher find competitors in the AI space
+    ↓
+ResearcherBot: Here's what I found...
+
+You: @all what do you think of this strategy?
+    ↓
+ResearcherBot: From a data perspective...
+CreativeBot: The branding approach should be...
+CoderBot: Technically, we could implement...
+Leader: Let me synthesize these perspectives...
+```
+
+### Direct Messages (DMs)
+
+Chat with a single bot privately without room context:
+
+```bash
+
+# DM a specific bot
+nanofolks agent -m "@researcher analyze this data privately"
+
+
+# Or enter interactive mode and use @ mentions
+nanofolks agent
+> @researcher what are the latest trends?
+```
+
+**DMs vs Rooms:**
+- **DMs** → Private 1-on-1, bot's individual expertise
+- **Rooms** → Collaborative, shared context, multiple perspectives
+
+### Room Creation by Leader
+
+The Leader can create rooms automatically when you ask:
+
+```
+You: Create a room for the website redesign project
+Leader: Created room 'website-redesign' with appropriate team members
+
+You: Set up a space for the Q4 planning
+Leader: Created 'q4-planning' room with researcher and creative
+```
+
+### Shared Context
+
+Rooms maintain shared context across the conversation:
+
+```
+You: @researcher find data on renewable energy
+ResearcherBot: [shares findings]
+
+You: @creative use that data for an infographic
+CreativeBot: [accesses the same research context]
+
+You: @coder build a dashboard with those stats
+CoderBot: [references previous findings]
+```
+
+### CLI Commands for Rooms
+
+| Command | Description |
+|---------|-------------|
+| `nanofolks room list` | Show all rooms |
+| `nanofolks room create <name>` | Create new room |
+| `nanofolks room invite <room> <bot>` | Add bot to room |
+| `nanofolks room remove <room> <bot>` | Remove bot from room |
+| `nanofolks room show <room>` | Show room details |
+
+### Best Practices
+
+**When to use @mentions:**
+- ✅ Use `@botname` when you know exactly who should help
+- ✅ Use `@all` for brainstorming or decisions needing multiple perspectives
+- ✅ No mention for general questions (Leader coordinates)
+
+**Room organization:**
+- Create PROJECT rooms for specific initiatives
+- Keep #general as OPEN for casual chat
+- Use DIRECT when you need a bot's specific expertise privately
+- Leader can auto-create rooms when you describe a project
+
+---
+
+
+# Build
+docker build -t nanofolks .
+
+
+# Initialize config
+docker run -v ~/.nanofolks:/root/.nanofolks --rm nanofolks onboard
+
+
+# Run gateway
+docker run -v ~/.nanofolks:/root/.nanofolks -p 18790:18790 nanofolks gateway
+```
+

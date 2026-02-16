@@ -308,22 +308,37 @@ def _configure_single_provider(name: str, schema: dict):
         console.print("[yellow]⚠ No API key provided, skipping[/yellow]")
         return
     
-    # Show preview
-    if len(api_key) > 8:
-        preview = f"{api_key[:8]}...{api_key[-4:]}"
-        console.print(f"Key preview: {preview}")
+    # Store API key in OS keyring (secure by default)
+    from nanofolks.security.keyring_manager import get_keyring_manager, is_keyring_available
     
-    # Confirm
-    if not Confirm.ask("Save this API key?", default=True):
-        console.print("[yellow]Cancelled[/yellow]")
-        return
+    keyring_available = is_keyring_available()
     
-    # Update config with spinner
-    with console.status(f"[cyan]Saving {name} configuration...[/cyan]", spinner="dots"):
-        result = asyncio.run(tool.execute(
-            path=f"providers.{name}.apiKey",
-            value=api_key
-        ))
+    if keyring_available:
+        # Store in keyring (secure default)
+        keyring = get_keyring_manager()
+        
+        with console.status(f"[cyan]Saving {name} API key to OS keyring...[/cyan]", spinner="dots"):
+            keyring.store_key(name, api_key)
+        
+        console.print(f"[green]✓[/green] API key saved securely to OS keyring")
+        
+        # Save marker to config (empty - key loaded from keyring)
+        with console.status("[cyan]Updating configuration...[/cyan]", spinner="dots"):
+            result = asyncio.run(tool.execute(
+                path=f"providers.{name}.apiKey",
+                value=""  # Empty - key loaded from keyring
+            ))
+        
+        console.print("[dim]API key stored in OS Keychain/Keyring (not in config file)[/dim]")
+    else:
+        # Fallback: store in config file if keyring not available
+        console.print("[yellow]⚠ OS Keyring not available, storing key in config file[/yellow]")
+        
+        with console.status(f"[cyan]Saving {name} configuration...[/cyan]", spinner="dots"):
+            result = asyncio.run(tool.execute(
+                path=f"providers.{name}.apiKey",
+                value=api_key
+            ))
     
     if "Error" in result:
         console.print(f"[red]{result}[/red]")
@@ -1026,11 +1041,30 @@ def _configure_tools():
                 api_key = Prompt.ask("Enter Brave Search API key", password=False)
                 
                 if api_key:
-                    with console.status("[cyan]Saving web search configuration...[/cyan]", spinner="dots"):
+                    # Store in OS keyring (secure by default)
+                    from nanofolks.security.keyring_manager import get_keyring_manager, is_keyring_available
+                    
+                    keyring_available = is_keyring_available()
+                    
+                    if keyring_available:
+                        keyring = get_keyring_manager()
+                        with console.status("[cyan]Saving Brave Search API key to OS keyring...[/cyan]", spinner="dots"):
+                            keyring.store_key("brave", api_key)
+                        
+                        # Save marker to config
                         result = asyncio.run(tool.execute(
                             path="tools.web.search.apiKey",
-                            value=api_key
+                            value="__KEYRING__"  # Marker for keyring
                         ))
+                        console.print("[green]✓[/green] API key saved securely to OS keyring")
+                    else:
+                        # Fallback to config file
+                        with console.status("[cyan]Saving web search configuration...[/cyan]", spinner="dots"):
+                            result = asyncio.run(tool.execute(
+                                path="tools.web.search.apiKey",
+                                value=api_key
+                            ))
+                    
                     if "Error" not in result:
                         console.print(f"[green]{result}[/green]")
                         console.print("[dim]Web search is now enabled[/dim]")

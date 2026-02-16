@@ -346,11 +346,29 @@ Then restart nanofolks for secure access.
             console.print(f"[yellow]⚠ Could not save evolutionary config: {e}[/yellow]")
     
     async def _save_provider_config(self, provider: str, api_key: str) -> None:
-        """Save provider API key to config."""
+        """Save provider API key to config using OS keyring."""
         try:
-            from nanofolks.agent.tools.update_config import UpdateConfigTool
-            tool = UpdateConfigTool()
-            await tool.execute(path=f"providers.{provider}.apiKey", value=api_key)
+            from nanofolks.security.keyring_manager import get_keyring_manager, is_keyring_available
+            
+            # Try to store in OS keyring (secure by default)
+            keyring_available = is_keyring_available()
+            
+            if keyring_available:
+                keyring = get_keyring_manager()
+                keyring.store_key(provider, api_key)
+                
+                # Save empty marker to config (key loaded from keyring)
+                from nanofolks.agent.tools.update_config import UpdateConfigTool
+                tool = UpdateConfigTool()
+                await tool.execute(path=f"providers.{provider}.apiKey", value="")
+                
+                console.print("[dim]API key saved to OS Keychain/Keyring (not in config file)[/dim]")
+            else:
+                # Fallback: store in config file
+                from nanofolks.agent.tools.update_config import UpdateConfigTool
+                tool = UpdateConfigTool()
+                await tool.execute(path=f"providers.{provider}.apiKey", value=api_key)
+                console.print("[yellow]⚠ OS Keyring unavailable, key stored in config file[/yellow]")
         except Exception as e:
             console.print(f"[yellow]⚠ Could not save API key: {e}[/yellow]")
     

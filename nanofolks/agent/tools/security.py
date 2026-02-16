@@ -206,6 +206,173 @@ class ValidateSkillSafetyTool(Tool):
             return "false (error)"
 
 
+class SecureRemediateTool(Tool):
+    """
+    Tool to help users fix security issues in HEARTBEAT.md or skills.
+    
+    This tool can:
+    - Scan files for exposed credentials
+    - Store credentials in OS Keyring
+    - Update files to use {{symbolic_ref}} instead of actual keys
+    
+    Use this when users ask about security warnings or want to secure their files.
+    """
+    
+    @property
+    def name(self) -> str:
+        return "secure_remediate"
+    
+    @property
+    def description(self) -> str:
+        return (
+            "Fix security issues in HEARTBEAT.md or skill files. "
+            "This tool scans for exposed API keys/tokens, offers to store them "
+            "securely in OS Keyring, and updates files to use {{symbolic_ref}} instead. "
+            "Use this when you notice security warnings or users ask to secure their files."
+        )
+    
+    @property
+    def parameters(self) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "file_path": {
+                    "type": "string",
+                    "description": "Path to file to scan and remediate (e.g., 'HEARTBEAT.md', 'skills/my-skill/SKILL.md')"
+                },
+                "action": {
+                    "type": "string",
+                    "description": "Action to take: 'scan' (default), 'store_and_fix', or 'show_instructions'",
+                    "enum": ["scan", "store_and_fix", "show_instructions"]
+                },
+                "key_type": {
+                    "type": "string",
+                    "description": "The type of key to store (e.g., 'github_token', 'openai_api_key'). Required for 'store_and_fix' action."
+                },
+                "api_key": {
+                    "type": "string",
+                    "description": "The actual API key to store securely. Required for 'store_and_fix' action."
+                }
+            },
+            "required": ["file_path", "action"]
+        }
+    
+    async def execute(self, file_path: str = "", action: str = "scan", key_type: str = "", api_key: str = "", **kwargs) -> str:
+        """Remediate security issues in a file."""
+        from nanofolks.security.credential_detector import CredentialDetector
+        from nanofolks.security.keyring_manager import get_keyring_manager
+        from nanofolks.security.symbolic_converter import get_symbolic_converter
+        
+        path = Path(file_path)
+        
+        if not path.exists():
+            return f"Error: File not found: {file_path}"
+        
+        if action == "show_instructions":
+            return self._show_instructions()
+        
+        if action == "scan":
+            return await self._scan_and_report(path)
+        
+        if action == "store_and_fix":
+            if not key_type or not api_key:
+                return "Error: key_type and api_key are required for 'store_and_fix' action"
+            return await self._store_and_fix(path, key_type, api_key)
+        
+        return "Error: Unknown action. Use 'scan', 'store_and_fix', or 'show_instructions'."
+    
+    def _show_instructions(self) -> str:
+        return """## How to Secure Your Files
+
+### Option 1: Store Key in OS Keyring
+```bash
+nanofolks security add <key_type>
+# Example: nanofolks security add github_token
+```
+
+### Option 2: Use Symbolic References
+Instead of:
+```
+Use token ghp_abc123xyz for GitHub
+```
+
+Use:
+```
+Use token {{github_token}} for GitHub
+```
+
+### Available Key Types
+- github_token / github_pat
+- openai_api_key
+- anthropic_api_key
+- brave_key
+- And more...
+
+### Benefits
+- Keys are stored securely in OS Keyring (never in config files)
+- LLM only sees {{symbolic_ref}}, never actual keys
+- Automatic resolution at tool execution time"""
+    
+    async def _scan_and_report(self, path: Path) -> str:
+        """Scan file and report found credentials."""
+        from nanofolks.security.credential_detector import CredentialDetector
+        
+        try:
+            content = path.read_text()
+        except Exception as e:
+            return f"Error reading file: {e}"
+        
+        detector = CredentialDetector()
+        matches = detector.detect(content)
+        
+        if not matches:
+            return f"✅ No credentials detected in {path.name}"
+        
+        unique_types = list(set(m.credential_type for m in matches))
+        
+        report = [f"⚠️ Found {len(matches)} credential(s) in {path.name}:"]
+        for m in matches:
+            masked = m.value[:4] + "..." + m.value[-4:] if len(m.value) > 8 else "***"
+            report.append(f"  - {m.credential_type}: ...{masked}")
+        
+        report.append("")
+        report.append("To fix this, I can help you:")
+        report.append("1. Store the key(s) in OS Keyring securely")
+        report.append("2. Update the file to use {{symbolic_ref}} instead")
+        report.append("")
+        report.append("Say something like: 'Please secure the keys in this file' and I'll help you fix it.")
+        
+        return "\n".join(report)
+    
+    async def _store_and_fix(self, path: Path, key_type: str, api_key: str) -> str:
+        """Store key in keyring and update file with symbolic ref."""
+        from nanofolks.security.keyring_manager import get_keyring_manager
+        
+        try:
+            keyring = get_keyring_manager()
+            keyring.store_key(key_type, api_key)
+        except Exception as e:
+            return f"Error storing key in keyring: {e}"
+        
+        try:
+            content = path.read_text()
+            
+            from nanofolks.security.symbolic_converter import get_symbolic_converter
+            converter = get_symbolic_converter()
+            result = converter.convert(content, f"remediate:{path.name}")
+            
+            path.write_text(result.text)
+        except Exception as e:
+            return f"Error updating file: {e}"
+        
+        return f"""✅ Security issues fixed in {path.name}!
+
+1. ✅ Stored {key_type} in OS Keyring securely
+2. ✅ Replaced actual key with {{symbolic_ref}} in {path.name}
+
+The file now uses {{symbolic_ref}} syntax which will be resolved to the actual key only at execution time. The LLM will never see your actual API key."""
+
+
 def create_security_tools() -> list[Tool]:
     """
     Create all security-related tools for the agent.
@@ -216,4 +383,5 @@ def create_security_tools() -> list[Tool]:
     return [
         ScanSkillTool(),
         ValidateSkillSafetyTool(),
+        SecureRemediateTool(),
     ]

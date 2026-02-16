@@ -22,6 +22,7 @@ from nanofolks.heartbeat.models import (
     CheckStatus, HeartbeatHistory, CheckDefinition
 )
 from nanofolks.heartbeat.check_registry import check_registry
+from nanofolks.security.credential_detector import CredentialDetector
 
 
 # The prompt sent to agent during heartbeat (from legacy service)
@@ -206,12 +207,75 @@ class BotHeartbeatService:
         
         return None
     
+    _heartbeat_secret_warning_shown: set[str] = set()
+    
+    def _scan_heartbeat_for_secrets(self, content: str, file_path: Path) -> list[dict]:
+        """Scan HEARTBEAT.md content for credentials.
+        
+        Returns list of detected credentials with type and value (masked).
+        """
+        detector = CredentialDetector()
+        matches = detector.detect(content)
+        
+        if matches:
+            detected = []
+            for match in matches:
+                value = match.value
+                masked_value = value[:4] + "..." + value[-4:] if len(value) > 8 else "***"
+                detected.append({
+                    "type": match.credential_type,
+                    "masked_value": masked_value,
+                    "file": str(file_path),
+                })
+            return detected
+        
+        return []
+    
+    def _warn_heartbeat_secrets(self, content: str, file_path: Path) -> None:
+        """Warn if HEARTBEAT.md contains potential secrets."""
+        file_key = str(file_path)
+        if file_key in self._heartbeat_secret_warning_shown:
+            return
+            
+        detected = self._scan_heartbeat_for_secrets(content, file_path)
+        
+        if detected:
+            self._heartbeat_secret_warning_shown.add(file_key)
+            logger.warning(
+                f"[{self.config.bot_name}] ⚠️ SECURITY WARNING: Potential secrets detected in {file_path.name}"
+            )
+            unique_types = set(item['type'] for item in detected)
+            for item in detected:
+                logger.warning(
+                    f"  - {item['type']}: {item['masked_value']} "
+                    f"(will be converted to {{symbolic_ref}} before sending to LLM)"
+                )
+            logger.warning(
+                f"\n  ➤ To fix this, you can:\n"
+            )
+            logger.warning(
+                f"  Option 1 (Chat): Tell me 'Please secure the keys in {file_path.name}' and I'll help you fix it\n"
+            )
+            logger.warning(
+                f"  Option 2 (CLI): Run these commands:\n"
+            )
+            for key_type in unique_types:
+                logger.warning(
+                    f"    1. nanofolks security add {key_type}\n"
+                    f"    2. Edit {file_path.name} and replace the actual key with {{{{{key_type}}}}}\n"
+                )
+            logger.warning(
+                f"\n  Example: After adding the key, update {file_path.name} to use {{{{{key_type}}}}} instead of the actual key value."
+            )
+    
     def _read_heartbeat_content(self) -> str | None:
         """Read HEARTBEAT.md content if exists."""
         heartbeat_file = self._get_heartbeat_file_path()
         if heartbeat_file:
             try:
-                return heartbeat_file.read_text()
+                content = heartbeat_file.read_text()
+                self._warn_heartbeat_secrets(content, heartbeat_file)
+                return content
             except Exception as e:
                 logger.warning(f"[{self.config.bot_name}] Failed to read HEARTBEAT.md: {e}")
         return None
@@ -234,6 +298,18 @@ class BotHeartbeatService:
             logger.debug(f"[{self.config.bot_name}] HEARTBEAT.md empty or not found")
             return None
         
+        # Convert any credentials to symbolic references before sending to LLM
+        from nanofolks.security.symbolic_converter import get_symbolic_converter
+        converter = get_symbolic_converter()
+        conversion_result = converter.convert(content, f"heartbeat:{self.config.bot_name}")
+        safe_content = conversion_result.text
+        
+        if conversion_result.credentials:
+            logger.info(
+                f"🔐 [{self.config.bot_name}] Converted {len(conversion_result.credentials)} "
+                f"credential(s) to symbolic references in HEARTBEAT.md"
+            )
+        
         # Log heartbeat start
         self._log_heartbeat_start(content)
         
@@ -243,9 +319,9 @@ class BotHeartbeatService:
             # Option 1: Use callback if provided
             if self.on_heartbeat:
                 response = await self._execute_via_callback()
-            # Option 2: Use direct LLM with routing
+            # Option 2: Use direct LLM with routing (use safe_content with refs resolved)
             elif self.provider:
-                response = await self._execute_via_provider(content)
+                response = await self._execute_via_provider(safe_content)
             # No way to execute
             else:
                 logger.warning(f"[{self.config.bot_name}] No way to execute HEARTBEAT.md")

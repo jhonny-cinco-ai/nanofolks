@@ -57,7 +57,12 @@ class ToolRegistry:
             errors = tool.validate_params(params)
             if errors:
                 return f"Error: Invalid parameters for tool '{name}': " + "; ".join(errors)
-            return await tool.execute(**params)
+            
+            # NEW: Resolve symbolic references in parameters before execution
+            # This converts {{github_token}} to actual credentials
+            resolved_params = tool.resolve_symbolic_params(params)
+            
+            return await tool.execute(**resolved_params)
         except Exception as e:
             return f"Error executing {name}: {str(e)}"
     

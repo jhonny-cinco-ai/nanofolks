@@ -850,8 +850,22 @@ class AgentLoop:
         if isinstance(cron_tool, CronTool):
             cron_tool.set_context(msg.channel, msg.chat_id)
         
-        # Sanitize message content before sending to LLM to prevent secret exposure
-        sanitized_content = self.sanitizer.sanitize(msg.content)
+        # NEW: Convert credentials to symbolic references before sending to LLM
+        # This is the core security feature - credentials never reach the LLM
+        from nanofolks.security.symbolic_converter import get_symbolic_converter
+        converter = get_symbolic_converter()
+        conversion_result = converter.convert(msg.content, session.session_key if session else None)
+        
+        # Use converted content (credentials replaced with {{ref}}) for LLM
+        # But keep original for logging
+        sanitized_content = conversion_result.text
+        
+        # Log warning if credentials were detected and converted
+        if conversion_result.credentials:
+            logger.info(f"🔐 Converted {len(conversion_result.credentials)} credential(s) to symbolic references: {[c['key_ref'] for c in conversion_result.credentials]}")
+        
+        # Also sanitize as backup defense-in-depth
+        sanitized_content = self.sanitizer.sanitize(sanitized_content)
         
         # Log event to memory system if enabled
         if self.memory_store:

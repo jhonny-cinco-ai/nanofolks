@@ -20,6 +20,8 @@ from typing import List, Optional
 
 from loguru import logger
 
+from nanofolks.security.credential_detector import CredentialDetector
+
 
 class Severity(Enum):
     """Severity levels for security findings."""
@@ -230,6 +232,9 @@ class SkillSecurityScanner:
                 content = file_path.read_text(encoding='utf-8')
                 file_findings = self._scan_content(content, file_path)
                 findings.extend(file_findings)
+                
+                credential_findings = self._scan_for_credentials(content, file_path)
+                findings.extend(credential_findings)
             except Exception as e:
                 logger.warning(f"Could not scan {file_path}: {e}")
         
@@ -289,6 +294,26 @@ class SkillSecurityScanner:
                             remediation=remediation
                         )
                         findings.append(finding)
+        
+        return findings
+    
+    def _scan_for_credentials(self, content: str, file_path: Path) -> List[SecurityFinding]:
+        """Scan for exposed credentials/API keys in skill content."""
+        findings = []
+        detector = CredentialDetector()
+        matches = detector.detect(content)
+        
+        for match in matches:
+            finding = SecurityFinding(
+                severity=Severity.HIGH,
+                category="exposed_credential",
+                description=f"Exposed {match.credential_type} detected - should use {{symbolic_ref}} instead",
+                line_number=match.start,
+                line_content=f"...{match.value[:8]}..." if len(match.value) > 8 else "***",
+                remediation=f"Run: nanofolks security add {match.credential_type}  Then replace actual key with {{{{{match.credential_type}}}}} in skill"
+            )
+            findings.append(finding)
+            logger.warning(f"🔐 Credential detected in {file_path.name}: {match.credential_type}")
         
         return findings
     

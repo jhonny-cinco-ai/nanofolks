@@ -894,7 +894,7 @@ We believe AI should:
 
 # Credits
 
-Nanofolks started as a fork of [nanofolks](https://github.com/HKUDS/nanofolks), a project by HKUDS. We're grateful for the foundation they built and continue to draw inspiration from their vision of making AI assistants accessible and fun.
+Nanofolks started as a fork of [nanobot](https://github.com/HKUDS/nanobot), a project by HKUDS. We're grateful for the foundation they built and continue to draw inspiration from their vision of making AI assistants accessible and fun.
 
 This project is for educational, research, and technical exchange purposes only.
 

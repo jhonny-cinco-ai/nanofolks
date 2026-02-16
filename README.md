@@ -260,6 +260,9 @@ Once a tier is selected, it "sticks" for the conversation context:
 
 ### Cost Savings
 
+> [!NOTE]
+> These figures are estimates based on typical usage patterns. Actual savings depend on your message distribution and model selection. Run `nanofolks routing analytics` to see your real cost data.
+
 Typical usage (45% simple, 35% medium, 15% complex, 5% reasoning):
 
 | Scenario | Cost per Million Tokens |

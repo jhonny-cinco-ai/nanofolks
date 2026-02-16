@@ -48,7 +48,7 @@ def _display_room_context(room, room_manager=None) -> None:
     # Used in 6 different places
 ```
 
-**Location**: Lines 1003-1025 in `nanobot/cli/commands.py`
+**Location**: Lines 1003-1025 in `nanofolks/cli/commands.py`
 
 ### Enhanced Commands (120 lines total)
 
@@ -145,7 +145,7 @@ TEAM
 ## Deliverables
 
 ### Code
-✅ Enhanced `nanobot/cli/commands.py`
+✅ Enhanced `nanofolks/cli/commands.py`
 - New helper function `_display_room_context()`
 - Enhanced `/create` command
 - Enhanced `/invite` command
@@ -321,15 +321,15 @@ console.print(f"{status}\n")
 - [x] Performance validated
 
 ### Deployment Steps
-1. Update `nanobot/cli/commands.py`
+1. Update `nanofolks/cli/commands.py`
 2. No migrations needed
 3. No config changes needed
-4. Restart nanobot
+4. Restart nanofolks
 5. Verify features work
 
 ### Verification Commands
 ```bash
-nanobot chat
+nanofolks chat
 [#general] You: /create test
 # See spinner, then context display
 
@@ -415,7 +415,7 @@ nanobot chat
 
 ### Files Updated This Session
 
-- ✅ `nanobot/cli/commands.py` - Main implementation
+- ✅ `nanofolks/cli/commands.py` - Main implementation
 - ✅ `CLI_UX_IMPLEMENTATION_STATUS.md` - Marked Phase 2 complete
 - ✅ `PHASE2_IMPROVEMENTS.md` - Detailed documentation
 - ✅ `PHASE2_IMPLEMENTATION_PLAN.md` - Planning document

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This index guides you through all documentation related to the nanobot room system implementation.
+This index guides you through all documentation related to the nanofolks room system implementation.
 
 ---
 
@@ -281,7 +281,7 @@ To enable in-session room management:
 - **ID**: Unique identifier (e.g., "general", "project-alpha")
 - **Type**: OPEN, PROJECT, DIRECT, or COORDINATION
 - **Participants**: List of bots in the room
-- **Storage**: `~/.nanobot/rooms/{id}.json`
+- **Storage**: `~/.nanofolks/rooms/{id}.json`
 
 ### Room Manager
 - Loads/creates rooms on startup

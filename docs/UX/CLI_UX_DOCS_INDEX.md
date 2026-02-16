@@ -14,7 +14,7 @@ Complete guide to CLI UX improvements, organized by audience and purpose.
 
 ## For End Users 👥
 
-Start here if you're using nanobot's room management features.
+Start here if you're using nanofolks's room management features.
 
 ### 1. **ROOM_COMMANDS_QUICK_REFERENCE.md**
 **What**: Complete command guide with examples  
@@ -30,7 +30,7 @@ Start here if you're using nanobot's room management features.
 **Start Reading**: [ROOM_COMMANDS_QUICK_REFERENCE.md](ROOM_COMMANDS_QUICK_REFERENCE.md)
 
 ### 2. **In-App Help**
-**What**: Instant help within nanobot  
+**What**: Instant help within nanofolks  
 **Best For**: Quick reference while chatting  
 **How to Access**:
 ```bash
@@ -121,7 +121,7 @@ Technical details and implementation information.
 ### 4. **Code Changes**
 **What**: Direct view of code modifications  
 **Best For**: Code review  
-**File**: `nanobot/cli/commands.py`
+**File**: `nanofolks/cli/commands.py`
 
 **Key Changes**:
 - Line 27: Import additions
@@ -256,9 +256,9 @@ High-level understanding of design and roadmap.
 ## Key Files
 
 ### Implementation
-- `nanobot/cli/commands.py` - Main implementation file (90 lines added)
-- `nanobot/cli/room_ui.py` - UI components (already existed)
-- `nanobot/bots/room_manager.py` - Room management (already existed)
+- `nanofolks/cli/commands.py` - Main implementation file (90 lines added)
+- `nanofolks/cli/room_ui.py` - UI components (already existed)
+- `nanofolks/bots/room_manager.py` - Room management (already existed)
 
 ### Documentation
 - `CLI_UX_IMPLEMENTATION_STATUS.md` - Status analysis
@@ -277,7 +277,7 @@ High-level understanding of design and roadmap.
 ### For New Team Members
 1. Read this index first
 2. Read [ROOM_COMMANDS_QUICK_REFERENCE.md](ROOM_COMMANDS_QUICK_REFERENCE.md)
-3. Try the commands: `nanobot chat` then `/help`
+3. Try the commands: `nanofolks chat` then `/help`
 4. Read [CLI_UX_IMPROVEMENTS_SUMMARY.md](CLI_UX_IMPROVEMENTS_SUMMARY.md)
 5. Explore [ADVANCED_CLI_UX_DESIGN.md](ADVANCED_CLI_UX_DESIGN.md) for vision
 
@@ -285,7 +285,7 @@ High-level understanding of design and roadmap.
 1. Start with [IMPLEMENTATION_CHECKLIST.md](IMPLEMENTATION_CHECKLIST.md)
 2. Read [PHASE1_IMPROVEMENTS.md](PHASE1_IMPROVEMENTS.md) for details
 3. Review [CLI_UX_IMPLEMENTATION_STATUS.md](CLI_UX_IMPLEMENTATION_STATUS.md)
-4. Check `nanobot/cli/commands.py` for actual code
+4. Check `nanofolks/cli/commands.py` for actual code
 
 ### For Deployment
 1. Read [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
@@ -307,7 +307,7 @@ High-level understanding of design and roadmap.
 
 ### Questions About Using the Commands?
 → See [ROOM_COMMANDS_QUICK_REFERENCE.md](ROOM_COMMANDS_QUICK_REFERENCE.md)  
-→ Type `/help` in nanobot
+→ Type `/help` in nanofolks
 
 ### Questions About Implementation?
 → See [PHASE1_IMPROVEMENTS.md](PHASE1_IMPROVEMENTS.md)  

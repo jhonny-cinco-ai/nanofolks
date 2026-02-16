@@ -9,7 +9,7 @@
 
 ## Overview
 
-Implemented all Phase 1 quick-win improvements to the nanobot CLI room management system. Enhanced user experience with better visual feedback, easier navigation, and comprehensive help documentation.
+Implemented all Phase 1 quick-win improvements to the nanofolks CLI room management system. Enhanced user experience with better visual feedback, easier navigation, and comprehensive help documentation.
 
 ---
 
@@ -65,7 +65,7 @@ TEAM
 ```
 
 **Lines of Code**: 7  
-**File**: nanobot/cli/commands.py (1153-1160)
+**File**: nanofolks/cli/commands.py (1153-1160)
 
 ---
 
@@ -91,7 +91,7 @@ TEAM
 - ✅ Better error messages for invalid rooms
 
 **Lines of Code**: 35  
-**File**: nanobot/cli/commands.py (1401-1440)
+**File**: nanofolks/cli/commands.py (1401-1440)
 
 ---
 
@@ -124,7 +124,7 @@ TEAM
 ```
 
 **Lines of Code**: 29  
-**File**: nanobot/cli/commands.py (1496-1524)
+**File**: nanofolks/cli/commands.py (1496-1524)
 
 ---
 
@@ -158,7 +158,7 @@ Available Room Commands:
 ```
 
 **Lines of Code**: 29  
-**File**: nanobot/cli/commands.py (1467-1495)
+**File**: nanofolks/cli/commands.py (1467-1495)
 
 ---
 
@@ -166,15 +166,15 @@ Available Room Commands:
 
 ### Code Changes
 
-**File Modified**: `nanobot/cli/commands.py`
+**File Modified**: `nanofolks/cli/commands.py`
 
 **Imports Updated**:
 ```python
 # Before
-from nanobot.cli.room_ui import TeamRoster
+from nanofolks.cli.room_ui import TeamRoster
 
 # After
-from nanobot.cli.room_ui import TeamRoster, RoomList, StatusBar
+from nanofolks.cli.room_ui import TeamRoster, RoomList, StatusBar
 ```
 
 **Functions Modified**:
@@ -189,7 +189,7 @@ from nanobot.cli.room_ui import TeamRoster, RoomList, StatusBar
 
 ### Components Used
 
-All improvements leverage existing UI components from `nanobot/cli/room_ui.py`:
+All improvements leverage existing UI components from `nanofolks/cli/room_ui.py`:
 - ✅ `TeamRoster.render()` - Display team with in-room markers
 - ✅ `TeamRoster.render_compact_inline()` - Emoji row for status bar
 - ✅ `RoomList.render()` - List available rooms
@@ -388,7 +388,7 @@ The system now provides:
 - **Implementation Status**: [CLI_UX_IMPLEMENTATION_STATUS.md](CLI_UX_IMPLEMENTATION_STATUS.md)
 - **Phase 1 Details**: [PHASE1_IMPROVEMENTS.md](PHASE1_IMPROVEMENTS.md)
 - **Command Reference**: [ROOM_COMMANDS_QUICK_REFERENCE.md](ROOM_COMMANDS_QUICK_REFERENCE.md)
-- **Code Changes**: [nanobot/cli/commands.py](nanobot/cli/commands.py) (lines 27, 1153-1160, 1401-1524)
+- **Code Changes**: [nanofolks/cli/commands.py](nanofolks/cli/commands.py) (lines 27, 1153-1160, 1401-1524)
 
 ---
 

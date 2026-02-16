@@ -10,8 +10,8 @@ We've successfully integrated room context into the leader CLI agent, enabling u
 
 ### 1. Room Selection (`--room` parameter)
 ```bash
-nanobot agent --room project-alpha
-nanobot agent -r project-alpha
+nanofolks agent --room project-alpha
+nanofolks agent -r project-alpha
 ```
 - Users can specify which room to join
 - Falls back gracefully to "general" if room doesn't exist
@@ -54,7 +54,7 @@ When the agent processes messages, the system prompt now includes:
 ## Room Context
 Room: #project-alpha
 Type: project
-Participants: nanobot, coder, researcher
+Participants: nanofolks, coder, researcher
 
 You are collaborating in this room with other bots. 
 Use @botname to mention specific bots when you need their expertise.
@@ -67,7 +67,7 @@ This enables:
 
 ### 6. Room-Aware Work Logs
 ```
-nanobot explain
+nanofolks explain
 # Shows:
 # Room: #project-alpha (project)
 # Participants: leader, coder, researcher
@@ -75,7 +75,7 @@ nanobot explain
 ```
 
 - Work logs capture room context
-- Can filter by room: `nanobot explain -w #project-alpha`
+- Can filter by room: `nanofolks explain -w #project-alpha`
 - Shows multi-bot interactions per room
 
 ### 7. Bot Activity Indicators
@@ -92,9 +92,9 @@ Room activity is shown with status:
 
 | File | Changes |
 |------|---------|
-| `nanobot/cli/commands.py` | Room parameter, header display, /room command, work log enhancement |
-| `nanobot/agent/loop.py` | Room context fields, pass to work logs and context builder |
-| `nanobot/agent/context.py` | Room parameters in build_messages(), room in system prompt |
+| `nanofolks/cli/commands.py` | Room parameter, header display, /room command, work log enhancement |
+| `nanofolks/agent/loop.py` | Room context fields, pass to work logs and context builder |
+| `nanofolks/agent/context.py` | Room parameters in build_messages(), room in system prompt |
 
 ### Total Changes
 - ~150 lines of new code
@@ -108,7 +108,7 @@ Room activity is shown with status:
 ```
 User Input
     ↓
-nanobot agent --room project-alpha
+nanofolks agent --room project-alpha
     ↓
 RoomManager.get_room("project-alpha")
     ↓
@@ -142,11 +142,11 @@ Work Log Stored with Room Context
 
 ### Before
 ```bash
-$ nanobot agent
-🤖 nanobot v1.0 - Interactive mode
+$ nanofolks agent
+🤖 nanofolks v1.0 - Interactive mode
 
 You: hello
-nanobot: I'll help with that.
+nanofolks: I'll help with that.
 ```
 
 **Problems:**
@@ -157,7 +157,7 @@ nanobot: I'll help with that.
 
 ### After
 ```bash
-$ nanobot agent --room website-redesign
+$ nanofolks agent --room website-redesign
 
 Room Context
 📁 #website-redesign (project) • 3 bots • 🟢 Active
@@ -167,7 +167,7 @@ Participants:
 
 [#website-redesign] You: Design the homepage
 
-nanobot: I can help! Since we have @coder and @creative 
+nanofolks: I can help! Since we have @coder and @creative 
 in this room, let me coordinate with them on the design.
 ```
 
@@ -184,15 +184,15 @@ in this room, let me coordinate with them on the design.
 
 ### Scenario 1: Default Room
 ```bash
-$ nanobot agent
+$ nanofolks agent
 # Uses "general" room automatically
 # Header shows: 🌐 #general (open) • 1 bot (leader)
 ```
 
 ### Scenario 2: Project Room
 ```bash
-$ nanobot room create website-redesign --bots leader,coder,creative
-$ nanobot agent --room website-redesign
+$ nanofolks room create website-redesign --bots leader,coder,creative
+$ nanofolks agent --room website-redesign
 # Header shows: 📁 #website-redesign (project) • 3 bots
 # Can invoke @coder or @creative
 ```
@@ -207,7 +207,7 @@ $ nanobot agent --room website-redesign
 
 ### Scenario 4: Room Not Found
 ```bash
-$ nanobot agent --room nonexistent
+$ nanofolks agent --room nonexistent
 # Output: Room 'nonexistent' not found. Using 'general' room.
 # Falls back gracefully
 ```
@@ -219,8 +219,8 @@ $ nanobot agent --room nonexistent
 ### Example 1: Simple Collaboration
 ```bash
 # Create and join a project
-nanobot room create design-system --bots leader,creative
-nanobot agent --room design-system
+nanofolks room create design-system --bots leader,creative
+nanofolks agent --room design-system
 
 [#design-system] You: Create a color palette for our brand
 
@@ -229,16 +229,16 @@ leader: Great! I'll work with @creative on this.
 [Response generated with room awareness]
 
 [#design-system] You: /explain
-# Shows: Room #design-system, Participants: nanobot, creative
+# Shows: Room #design-system, Participants: nanofolks, creative
 ```
 
 ### Example 2: Research Project
 ```bash
-nanobot room create market-analysis
-nanobot room invite market-analysis researcher
-nanobot room invite market-analysis social
+nanofolks room create market-analysis
+nanofolks room invite market-analysis researcher
+nanofolks room invite market-analysis social
 
-nanobot agent --room market-analysis
+nanofolks agent --room market-analysis
 
 [#market-analysis] You: Research latest AI trends
 
@@ -249,8 +249,8 @@ leader: I'll coordinate with @researcher and @social.
 
 ### Example 3: Direct Conversation
 ```bash
-nanobot room create dm-researcher --bots leader,researcher
-nanobot agent --room dm-researcher
+nanofolks room create dm-researcher --bots leader,researcher
+nanofolks agent --room dm-researcher
 
 [#dm-researcher] You: Tell me about your analysis approach
 
@@ -438,13 +438,13 @@ All while maintaining a clean, intuitive CLI experience and 100% backwards compa
 ### For End Users
 ```bash
 # Create a project room
-nanobot room create my-project --bots leader,coder
+nanofolks room create my-project --bots leader,coder
 
 # Join and collaborate
-nanobot agent --room my-project
+nanofolks agent --room my-project
 
 # See what happened
-nanobot explain -w #my-project
+nanofolks explain -w #my-project
 ```
 
 ### For Developers
@@ -460,7 +460,7 @@ See: `docs/agent_flow_analysis.md` for multi-bot architecture
 Questions? Check:
 - `docs/room_integration_cli.md` - User guide
 - `docs/room_integration_changelog.md` - Technical details
-- `nanobot room --help` - Command help
+- `nanofolks room --help` - Command help
 - `/help` in interactive mode - In-session help
 
 ---

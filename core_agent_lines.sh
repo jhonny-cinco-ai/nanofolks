@@ -2,7 +2,7 @@
 # Count core agent lines (excluding channels/, cli/, providers/ adapters)
 cd "$(dirname "$0")" || exit 1
 
-echo "nanobot core agent line count"
+echo "nanofolks core agent line count"
 echo "================================"
 echo ""
 
@@ -24,15 +24,15 @@ total_lines=0
 for dir_info in "${core_dirs[@]}"; do
     dir="${dir_info%%:*}"
     desc="${dir_info##*:}"
-    if [ -d "nanobot/$dir" ]; then
-        count=$(find "nanobot/$dir" -name "*.py" -exec cat {} + 2>/dev/null | wc -l)
+    if [ -d "nanofolks/$dir" ]; then
+         count=$(find "nanofolks/$dir" -name "*.py" -exec cat {} + 2>/dev/null | wc -l)
         printf "  %-16s %5s lines  # %s\n" "$dir/" "$count" "$desc"
         total_lines=$((total_lines + count))
     fi
 done
 
 # Root files
-root_count=$(cat nanobot/__init__.py nanobot/__main__.py 2>/dev/null | wc -l)
+root_count=$(cat nanofolks/__init__.py nanofolks/__main__.py 2>/dev/null | wc -l)
 printf "  %-16s %5s lines  # Package root\n" "(root)" "$root_count"
 total_lines=$((total_lines + root_count))
 

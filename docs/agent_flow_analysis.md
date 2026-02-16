@@ -2,17 +2,17 @@
 
 ## Executive Summary
 
-This document provides a comprehensive Python analysis of the `nanobot agent` and `nanobot gateway` commands, focusing on how the multi-bot architecture is implemented, how work logs are displayed, and how bot activity is shown to users.
+This document provides a comprehensive Python analysis of the `nanofolks agent` and `nanofolks gateway` commands, focusing on how the multi-bot architecture is implemented, how work logs are displayed, and how bot activity is shown to users.
 
 ---
 
-## 1. NANOBOT AGENT COMMAND (`nanobot agent`)
+## 1. NANOBOT AGENT COMMAND (`nanofolks agent`)
 
 ### Location
-**File**: `nanobot/cli/commands.py:827-969`
+**File**: `nanofolks/cli/commands.py:827-969`
 
 ### Purpose
-Interactive CLI mode for direct conversation with the nanobot agent. This is the primary user interface for single-bot or multi-bot interaction.
+Interactive CLI mode for direct conversation with the nanofolks agent. This is the primary user interface for single-bot or multi-bot interaction.
 
 ### Command Flow
 
@@ -57,7 +57,7 @@ Response to User
 
 ### Key Components
 
-#### AgentLoop (`nanobot/agent/loop.py`)
+#### AgentLoop (`nanofolks/agent/loop.py`)
 The core message processing engine with these key responsibilities:
 
 **Initialization** (lines 43-271):
@@ -117,13 +117,13 @@ async def _process_message(self, msg: InboundMessage) -> OutboundMessage | None:
 
 ---
 
-## 2. NANOBOT GATEWAY COMMAND (`nanobot gateway`)
+## 2. NANOBOT GATEWAY COMMAND (`nanofolks gateway`)
 
 ### Location
-**File**: `nanobot/cli/commands.py:544-817`
+**File**: `nanofolks/cli/commands.py:544-817`
 
 ### Purpose
-Starts the full nanobot server with multi-bot support, channels (Telegram, Discord, Slack), cron jobs, heartbeats, and dashboard.
+Starts the full nanofolks server with multi-bot support, channels (Telegram, Discord, Slack), cron jobs, heartbeats, and dashboard.
 
 ### Command Flow
 
@@ -133,7 +133,7 @@ def gateway(
     port: int = typer.Option(18790, "--port", "-p"),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ):
-    """Start the nanobot gateway."""
+    """Start the nanofolks gateway."""
 ```
 
 ### Architecture Flow
@@ -176,7 +176,7 @@ asyncio.gather(
 
 ```python
 # Create all 6 bot instances
-from nanobot.bots.implementations import (
+from nanofolks.bots.implementations import (
     ResearcherBot, CoderBot, SocialBot, 
     AuditorBot, CreativeBot, NanobotLeader
 )
@@ -193,7 +193,7 @@ researcher = ResearcherBus(
     theme_manager=theme_manager,
     custom_name=appearance_config.get_custom_name("researcher")
 )
-# ... similar for coder, social, auditor, creative, nanobot
+# ... similar for coder, social, auditor, creative, nanofolks
 
 # Initialize multi-heartbeat manager
 multi_manager = MultiHeartbeatManager()
@@ -202,7 +202,7 @@ multi_manager.register_bot(coder)
 multi_manager.register_bot(social)
 multi_manager.register_bot(auditor)
 multi_manager.register_bot(creative)
-multi_manager.register_bot(nanobot)
+multi_manager.register_bot(nanofolks)
 ```
 
 ---
@@ -219,7 +219,7 @@ multi_manager.register_bot(nanobot)
                                    ▼
                     ┌─────────────────────────────────────┐
                     │    BotDispatch.dispatch_message()   │
-                    │        (nanobot/bots/dispatch.py)   │
+                    │        (nanofolks/bots/dispatch.py)   │
                     └──────────────┬──────────────────────┘
                                    │
             ┌──────────────────────┼──────────────────────┐
@@ -232,7 +232,7 @@ multi_manager.register_bot(nanobot)
            │                     │                     │
            ▼                     ▼                     ▼
     ┌──────────────┐      ┌──────────────┐      ┌──────────────┐
-    │ Direct Bot   │      │ Mentioned    │      │ nanobot      │
+    │ Direct Bot   │      │ Mentioned    │      │ nanofolks      │
     │ Response     │      │ Bot Direct   │      │ Leader       │
     └──────────────┘      └──────────────┘      └──────┬───────┘
                                                        │
@@ -245,7 +245,7 @@ multi_manager.register_bot(nanobot)
                     └──────────────────┘    └──────────────────┘    └──────────────────┘
 ```
 
-### Bot Dispatch Rules (`nanobot/bots/dispatch.py:74-135`)
+### Bot Dispatch Rules (`nanofolks/bots/dispatch.py:74-135`)
 
 ```python
 def dispatch_message(self, message: str, room: Optional[Room] = None,
@@ -267,8 +267,8 @@ def dispatch_message(self, message: str, room: Optional[Room] = None,
         if mentioned_bot == "all":
             return DispatchResult(
                 target=DispatchTarget.DIRECT_BOT,
-                primary_bot="nanobot",  # Leader coordinates
-                secondary_bots=room.participants if room else ["nanobot"],
+                primary_bot="nanofolks",  # Leader coordinates
+                secondary_bots=room.participants if room else ["nanofolks"],
                 reason="User tagged @all/@crew - leader coordinates all bots"
             )
         else:
@@ -282,8 +282,8 @@ def dispatch_message(self, message: str, room: Optional[Room] = None,
     # Case 3: Default - Route through Leader first
     return DispatchResult(
         target=DispatchTarget.LEADER_FIRST,
-        primary_bot="nanobot",
-        secondary_bots=[p for p in room.participants if p != "nanobot"] if room else [],
+        primary_bot="nanofolks",
+        secondary_bots=[p for p in room.participants if p != "nanofolks"] if room else [],
         reason="Default: Leader coordinates response"
     )
 ```
@@ -295,9 +295,9 @@ When the Leader decides to delegate to a specialist bot:
 ```
 Leader Agent
     ↓
-invoke_tool.execute() → nanobot/agent/tools/invoke.py
+invoke_tool.execute() → nanofolks/agent/tools/invoke.py
     ↓
-BotInvoker.invoke() → nanobot/agent/bot_invoker.py
+BotInvoker.invoke() → nanofolks/agent/bot_invoker.py
     ↓
 _invoke_async() - Fire and forget
     ↓
@@ -318,7 +318,7 @@ AgentLoop._process_system_message():
     3. Send response
 ```
 
-### BotInvoker Implementation (`nanobot/agent/bot_invoker.py`)
+### BotInvoker Implementation (`nanofolks/agent/bot_invoker.py`)
 
 ```python
 class BotInvoker:
@@ -370,7 +370,7 @@ class BotInvoker:
 ### Purpose
 Comprehensive logging of all agent decisions, tool executions, and bot interactions for transparency and debugging.
 
-### Data Model (`nanobot/agent/work_log.py`)
+### Data Model (`nanofolks/agent/work_log.py`)
 
 ```python
 @dataclass
@@ -390,8 +390,8 @@ class WorkLogEntry:
     
     # Multi-Agent Extension Fields
     room_id: str = "default"
-    participants: List[str] = field(default_factory=lambda: ["nanobot"])
-    bot_name: str = "nanobot"
+    participants: List[str] = field(default_factory=lambda: ["nanofolks"])
+    bot_name: str = "nanofolks"
     bot_role: str = "primary"
     triggered_by: str = "user"
     coordinator_mode: bool = False
@@ -400,12 +400,12 @@ class WorkLogEntry:
 ```
 
 ### Storage
-- **Database**: SQLite at `~/.nanobot/work_logs.db`
+- **Database**: SQLite at `~/.nanofolks/work_logs.db`
 - **Tables**: 
   - `work_logs` - Session-level information
   - `work_log_entries` - Individual log entries with multi-agent support
 
-### Work Log Manager (`nanobot/agent/work_log_manager.py`)
+### Work Log Manager (`nanofolks/agent/work_log_manager.py`)
 
 ```python
 class WorkLogManager:
@@ -413,7 +413,7 @@ class WorkLogManager:
     
     def log(self, level: LogLevel, category: str, message: str,
             details: Optional[dict] = None, confidence: Optional[float] = None,
-            duration_ms: Optional[int] = None, bot_name: str = "nanobot",
+            duration_ms: Optional[int] = None, bot_name: str = "nanofolks",
             triggered_by: str = "user") -> Optional[WorkLogEntry]:
         """Add an entry to the current work log."""
         entry = self.current_log.add_entry(...)
@@ -428,7 +428,7 @@ class WorkLogManager:
                        response_to: int = None, mentions: list = None) -> Optional[WorkLogEntry]:
         """Log a bot-to-bot communication message."""
         
-    def log_escalation(self, reason: str, bot_name: str = "nanobot") -> Optional[WorkLogEntry]:
+    def log_escalation(self, reason: str, bot_name: str = "nanofolks") -> Optional[WorkLogEntry]:
         """Log an escalation that needs user attention."""
 ```
 
@@ -443,13 +443,13 @@ class WorkLogManager:
 /how "routing"        # Search for specific events
 
 # Standalone commands
-nanobot explain                           # Explain last decision
-nanobot explain --mode summary            # Brief summary
-nanobot explain --mode debug              # Full technical details
-nanobot explain --mode coordination       # Focus on coordinator decisions
-nanobot explain -b @researcher            # See what researcher did
-nanobot how "web_search"                  # Search for tool calls
-nanobot workspace-logs                    # List recent logs
+nanofolks explain                           # Explain last decision
+nanofolks explain --mode summary            # Brief summary
+nanofolks explain --mode debug              # Full technical details
+nanofolks explain --mode coordination       # Focus on coordinator decisions
+nanofolks explain -b @researcher            # See what researcher did
+nanofolks how "web_search"                  # Search for tool calls
+nanofolks workspace-logs                    # List recent logs
 ```
 
 #### Display Format Examples:
@@ -503,7 +503,7 @@ Steps:
 
 ## 5. BOT ACTIVITY & STATUS DISPLAY
 
-### Dashboard (`nanobot/heartbeat/dashboard.py`)
+### Dashboard (`nanofolks/heartbeat/dashboard.py`)
 
 **Real-time monitoring at http://localhost:9090**
 
@@ -541,8 +541,8 @@ The dashboard shows:
 ### CLI Status Commands
 
 ```bash
-nanobot bot status           # Show all bots and heartbeat status
-nanobot heartbeat status     # Show heartbeat statistics
+nanofolks bot status           # Show all bots and heartbeat status
+nanofolks heartbeat status     # Show heartbeat statistics
 ```
 
 ### How Bot Activity Is Shown
@@ -599,7 +599,7 @@ class ToolRegistry:
 
 ```python
 class ContextBuilder:
-    def build_messages(self, bot_name: str = "nanobot", ...) -> List[dict]:
+    def build_messages(self, bot_name: str = "nanofolks", ...) -> List[dict]:
         """Build system prompt with bot-specific SOUL.md"""
         soul = self._load_soul_for_bot(bot_name)
         identity = self._load_identity_for_bot(bot_name)
@@ -624,7 +624,7 @@ async def invoke(bot_name: str, task: str) -> str:
 
 ### Multi-Bot Architecture Highlights
 
-1. **Leader-First Dispatch**: All messages go through nanobot first, unless user directly mentions a bot or sends a DM
+1. **Leader-First Dispatch**: All messages go through nanofolks first, unless user directly mentions a bot or sends a DM
 2. **Async Bot Invocation**: Specialist bots work in background and announce results via system messages
 3. **State Isolation**: Each bot has its own SOUL.md, IDENTITY.md, and AGENTS.md for personality and permissions
 4. **Unified Work Logging**: All bot interactions logged with multi-agent context (room_id, bot_name, mentions, etc.)
@@ -632,7 +632,7 @@ async def invoke(bot_name: str, task: str) -> str:
 
 ### Work Log Display
 
-- **Stored in**: SQLite database (`~/.nanobot/work_logs.db`)
+- **Stored in**: SQLite database (`~/.nanofolks/work_logs.db`)
 - **View via**: CLI commands (`explain`, `how`, `workspace-logs`)
 - **Shows**: All decisions, tool executions, bot handoffs, errors, timing
 - **Multi-bot support**: Each entry tracks which bot, room, and participants
@@ -650,18 +650,18 @@ async def invoke(bot_name: str, task: str) -> str:
 
 | Component | File |
 |-----------|------|
-| Agent Command | `nanobot/cli/commands.py:827-969` |
-| Gateway Command | `nanobot/cli/commands.py:544-817` |
-| AgentLoop | `nanobot/agent/loop.py` |
-| BotInvoker | `nanobot/agent/bot_invoker.py` |
-| Invoke Tool | `nanobot/agent/tools/invoke.py` |
-| WorkLog Data Model | `nanobot/agent/work_log.py` |
-| WorkLog Manager | `nanobot/agent/work_log_manager.py` |
-| Bot Dispatch | `nanobot/bots/dispatch.py` |
-| Bot Implementations | `nanobot/bots/implementations.py` |
-| Dashboard | `nanobot/heartbeat/dashboard.py` |
-| MessageBus | `nanobot/bus/queue.py` |
-| ContextBuilder | `nanobot/agent/context.py` |
+| Agent Command | `nanofolks/cli/commands.py:827-969` |
+| Gateway Command | `nanofolks/cli/commands.py:544-817` |
+| AgentLoop | `nanofolks/agent/loop.py` |
+| BotInvoker | `nanofolks/agent/bot_invoker.py` |
+| Invoke Tool | `nanofolks/agent/tools/invoke.py` |
+| WorkLog Data Model | `nanofolks/agent/work_log.py` |
+| WorkLog Manager | `nanofolks/agent/work_log_manager.py` |
+| Bot Dispatch | `nanofolks/bots/dispatch.py` |
+| Bot Implementations | `nanofolks/bots/implementations.py` |
+| Dashboard | `nanofolks/heartbeat/dashboard.py` |
+| MessageBus | `nanofolks/bus/queue.py` |
+| ContextBuilder | `nanofolks/agent/context.py` |
 
 ---
 

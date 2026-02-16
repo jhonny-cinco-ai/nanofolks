@@ -102,7 +102,7 @@ Coverage:        100%
 ## Code Structure
 
 ```
-nanobot/cli/
+nanofolks/cli/
   ├── commands.py (MODIFIED)
   │   ├── _show_thinking_logs() [NEW]
   │   └── _handle_thinking_toggle() [NEW]
@@ -137,7 +137,7 @@ Read [THINKING_DISPLAY_README.md](THINKING_DISPLAY_README.md) for:
 ### For Developers
 1. Read [IMPLEMENTATION_PROGRESS.md](IMPLEMENTATION_PROGRESS.md) for overview
 2. Review [PHASE_2_COMPLETION_SUMMARY.md](PHASE_2_COMPLETION_SUMMARY.md) for details
-3. Check code in `nanobot/cli/` and `nanobot/cli/ui/`
+3. Check code in `nanofolks/cli/` and `nanofolks/cli/ui/`
 4. Run tests: `pytest tests/test_thinking_*.py`
 
 ### For Project Managers
@@ -187,10 +187,10 @@ When ready to continue development:
 ## Files at a Glance
 
 ### New Code Files
-- `nanobot/cli/ui/thinking_summary.py` - 400+ LOC
-- `nanobot/cli/ui/thinking_display.py` - 150+ LOC
-- `nanobot/cli/ui/input_handler.py` - 180+ LOC
-- `nanobot/cli/ui/__init__.py` - 20 LOC
+- `nanofolks/cli/ui/thinking_summary.py` - 400+ LOC
+- `nanofolks/cli/ui/thinking_display.py` - 150+ LOC
+- `nanofolks/cli/ui/input_handler.py` - 180+ LOC
+- `nanofolks/cli/ui/__init__.py` - 20 LOC
 
 ### Test Files
 - `tests/test_thinking_display.py` - 350+ LOC (15 tests)
@@ -203,7 +203,7 @@ When ready to continue development:
 - `docs/UX/INDEX.md` - This file
 
 ### Modified Files
-- `nanobot/cli/commands.py` - 52 lines added
+- `nanofolks/cli/commands.py` - 52 lines added
 - `docs/UX/INLINE_THINKING_COLLAPSIBLE.md` - Updated status
 
 ## Questions?
@@ -237,13 +237,13 @@ pytest tests/test_thinking_*.py --cov
 ### Using the Feature
 ```bash
 # Single message mode
-nanobot agent --message "Your question here"
+nanofolks agent --message "Your question here"
 
 # Interactive mode
-nanobot agent
+nanofolks agent
 
 # With logs visible
-nanobot agent --logs
+nanofolks agent --logs
 ```
 
 ### Keyboard Controls

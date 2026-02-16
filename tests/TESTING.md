@@ -1,6 +1,6 @@
 # Testing Guide
 
-This guide explains how to run the nanobot router tests.
+This guide explains how to run the nanofolks router tests.
 
 ## Prerequisites
 
@@ -10,7 +10,7 @@ The tests require `pytest` and `pytest-asyncio`:
 # Install with pip
 pip install pytest pytest-asyncio
 
-# Or install nanobot with dev dependencies
+# Or install nanofolks with dev dependencies
 pip install -e ".[dev]"
 
 # Or with uv
@@ -22,7 +22,7 @@ uv pip install pytest pytest-asyncio
 ### Option 1: Run All Router Tests
 
 ```bash
-cd /projects/nanobot-turbo
+cd /projects/nanofolks-turbo
 python -m pytest tests/router/ -v
 ```
 
@@ -62,7 +62,7 @@ python -m pytest tests/router/test_classifier.py::TestClientSideClassifier::test
 pip install pytest-cov
 
 # Run with coverage report
-python -m pytest tests/router/ --cov=nanobot.agent.router --cov-report=html
+python -m pytest tests/router/ --cov=nanofolks.agent.router --cov-report=html
 
 # View coverage report
 open htmlcov/index.html  # macOS
@@ -100,7 +100,7 @@ If pytest is not available, you can test manually:
 
 ```python
 # Test basic classification
-from nanobot.agent.router import classify_content
+from nanofolks.agent.router import classify_content
 
 decision, scores = classify_content("Write a Python function to sort a list")
 print(f"Tier: {decision.tier.value}")
@@ -124,7 +124,7 @@ pip install -e ".[dev]"
 python -m pytest tests/router/ -v --tb=short
 
 # Or with coverage
-python -m pytest tests/router/ --cov=nanobot.agent.router --cov-report=xml
+python -m pytest tests/router/ --cov=nanofolks.agent.router --cov-report=xml
 ```
 
 ## Test Markers
@@ -147,7 +147,7 @@ pip install pytest pytest-asyncio
 
 Make sure you're in the project root:
 ```bash
-cd /projects/nanobot-turbo
+cd /projects/nanofolks-turbo
 python -m pytest tests/router/
 ```
 
@@ -184,7 +184,7 @@ When adding new features, add corresponding tests:
 ```python
 # tests/router/test_feature.py
 import pytest
-from nanobot.agent.router import YourFeature
+from nanofolks.agent.router import YourFeature
 
 class TestYourFeature:
     """Tests for YourFeature."""
@@ -213,5 +213,5 @@ class TestYourFeature:
 
 Current status can be checked with:
 ```bash
-python -m pytest tests/router/ --cov=nanobot.agent.router --cov-report=term-missing
+python -m pytest tests/router/ --cov=nanofolks.agent.router --cov-report=term-missing
 ```

@@ -11,7 +11,7 @@
 - [ ] Review PHASE3_QUICK_REFERENCE.md (5 mins)
 - [ ] Review PHASE3_INTEGRATION_GUIDE.md (20 mins)
 - [ ] Review PHASE3_ARCHITECTURE.md (15 mins)
-- [ ] Run `grep -c "^" nanobot/cli/advanced_layout.py` to verify file exists
+- [ ] Run `grep -c "^" nanofolks/cli/advanced_layout.py` to verify file exists
 - [ ] Read docstrings in advanced_layout.py
 
 **Time**: ~40 minutes
@@ -21,10 +21,10 @@
 ## Integration Steps (2.5 Hours)
 
 ### Step 1: Add Imports (5 minutes)
-- [ ] Open nanobot/cli/commands.py
-- [ ] Find line 27 (after `from nanobot.cli.room_ui import...`)
+- [ ] Open nanofolks/cli/commands.py
+- [ ] Find line 27 (after `from nanofolks.cli.room_ui import...`)
 - [ ] Add imports for advanced_layout module
-- [ ] Verify imports compile: `python -m py_compile nanobot/cli/commands.py`
+- [ ] Verify imports compile: `python -m py_compile nanofolks/cli/commands.py`
 
 **Done**: ✅
 

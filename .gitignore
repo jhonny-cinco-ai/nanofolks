@@ -20,3 +20,5 @@ config.json
 example.config.json
 tests/
 botpy.log
+__nanobot/
+__nanobot_backup/

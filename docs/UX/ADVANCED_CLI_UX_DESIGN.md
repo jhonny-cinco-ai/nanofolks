@@ -41,9 +41,9 @@ We'll enhance the CLI agent with:
 
 ### Current Layout (Simple)
 ```
-🤖 nanobot v1.0 - Interactive mode
+🤖 nanofolks v1.0 - Interactive mode
 Room Context: 🌐 #general (open) • 1 bot
-Participants: nanobot
+Participants: nanofolks
 [#general] You: 
 ```
 
@@ -55,11 +55,11 @@ Participants: nanobot
 │                                                                       │              │
 │ [Chat area - 70% width]                                             │ BOTS (8)     │
 │                                                                       │ ┌──────────┐ │
-│ nanobot: Hello! How can I help?                                    │ │🧠Research│ │
+│ nanofolks: Hello! How can I help?                                    │ │🧠Research│ │
 │                                                                       │ │💻Code    │ │
 │ [#general] You: Create a room for my website                       │ │🎨Create  │ │
 │                                                                       │ │🤝Social  │ │
-│ nanobot: I'll set up a room for your website project!             │ │✅Auditor │ │
+│ nanofolks: I'll set up a room for your website project!             │ │✅Auditor │ │
 │ I'm inviting Marcus (creative), Laura (researcher),                │ │👑Leader  │ │
 │ and Johnny (coder) to help. Is that good?                          │ │          │ │
 │                                                                       │ │          │ │
@@ -90,7 +90,7 @@ Legend:
 ```
 [#general] You: Leader, can you create a new room for building a website for my company?
 
-nanobot: I'll help you set up a dedicated room for your website project!
+nanofolks: I'll help you set up a dedicated room for your website project!
          
          🔍 Analyzing task requirements...
          
@@ -105,7 +105,7 @@ nanobot: I'll help you set up a dedicated room for your website project!
          
 You: Yes, create it!
 
-nanobot: ✅ Room created: #company-website
+nanofolks: ✅ Room created: #company-website
          ✅ Invited @creative (Marcus)
          ✅ Invited @researcher (Laura)
          ✅ Invited @coder (Johnny)
@@ -180,7 +180,7 @@ async def _handle_room_creation_intent(intent: dict, session: Session):
     new_room = room_manager.create_room(
         name=intent["room_name"],
         room_type=RoomType.PROJECT,
-        participants=["nanobot"]
+        participants=["nanofolks"]
     )
     
     # Invite bots
@@ -214,7 +214,7 @@ if command.startswith("/create "):
         new_room = room_manager.create_room(
             name=room_name,
             room_type=RoomType(room_type),
-            participants=["nanobot"]
+            participants=["nanofolks"]
         )
         console.print(f"\n✅ Created room #{new_room.id} ({room_type})")
         console.print(f"   Use: /invite <bot> to add bots")
@@ -336,7 +336,7 @@ def _render_team_sidebar() -> str:
         ("🤝", "social", "Community"),
         ("✅", "auditor", "Quality"),
         ("🔧", "tools", "Tools"),
-        ("👑", "nanobot", "Leader"),
+        ("👑", "nanofolks", "Leader"),
     ]
     
     output = "[bold cyan]TEAM[/bold cyan]\n"
@@ -429,9 +429,9 @@ def _create_advanced_layout(current_room):
 ## Part 5: Complete User Flow Example
 
 ```bash
-$ nanobot agent
+$ nanofolks agent
 
-🤖 nanobot v1.0 - Interactive mode
+🤖 nanofolks v1.0 - Interactive mode
 
 TEAM
 🧠 researcher   Research
@@ -439,7 +439,7 @@ TEAM
 🎨 creative     Design
 🤝 social       Community
 ✅ auditor      Quality
-👑 nanobot      Leader
+👑 nanofolks      Leader
 
 ROOMS
 → 🌐 general           (1)
@@ -448,7 +448,7 @@ Room: general • Bots: 1
 
 [#general] You: Leader, can you create a room for my website project?
 
-nanobot: I'll help you set up a dedicated room for your website!
+nanofolks: I'll help you set up a dedicated room for your website!
 
          🔍 Analyzing task requirements...
          
@@ -473,7 +473,7 @@ TEAM
 🎨 creative     Design         ✓ In room
 🤝 social       Community
 ✅ auditor      Quality
-👑 nanobot      Leader         ✓ In room
+👑 nanofolks      Leader         ✓ In room
 
 ROOMS
   🌐 general           (1)
@@ -483,7 +483,7 @@ Room: website-project • Bots: 4
 
 [#website-project] You: Let's start with the design
 
-nanobot: Perfect! I'm coordinating with @creative on the visual
+nanofolks: Perfect! I'm coordinating with @creative on the visual
          design while @coder works on the architecture...
 
 [#website-project] You: /list-rooms
@@ -503,7 +503,7 @@ Room: general • Bots: 1
 
 [#general] You: Check status
 
-nanobot: Your website project is progressing well in the
+nanofolks: Your website project is progressing well in the
          #website-project room. Want to check on it?
 
 [#general] You: /switch website-project
@@ -551,7 +551,7 @@ nanobot: Your website project is progressing well in the
 ### New Files/Classes Needed
 
 ```python
-# nanobot/cli/room_ui.py - New file for UI components
+# nanofolks/cli/room_ui.py - New file for UI components
 
 class TeamRoster:
     """Manages team display."""
@@ -562,7 +562,7 @@ class TeamRoster:
             ("🎨", "creative", "Design"),
             ("🤝", "social", "Community"),
             ("✅", "auditor", "Quality"),
-            ("👑", "nanobot", "Leader"),
+            ("👑", "nanofolks", "Leader"),
         ]
     
     def render(self, current_room) -> str:
@@ -589,11 +589,11 @@ class StatusBar:
 ### Existing Files to Modify
 
 ```python
-# nanobot/cli/commands.py
+# nanofolks/cli/commands.py
 
 # Add imports
 from rich.layout import Layout  # Optional for advanced UI
-from nanobot.cli.room_ui import TeamRoster, RoomList, StatusBar
+from nanofolks.cli.room_ui import TeamRoster, RoomList, StatusBar
 
 # Add command handlers in interactive loop
 if command.startswith("/create "):

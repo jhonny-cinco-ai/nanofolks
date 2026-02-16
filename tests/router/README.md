@@ -19,7 +19,7 @@ tests/router/
 
 ### Run all router tests
 ```bash
-cd /projects/nanobot-turbo
+cd /projects/nanofolks-turbo
 python -m pytest tests/router/ -v
 ```
 
@@ -30,7 +30,7 @@ python -m pytest tests/router/test_classifier.py -v
 
 ### Run with coverage
 ```bash
-python -m pytest tests/router/ --cov=nanobot.agent.router --cov-report=html
+python -m pytest tests/router/ --cov=nanofolks.agent.router --cov-report=html
 ```
 
 ### Run specific test
@@ -164,7 +164,7 @@ python -m pytest tests/router/ -v --showlocals
 ### Import errors
 Make sure you're in the correct directory:
 ```bash
-cd /projects/nanobot-turbo
+cd /projects/nanofolks-turbo
 ```
 
 ### Async test failures

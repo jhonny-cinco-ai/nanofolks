@@ -1,8 +1,8 @@
-# Proposal: nanobot-turbo Memory System v2 (REVISED)
+# Proposal: nanofolks-turbo Memory System v2 (REVISED)
 
 ## Executive Summary
 
-Replace the current flat-file memory system with a 3-layer local-first memory architecture. This revision incorporates lessons from technical review and optimizes for nanobot's existing architecture.
+Replace the current flat-file memory system with a 3-layer local-first memory architecture. This revision incorporates lessons from technical review and optimizes for nanofolks's existing architecture.
 
 **Key Changes from Original Proposal:**
 - ✅ GLiNER2-base as default extractor (superior accuracy, manageable resource footprint)
@@ -100,7 +100,7 @@ User message → Session (JSONL, last 50 msgs) → System prompt
 ### Storage: SQLite with WAL Mode
 
 ```
-~/.nanobot/workspace/memory/memory.db
+~/.nanofolks/workspace/memory/memory.db
 ```
 
 Single file, zero config, perfect for single-user. **WAL mode enabled** for better concurrency:
@@ -293,18 +293,18 @@ class Learning:
 **Estimated effort: 3-5 days**
 
 New files:
-- `nanobot/memory/__init__.py` - Module exports
-- `nanobot/memory/models.py` - All dataclasses above
-- `nanobot/memory/store.py` - SQLite database manager with WAL mode
-- `nanobot/memory/events.py` - Event logging (write events, query events)
+- `nanofolks/memory/__init__.py` - Module exports
+- `nanofolks/memory/models.py` - All dataclasses above
+- `nanofolks/memory/store.py` - SQLite database manager with WAL mode
+- `nanofolks/memory/events.py` - Event logging (write events, query events)
 
 Changes to existing files:
-- `nanobot/agent/loop.py` - After each message exchange, log events to SQLite
+- `nanofolks/agent/loop.py` - After each message exchange, log events to SQLite
 - `pyproject.toml` - No new dependencies for Phase 1 (SQLite is built-in)
 
 **WAL Mode Setup:**
 ```python
-# In nanobot/memory/store.py
+# In nanofolks/memory/store.py
 def _setup_database(self):
     self.conn.execute("PRAGMA journal_mode=WAL;")
     self.conn.execute("PRAGMA synchronous=NORMAL;")
@@ -326,17 +326,17 @@ Backward compatibility:
 **Estimated effort: 2-3 days**
 
 New files:
-- `nanobot/memory/embeddings.py` - Embedding provider with lazy loading
+- `nanofolks/memory/embeddings.py` - Embedding provider with lazy loading
 
 Changes to existing files:
-- `nanobot/memory/store.py` - Add embedding columns, cosine similarity search
-- `nanobot/memory/events.py` - Embed event content on write (with lazy model load)
+- `nanofolks/memory/store.py` - Add embedding columns, cosine similarity search
+- `nanofolks/memory/events.py` - Embed event content on write (with lazy model load)
 - `pyproject.toml` - Add `fastembed` dependency
-- `nanobot/config/schema.py` - Add `MemoryConfig` with embedding settings
+- `nanofolks/config/schema.py` - Add `MemoryConfig` with embedding settings
 
 **Lazy Loading Implementation:**
 ```python
-# In nanobot/memory/embeddings.py
+# In nanofolks/memory/embeddings.py
 class EmbeddingProvider:
     def __init__(self, config: MemoryConfig):
         self.config = config
@@ -364,15 +364,15 @@ What this gives you:
 **Estimated effort: 5-7 days**
 
 New files:
-- `nanobot/memory/extraction.py` - Background extraction pipeline
-- `nanobot/memory/graph.py` - Entity resolution, edge management, fact deduplication
-- `nanobot/memory/extractors/gliner2_extractor.py` - GLiNER2 unified extraction
-- `nanobot/memory/extractors/spacy_extractor.py` - spaCy fallback extractor
+- `nanofolks/memory/extraction.py` - Background extraction pipeline
+- `nanofolks/memory/graph.py` - Entity resolution, edge management, fact deduplication
+- `nanofolks/memory/extractors/gliner2_extractor.py` - GLiNER2 unified extraction
+- `nanofolks/memory/extractors/spacy_extractor.py` - spaCy fallback extractor
 
 Changes to existing files:
-- `nanobot/agent/loop.py` - Start background extraction task on agent startup
+- `nanofolks/agent/loop.py` - Start background extraction task on agent startup
 - `pyproject.toml` - Add `gliner2` dependency, optional `spacy`
-- `nanobot/config/schema.py` - Add extraction config
+- `nanofolks/config/schema.py` - Add extraction config
 
 Extraction pipeline:
 ```
@@ -404,11 +404,11 @@ What this gives you:
 **Estimated effort: 4-6 days**
 
 New files:
-- `nanobot/memory/summaries.py` - Summary tree management, staleness tracking, refresh logic
+- `nanofolks/memory/summaries.py` - Summary tree management, staleness tracking, refresh logic
 
 Changes to existing files:
-- `nanobot/memory/extraction.py` - After extraction, increment staleness counters
-- `nanobot/memory/extraction.py` - After extraction batch, trigger stale summary refresh
+- `nanofolks/memory/extraction.py` - After extraction, increment staleness counters
+- `nanofolks/memory/extraction.py` - After extraction batch, trigger stale summary refresh
 
 What this gives you:
 - Pre-computed summaries for fast context assembly
@@ -420,13 +420,13 @@ What this gives you:
 **Estimated effort: 3-5 days**
 
 New files:
-- `nanobot/memory/learning.py` - Feedback detection, learning storage, contradiction resolution
-- `nanobot/memory/preferences.py` - Aggregate learnings into user_preferences summary
+- `nanofolks/memory/learning.py` - Feedback detection, learning storage, contradiction resolution
+- `nanofolks/memory/preferences.py` - Aggregate learnings into user_preferences summary
 
 Changes to existing files:
-- `nanobot/memory/extraction.py` - Add feedback detection to extraction pipeline
-- `nanobot/memory/summaries.py` - Add special `user_preferences` node (always in context)
-- `nanobot/memory/events.py` - Add relevance_score decay logic
+- `nanofolks/memory/extraction.py` - Add feedback detection to extraction pipeline
+- `nanofolks/memory/summaries.py` - Add special `user_preferences` node (always in context)
+- `nanofolks/memory/events.py` - Add relevance_score decay logic
 
 **Relevance Decay:**
 ```python
@@ -451,12 +451,12 @@ What this gives you:
 **Estimated effort: 3-4 days**
 
 New files:
-- `nanobot/memory/context.py` - Token-budgeted context assembly from summaries
-- `nanobot/memory/retrieval.py` - Query interface (search, lookup, traverse)
+- `nanofolks/memory/context.py` - Token-budgeted context assembly from summaries
+- `nanofolks/memory/retrieval.py` - Query interface (search, lookup, traverse)
 
 Changes to existing files:
-- `nanobot/agent/context.py` - Replace current `get_memory_context()` with summary-based assembly
-- `nanobot/agent/loop.py` - Register memory tools
+- `nanofolks/agent/context.py` - Replace current `get_memory_context()` with summary-based assembly
+- `nanofolks/agent/loop.py` - Register memory tools
 
 New agent tools:
 - `search_memory` - Semantic search over events, entities, facts
@@ -483,25 +483,25 @@ What this gives you:
 **Estimated effort: 2-3 days**
 
 Changes to existing files:
-- `nanobot/cli/commands.py` - Add memory subcommands with TUI
+- `nanofolks/cli/commands.py` - Add memory subcommands with TUI
 
 New CLI commands:
 ```bash
-nanobot memory init              # Initialize memory system (with TUI progress)
-nanobot memory status            # Show memory stats (events, entities, summaries)
-nanobot memory search "query"    # Semantic search
-nanobot memory entities          # List known entities
-nanobot memory entity "John"     # Show everything about John
-nanobot memory summary           # Show root summary
-nanobot memory forget "entity"   # Remove an entity and related data
-nanobot memory export            # Export memory to JSON
-nanobot memory import file.json  # Import memory from JSON
-nanobot memory doctor            # Health check (integrity, models, etc.)
+nanofolks memory init              # Initialize memory system (with TUI progress)
+nanofolks memory status            # Show memory stats (events, entities, summaries)
+nanofolks memory search "query"    # Semantic search
+nanofolks memory entities          # List known entities
+nanofolks memory entity "John"     # Show everything about John
+nanofolks memory summary           # Show root summary
+nanofolks memory forget "entity"   # Remove an entity and related data
+nanofolks memory export            # Export memory to JSON
+nanofolks memory import file.json  # Import memory from JSON
+nanofolks memory doctor            # Health check (integrity, models, etc.)
 ```
 
 **TUI Model Download:**
 ```python
-# In nanobot/memory/setup.py
+# In nanofolks/memory/setup.py
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 def download_models_with_tui():
@@ -661,7 +661,7 @@ Example config.json addition:
 ## File Map (New Files)
 
 ```
-nanobot/memory/
+nanofolks/memory/
 ├── __init__.py              # Module exports
 ├── models.py                # Event, Entity, Edge, Fact, Topic, SummaryNode, Learning
 ├── store.py                 # SQLite database manager (tables, CRUD, migrations, WAL mode)
@@ -875,7 +875,7 @@ class BackgroundProcessor:
         # 1. Extract entities from pending events
         pending = await self.memory_store.get_pending_events(limit=20)
         if pending:
-            from nanobot.memory.extraction import extract_entities
+            from nanofolks.memory.extraction import extract_entities
             for event in pending:
                 entities = await extract_entities(event)
                 await self.memory_store.save_entities(entities)
@@ -884,14 +884,14 @@ class BackgroundProcessor:
         
         # 2. Refresh stale summaries (every 5th cycle = every 5 min)
         if asyncio.get_event_loop().time() % 300 < 60:  # Approximate 5 min
-            from nanobot.memory.summaries import refresh_stale_summaries
+            from nanofolks.memory.summaries import refresh_stale_summaries
             refreshed = await refresh_stale_summaries(self.memory_store)
             if refreshed:
                 logger.info(f"Refreshed {refreshed} summary nodes")
         
         # 3. Apply learning decay (every hour)
         if asyncio.get_event_loop().time() % 3600 < 60:  # Approximate 1 hour
-            from nanobot.memory.learning import decay_learnings
+            from nanofolks.memory.learning import decay_learnings
             decayed = await decay_learnings(self.memory_store)
             if decayed:
                 logger.info(f"Applied decay to {decayed} learnings")
@@ -929,7 +929,7 @@ Example config:
 ### Integration with AgentLoop
 
 ```python
-# nanobot/agent/loop.py
+# nanofolks/agent/loop.py
 
 class AgentLoop:
     def __init__(self, ..., memory_config: Optional[MemoryConfig] = None):
@@ -940,8 +940,8 @@ class AgentLoop:
         self.background_processor = None
         
         if memory_config and memory_config.enabled:
-            from nanobot.memory.store import MemoryStore
-            from nanobot.memory.background import ActivityTracker, BackgroundProcessor
+            from nanofolks.memory.store import MemoryStore
+            from nanofolks.memory.background import ActivityTracker, BackgroundProcessor
             
             self.memory_store = MemoryStore(memory_config)
             self.activity_tracker = ActivityTracker(
@@ -1464,7 +1464,7 @@ class ResolutionMetrics:
 
 CLI command to inspect:
 ```bash
-$ nanobot memory resolution-stats
+$ nanofolks memory resolution-stats
 Entity Resolution Statistics (last 7 days)
 ─────────────────────────────────────────
 Total resolutions:    1,234
@@ -1563,7 +1563,7 @@ For 100 entity candidates:
 
 **Last Updated**: 2026-02-10
 **Status**: Proposal REVISED - Ready for Implementation
-**Author**: nanobot-turbo development team
+**Author**: nanofolks-turbo development team
 **Revisions**: 
 - v1: Original proposal with spaCy
 - v2: Revised with GLiNER2, WAL mode, lazy loading, privacy controls, TUI downloads

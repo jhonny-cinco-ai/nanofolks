@@ -110,10 +110,10 @@ A researcher's job (analyze data, find information) doesn't change whether they'
 ### Template Files
 
 ```
-nanobot/templates/
+nanofolks/templates/
 ├── soul/
 │   ├── pirate_crew/
-│   │   ├── nanobot_SOUL.md
+│   │   ├── nanofolks_SOUL.md
 │   │   ├── researcher_SOUL.md
 │   │   ├── coder_SOUL.md
 │   │   ├── social_SOUL.md
@@ -143,7 +143,7 @@ nanobot/templates/
 │   └── space_crew/
 │       └── [6 files]
 └── bots/
-    ├── nanobot_AGENTS.md
+    ├── nanofolks_AGENTS.md
     ├── researcher_AGENTS.md
     ├── coder_AGENTS.md
     ├── social_AGENTS.md
@@ -179,8 +179,8 @@ nano workspace/bots/researcher/IDENTITY.md
 # Override coder's SOUL
 nano workspace/bots/coder/SOUL.md
 
-# Customize nanobot's AGENTS
-nano workspace/bots/nanobot/AGENTS.md
+# Customize nanofolks's AGENTS
+nano workspace/bots/nanofolks/AGENTS.md
 ```
 
 ## Improvements Made

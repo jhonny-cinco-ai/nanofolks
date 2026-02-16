@@ -54,7 +54,7 @@ Phase 3 enhances the CLI with true side-by-side layout, terminal resize handling
 - [ ] Implement dimension tracking
 - [ ] Test on various terminal sizes
 
-**Location**: `nanobot/cli/advanced_layout.py`
+**Location**: `nanofolks/cli/advanced_layout.py`
 
 ### Task 2: Resize Handling (1.5 hours)
 - [ ] Implement terminal size monitoring
@@ -78,7 +78,7 @@ Phase 3 enhances the CLI with true side-by-side layout, terminal resize handling
 - [ ] Add layout mode toggle
 - [ ] Handle mode switching
 
-**Location**: `nanobot/cli/commands.py`
+**Location**: `nanofolks/cli/commands.py`
 
 ### Task 5: Transitions & Polish (0.5 hours)
 - [ ] Add smooth transition effects
@@ -91,7 +91,7 @@ Phase 3 enhances the CLI with true side-by-side layout, terminal resize handling
 
 ## Code Changes Summary
 
-### New File: `nanobot/cli/advanced_layout.py`
+### New File: `nanofolks/cli/advanced_layout.py`
 ```
 ✅ AdvancedLayout class (200 lines)
 ✅ LayoutManager class (80 lines)
@@ -101,7 +101,7 @@ Phase 3 enhances the CLI with true side-by-side layout, terminal resize handling
 Total: ~450 lines
 ```
 
-### Modified File: `nanobot/cli/commands.py`
+### Modified File: `nanofolks/cli/commands.py`
 ```
 - Import AdvancedLayout, LayoutManager, SidebarManager
 - Update interactive loop to initialize layout
@@ -111,7 +111,7 @@ Total: ~450 lines
 Estimated: 80-100 lines
 ```
 
-### Modified File: `nanobot/cli/room_ui.py`
+### Modified File: `nanofolks/cli/room_ui.py`
 ```
 - Add get_sidebar_content() helper
 - Improve compact rendering

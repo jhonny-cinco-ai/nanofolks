@@ -2,16 +2,16 @@
 
 ## Overview
 
-This guide explains how rooms work when users interact with `nanobot agent`, including room initialization, switching, and creation directly from the CLI.
+This guide explains how rooms work when users interact with `nanofolks agent`, including room initialization, switching, and creation directly from the CLI.
 
 ---
 
 ## Part 1: Default Room Initialization
 
-### What Happens When User Runs `nanobot agent`
+### What Happens When User Runs `nanofolks agent`
 
 ```bash
-$ nanobot agent
+$ nanofolks agent
 ```
 
 #### Step-by-Step Flow
@@ -22,7 +22,7 @@ $ nanobot agent
    ```
    
    The RoomManager:
-   - Checks `~/.nanobot/rooms/` directory
+   - Checks `~/.nanofolks/rooms/` directory
    - Loads any existing room JSON files
    - **Automatically creates "general" room if it doesn't exist**
 
@@ -31,7 +31,7 @@ $ nanobot agent
    {
      "id": "general",
      "type": "open",
-     "participants": ["nanobot"],
+     "participants": ["nanofolks"],
      "owner": "user",
      "created_at": "2026-02-15T10:30:00",
      "summary": "",
@@ -39,7 +39,7 @@ $ nanobot agent
      "coordinator_mode": false
    }
    ```
-   Saved to: `~/.nanobot/rooms/general.json`
+   Saved to: `~/.nanofolks/rooms/general.json`
 
 3. **Room Loaded in Agent Command**
    ```python
@@ -57,7 +57,7 @@ $ nanobot agent
 ### Important: General Room Always Exists
 
 - **First Run**: Created automatically with just leader
-- **Subsequent Runs**: Loaded from disk (`~/.nanobot/rooms/general.json`)
+- **Subsequent Runs**: Loaded from disk (`~/.nanofolks/rooms/general.json`)
 - **Guaranteed**: Always available as fallback
 - **Default**: Used when no `--room` parameter specified
 
@@ -68,7 +68,7 @@ $ nanobot agent
 ### Joining an Existing Room
 
 ```bash
-$ nanobot agent --room project-alpha
+$ nanofolks agent --room project-alpha
 ```
 
 #### What Happens
@@ -79,12 +79,12 @@ $ nanobot agent --room project-alpha
    ```
 
 2. **Room File Loaded**
-   From: `~/.nanobot/rooms/project-alpha.json`
+   From: `~/.nanofolks/rooms/project-alpha.json`
    ```json
    {
      "id": "project-alpha",
      "type": "project",
-     "participants": ["nanobot", "coder", "researcher"],
+     "participants": ["nanofolks", "coder", "researcher"],
      "owner": "user",
      "created_at": "2026-02-15T12:00:00"
    }
@@ -108,7 +108,7 @@ $ nanobot agent --room project-alpha
 ### Room Not Found Behavior
 
 ```bash
-$ nanobot agent --room nonexistent-room
+$ nanofolks agent --room nonexistent-room
 ```
 
 **Output:**
@@ -125,7 +125,7 @@ Participants: leader
 - ✅ No error
 - ✅ Falls back to "general" automatically
 - ✅ User can work normally
-- ✅ To use desired room, create it first with `nanobot room create`
+- ✅ To use desired room, create it first with `nanofolks room create`
 
 ---
 
@@ -136,10 +136,10 @@ Participants: leader
 **Outside Agent:**
 ```bash
 # Create a room
-nanobot room create website-redesign --bots nanobot,coder,creative
+nanofolks room create website-redesign --bots nanofolks,coder,creative
 
 # Then join it
-nanobot agent --room website-redesign
+nanofolks agent --room website-redesign
 ```
 
 ### Proposed: In-Session Room Creation (New Feature)
@@ -151,7 +151,7 @@ Users should be able to create rooms directly in the CLI agent without exiting. 
 ```
 [#general] You: /create website-redesign
 
-nanobot: ✅ Created room #website-redesign (type: project)
+nanofolks: ✅ Created room #website-redesign (type: project)
          Add bots to the room? Use: /invite <room> <bot>
          Join it with: /switch website-redesign
 ```
@@ -168,7 +168,7 @@ nanobot: ✅ Created room #website-redesign (type: project)
            new_room = room_manager.create_room(
                name=room_name,
                room_type=RoomType.PROJECT,
-               participants=["nanobot"]
+               participants=["nanofolks"]
            )
            console.print(f"✅ Created room #{new_room.id}")
        except ValueError as e:
@@ -211,8 +211,8 @@ Here's a complete design for managing rooms without exiting the CLI:
 ```
 
 **What it does:**
-- Creates new room in `~/.nanobot/rooms/<name>.json`
-- Initializes with ["nanobot"] as participants
+- Creates new room in `~/.nanofolks/rooms/<name>.json`
+- Initializes with ["nanofolks"] as participants
 - Shows confirmation
 - User stays in current room (doesn't auto-switch)
 
@@ -243,7 +243,7 @@ Available commands:
 
 **What it does:**
 - Adds bot to current room
-- Updates `~/.nanobot/rooms/<current>.json`
+- Updates `~/.nanofolks/rooms/<current>.json`
 - Shows who's now in the room
 - Reloads prompt with new participants
 
@@ -254,7 +254,7 @@ Available commands:
 ✅ Invited coder to #website-redesign
 
 Current participants (2):
-  • nanobot
+  • nanofolks
   • coder
 
 [#website-redesign] You: 
@@ -285,7 +285,7 @@ Current participants (2):
 📁 #website-redesign (project) • 3 bots • 🟢 Active
 
 Participants:
-  nanobot
+  nanofolks
   coder
   creative
 
@@ -317,7 +317,7 @@ Use /switch <room_id> to join a room
 ### Complete Workflow With In-Session Creation
 
 ```bash
-$ nanobot agent
+$ nanofolks agent
 
 🌐 #general (open) • 1 bot • 🟢 Active
 Participants: leader
@@ -332,7 +332,7 @@ Commands:
 
 [#general] You: I need to start a website project
 
-nanobot: Great! Let me create a dedicated room for that.
+nanofolks: Great! Let me create a dedicated room for that.
 
 [#general] You: /create website-redesign
 
@@ -355,7 +355,7 @@ Participants: leader, coder, creative
 
 [#website-redesign] You: Design the homepage
 
-nanobot: Perfect! I'm coordinating with @coder and @creative
+nanofolks: Perfect! I'm coordinating with @coder and @creative
 on the design. Let me break this down:
 
 @coder - Handle the technical architecture
@@ -383,7 +383,7 @@ Step 4: Agent coordinated task across team
 
 ### Where to Add Command Handlers
 
-**File:** `nanobot/cli/commands.py`
+**File:** `nanofolks/cli/commands.py`
 
 **Location:** Interactive loop (around line 960)
 
@@ -405,7 +405,7 @@ if command == "/list-rooms":
 
 ### Data Persistence
 
-- **Created rooms**: Automatically saved to `~/.nanobot/rooms/<room_id>.json`
+- **Created rooms**: Automatically saved to `~/.nanofolks/rooms/<room_id>.json`
 - **Participant changes**: Automatically saved via RoomManager
 - **Room switching**: Doesn't save anything (just changes context)
 - **No data loss**: All changes persisted immediately
@@ -442,13 +442,13 @@ work_log_manager.log(
 
 **Current:**
 ```bash
-$ nanobot room create website --bots nanobot,coder
-$ nanobot agent --room website
+$ nanofolks room create website --bots nanofolks,coder
+$ nanofolks agent --room website
 ```
 
 **With new feature:**
 ```bash
-$ nanobot agent
+$ nanofolks agent
 
 [#general] You: /create website
 [#general] You: /invite coder
@@ -489,7 +489,7 @@ $ nanobot agent
 [#general] You: /switch dm-researcher
 [#dm-researcher] You: What's your research approach?
 
-nanobot: I'm speaking directly with researcher now...
+nanofolks: I'm speaking directly with researcher now...
 ```
 
 ---
@@ -500,7 +500,7 @@ nanobot: I'm speaking directly with researcher now...
 
 **File Structure:**
 ```
-~/.nanobot/
+~/.nanofolks/
 ├── rooms/
 │   ├── general.json              # Auto-created
 │   ├── project-alpha.json        # User created
@@ -515,7 +515,7 @@ nanobot: I'm speaking directly with researcher now...
 
 | Aspect | Room | Session |
 |--------|------|---------|
-| **Storage** | `~/.nanobot/rooms/*.json` | `~/.nanobot/sessions/*.jsonl` |
+| **Storage** | `~/.nanofolks/rooms/*.json` | `~/.nanofolks/sessions/*.jsonl` |
 | **Persistence** | Permanent (until deleted) | Per-session |
 | **Participants** | All bots in room | N/A |
 | **Context** | Shared among team | Per-session/channel |
@@ -526,12 +526,12 @@ nanobot: I'm speaking directly with researcher now...
 ## Part 8: Architecture Diagram
 
 ```
-User: nanobot agent
+User: nanofolks agent
   │
   ▼
 RoomManager Initializes
   │
-  ├─→ Load existing rooms from ~/.nanobot/rooms/
+  ├─→ Load existing rooms from ~/.nanofolks/rooms/
   │
   └─→ Create "general" room if missing
        │

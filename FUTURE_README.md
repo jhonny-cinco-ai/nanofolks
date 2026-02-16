@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="nanobot_logo.png" alt="Nanofolks" width="500">
+  <img src="nanofolks_logo.png" alt="Nanofolks" width="500">
   <h1>Nanofolks - Your crew's already on it.</h1>
   <p>
-    <a href="https://pypi.org/project/nanobot-ai/"><img src="https://img.shields.io/pypi/v/nanobot-ai" alt="PyPI"></a>
-    <a href="https://pepy.tech/project/nanobot-ai"><img src="https://static.pepy.tech/badge/nanobot-ai" alt="Downloads"></a>
+    <a href="https://pypi.org/project/nanofolks-ai/"><img src="https://img.shields.io/pypi/v/nanofolks-ai" alt="PyPI"></a>
+    <a href="https://pepy.tech/project/nanofolks-ai"><img src="https://static.pepy.tech/badge/nanofolks-ai" alt="Downloads"></a>
     <img src="https://img.shields.io/badge/python-≥3.11-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
     <a href="./COMMUNICATION.md"><img src="https://img.shields.io/badge/Discord-Community-5865F2?style=flat&logo=discord&logoColor=white" alt="Discord"></a>
@@ -50,10 +50,10 @@ Nanofolks provides a flexible architecture for:
 | 🔧 | extensibility |
 | 💬 | multi-platform interaction |
 
-**Inspired by nanobot's simplicity, Nanofolks expands the concept into a more expressive, team-oriented system.**
+**Inspired by nanofolks's simplicity, Nanofolks expands the concept into a more expressive, team-oriented system.**
 
 > [!TIP]
-> Nanofolks is a fork of [nanobot](https://github.com/HKUDS/nanobot). We maintain full compatibility while adding crew-based features.
+> Nanofolks is a fork of [nanofolks](https://github.com/HKUDS/nanofolks). We maintain full compatibility while adding crew-based features.
 
 ---
 
@@ -278,10 +278,10 @@ Nanofolks doesn't just wait for you to message it. It can proactively act.
 
 ```bash
 # Every morning at 9am
-nanobot cron add --name "morning" --message "What's on my calendar?" --cron "0 9 * * *"
+nanofolks cron add --name "morning" --message "What's on my calendar?" --cron "0 9 * * *"
 
 # Hourly health checks
-nanobot cron add --name "hourly" --message "Check system status" --every 3600
+nanofolks cron add --name "hourly" --message "Check system status" --every 3600
 ```
 
 ### Proactive Wake-Up
@@ -415,18 +415,18 @@ Create rooms for different projects or contexts:
 
 ```bash
 # Create a new project room
-nanobot room create project-alpha
+nanofolks room create project-alpha
 
 # Invite bots to the room
-nanobot room invite project-alpha researcher
-nanobot room invite project-alpha coder
-nanobot room invite project-alpha creative
+nanofolks room invite project-alpha researcher
+nanofolks room invite project-alpha coder
+nanofolks room invite project-alpha creative
 
 # See who's in the room
-nanobot room show project-alpha
+nanofolks room show project-alpha
 
 # List all your rooms
-nanobot room list
+nanofolks room list
 ```
 
 ### The @ Mention System
@@ -488,10 +488,10 @@ Chat with a single bot privately without room context:
 
 ```bash
 # DM a specific bot
-nanobot agent -m "@researcher analyze this data privately"
+nanofolks agent -m "@researcher analyze this data privately"
 
 # Or enter interactive mode and use @ mentions
-nanobot agent
+nanofolks agent
 > @researcher what are the latest trends?
 ```
 
@@ -530,11 +530,11 @@ CoderBot: [references previous findings]
 
 | Command | Description |
 |---------|-------------|
-| `nanobot room list` | Show all rooms |
-| `nanobot room create <name>` | Create new room |
-| `nanobot room invite <room> <bot>` | Add bot to room |
-| `nanobot room remove <room> <bot>` | Remove bot from room |
-| `nanobot room show <room>` | Show room details |
+| `nanofolks room list` | Show all rooms |
+| `nanofolks room create <name>` | Create new room |
+| `nanofolks room invite <room> <bot>` | Add bot to room |
+| `nanofolks room remove <room> <bot>` | Remove bot from room |
+| `nanofolks room show <room>` | Show room details |
 
 ### Best Practices
 
@@ -586,7 +586,7 @@ docker build -t nanofolks .
 Run the onboarding wizard:
 
 ```bash
-nanobot onboard
+nanofolks onboard
 ```
 
 This will guide you through:
@@ -605,7 +605,7 @@ Each Nanofolks crew has 6 bots:
 
 | Bot | Role | What they do |
 |-----|------|--------------|
-| **Leader** (@nanobot) | Coordinator | Plans, delegates, makes decisions |
+| **Leader** (@nanofolks) | Coordinator | Plans, delegates, makes decisions |
 | **Researcher** (@researcher) | Research | Analyzes, gathers information |
 | **Coder** (@coder) | Development | Codes, debugs, builds |
 | **Social** (@social) | Community | Engages, communicates |
@@ -617,13 +617,13 @@ That's it! Your crew is ready to go!
 ## Start Chatting
 
 ```bash
-nanobot agent -m "Hello!"
+nanofolks agent -m "Hello!"
 ```
 
 Or enter interactive mode:
 
 ```bash
-nanobot agent
+nanofolks agent
 ```
 
 ---
@@ -660,7 +660,7 @@ Connect Nanofolks to your favorite messaging platforms.
 }
 ```
 
-4. Run: `nanobot gateway`
+4. Run: `nanofolks gateway`
 
 </details>
 
@@ -685,7 +685,7 @@ Connect Nanofolks to your favorite messaging platforms.
 ```
 
 5. Invite the bot to your server
-6. Run: `nanobot gateway`
+6. Run: `nanofolks gateway`
 
 </details>
 
@@ -696,7 +696,7 @@ Requires Node.js ≥18.
 
 1. Link device:
    ```bash
-   nanobot channels login
+   nanofolks channels login
    # Scan QR with WhatsApp → Settings → Linked Devices
    ```
 
@@ -716,10 +716,10 @@ Requires Node.js ≥18.
 3. Run both:
    ```bash
    # Terminal 1
-   nanobot channels login
+   nanofolks channels login
    
    # Terminal 2
-   nanobot gateway
+   nanofolks gateway
    ```
 
 </details>
@@ -744,7 +744,7 @@ Requires Node.js ≥18.
 }
 ```
 
-5. Run: `nanobot gateway`
+5. Run: `nanofolks gateway`
 
 </details>
 
@@ -801,43 +801,43 @@ Nanofolks also respects these env vars:
 
 | Command | Description |
 |---------|-------------|
-| `nanobot onboard` | First-time setup |
-| `nanobot configure` | Interactive configuration |
-| `nanobot agent -m "msg"` | Send a message |
-| `nanobot agent` | Interactive chat mode |
-| `nanobot gateway` | Start multi-channel gateway |
+| `nanofolks onboard` | First-time setup |
+| `nanofolks configure` | Interactive configuration |
+| `nanofolks agent -m "msg"` | Send a message |
+| `nanofolks agent` | Interactive chat mode |
+| `nanofolks gateway` | Start multi-channel gateway |
 
 ## Memory & Session
 
 ```bash
-nanobot memory status       # Show memory statistics
-nanobot memory search "query"  # Search memories
-nanobot session status     # Show context usage
-nanobot session compact    # Manual compaction
+nanofolks memory status       # Show memory statistics
+nanofolks memory search "query"  # Search memories
+nanofolks session status     # Show context usage
+nanofolks session compact    # Manual compaction
 ```
 
 ## Routing
 
 ```bash
-nanobot routing status     # Show routing config
-nanobot routing test "msg" # Test classification
-nanobot routing analytics  # Show cost savings
+nanofolks routing status     # Show routing config
+nanofolks routing test "msg" # Test classification
+nanofolks routing analytics  # Show cost savings
 ```
 
 ## Skills
 
 ```bash
-nanobot skills list        # List all skills
-nanobot skills scan ./skill  # Security scan
-nanobot skills approve name # Approve skill
+nanofolks skills list        # List all skills
+nanofolks skills scan ./skill  # Security scan
+nanofolks skills approve name # Approve skill
 ```
 
 ## Scheduled Tasks
 
 ```bash
-nanobot cron add --name "task" --message "Do X" --cron "0 9 * * *"
-nanobot cron list
-nanobot cron remove <id>
+nanofolks cron add --name "task" --message "Do X" --cron "0 9 * * *"
+nanofolks cron list
+nanofolks cron remove <id>
 ```
 
 ---
@@ -851,16 +851,16 @@ nanobot cron remove <id>
 docker build -t nanofolks .
 
 # Initialize config
-docker run -v ~/.nanobot:/root/.nanobot --rm nanofolks onboard
+docker run -v ~/.nanofolks:/root/.nanofolks --rm nanofolks onboard
 
 # Run gateway
-docker run -v ~/.nanobot:/root/.nanobot -p 18790:18790 nanofolks gateway
+docker run -v ~/.nanofolks:/root/.nanofolks -p 18790:18790 nanofolks gateway
 ```
 
 ## Persisting Data
 
 > [!TIP]
-> The `-v ~/.nanobot:/root/.nanobot` flag mounts your config directory, so your settings and memory persist across restarts.
+> The `-v ~/.nanofolks:/root/.nanofolks` flag mounts your config directory, so your settings and memory persist across restarts.
 
 ---
 
@@ -891,7 +891,7 @@ We believe AI should:
 
 # Credits
 
-Nanofolks started as a fork of [nanobot](https://github.com/HKUDS/nanobot), a project by HKUDS. We're grateful for the foundation they built and continue to draw inspiration from their vision of making AI assistants accessible and fun.
+Nanofolks started as a fork of [nanofolks](https://github.com/HKUDS/nanofolks), a project by HKUDS. We're grateful for the foundation they built and continue to draw inspiration from their vision of making AI assistants accessible and fun.
 
 This project is for educational, research, and technical exchange purposes only.
 

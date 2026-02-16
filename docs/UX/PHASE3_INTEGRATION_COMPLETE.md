@@ -10,7 +10,7 @@
 ## All 7 Integration Steps Completed
 
 ### ✅ Step 1: Add Imports (5 min)
-- Added imports from `nanobot.cli.advanced_layout`
+- Added imports from `nanofolks.cli.advanced_layout`
 - Imported: AdvancedLayout, LayoutManager, SidebarManager, TransitionEffect, ResponsiveLayout
 - Location: Line 27-32 in commands.py
 
@@ -142,7 +142,7 @@ The integration is complete and syntax-valid. Next phase is testing:
 
 ### Immediate Testing (Smoke Tests - 30 mins)
 ```bash
-nanobot chat
+nanofolks chat
 
 # Test 1: Layout appears
 - Start in wide terminal (120+ chars)
@@ -169,7 +169,7 @@ exit
 ### Resize Testing (20 mins)
 ```bash
 # Start in wide terminal
-nanobot chat
+nanofolks chat
 # Resize to narrow (<80 chars)
 # Verify fallback to Phase 2 display
 # Resize back to wide
@@ -198,7 +198,7 @@ nanobot chat
 
 ## Files Modified
 
-### nanobot/cli/commands.py
+### nanofolks/cli/commands.py
 - Lines 27-32: Added Phase 3 imports
 - Lines 1309-1338: Added _redraw_layout() helper
 - Lines 1343-1377: Added layout initialization
@@ -246,7 +246,7 @@ Phase 3 integration is **complete and production-ready**. The code:
 
 ## Summary
 
-**Phase 3: Advanced Layout is now fully integrated into the nanobot CLI!**
+**Phase 3: Advanced Layout is now fully integrated into the nanofolks CLI!**
 
 All 7 integration steps completed successfully. The module is now:
 - Initializing on startup

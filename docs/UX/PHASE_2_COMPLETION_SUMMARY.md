@@ -13,7 +13,7 @@ Complete integration of the thinking display components into the Nanobot CLI age
 
 ## Key Changes
 
-### 1. New Integration Functions (`nanobot/cli/commands.py`)
+### 1. New Integration Functions (`nanofolks/cli/commands.py`)
 
 #### `async _show_thinking_logs(agent_loop, bot_name=None) -> ThinkingDisplay`
 Fetches and displays thinking logs after agent processes a message.
@@ -43,7 +43,7 @@ Manages user input to toggle between collapsed and expanded views.
 ### 2. Agent Command Integration Points
 
 #### Single Message Mode (CLI Agent)
-When user runs: `nanobot agent --message "What should I build?"`
+When user runs: `nanofolks agent --message "What should I build?"`
 
 **Flow:**
 1. Agent processes message
@@ -52,7 +52,7 @@ When user runs: `nanobot agent --message "What should I build?"`
 4. User can press SPACE to expand or any other key to exit
 
 #### Interactive Mode
-When user runs: `nanobot agent` (interactive chat)
+When user runs: `nanofolks agent` (interactive chat)
 
 **Flow:**
 1. User sends message
@@ -126,7 +126,7 @@ _handle_thinking_toggle()
 
 ## Files Modified
 
-### `nanobot/cli/commands.py`
+### `nanofolks/cli/commands.py`
 - Added `_show_thinking_logs()` function (20 LOC)
 - Added `_handle_thinking_toggle()` function (20 LOC)
 - Integrated in single message mode (6 LOC)
@@ -135,10 +135,10 @@ _handle_thinking_toggle()
 
 ## Files Created (Phase 1+2)
 
-1. `nanobot/cli/ui/__init__.py` (20 LOC)
-2. `nanobot/cli/ui/thinking_summary.py` (400+ LOC)
-3. `nanobot/cli/ui/thinking_display.py` (150+ LOC)
-4. `nanobot/cli/ui/input_handler.py` (180+ LOC)
+1. `nanofolks/cli/ui/__init__.py` (20 LOC)
+2. `nanofolks/cli/ui/thinking_summary.py` (400+ LOC)
+3. `nanofolks/cli/ui/thinking_display.py` (150+ LOC)
+4. `nanofolks/cli/ui/input_handler.py` (180+ LOC)
 5. `tests/test_thinking_display.py` (350+ LOC)
 6. `tests/test_thinking_integration.py` (300+ LOC)
 7. `docs/UX/IMPLEMENTATION_PROGRESS.md` (280+ LOC)
@@ -186,13 +186,13 @@ _handle_thinking_toggle()
 
 ### Single Message Test
 ```bash
-nanobot agent --message "What's a good project structure?"
+nanofolks agent --message "What's a good project structure?"
 # Should show response followed by thinking display
 ```
 
 ### Interactive Test
 ```bash
-nanobot agent
+nanofolks agent
 # Type several messages
 # Each should show thinking display after response
 # Press SPACE to toggle, any other key to continue

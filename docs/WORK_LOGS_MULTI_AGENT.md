@@ -80,7 +80,7 @@ Key integration points:
 
 ## Executive Summary
 
-Based on [VoxYZ research](https://www.voxyz.space/insights/agent-work-logs-beat-polish-trust), this document outlines the implementation of **Raw Work Logs** for nanobot - a transparency feature that shows users the agent's real-time thinking, decision points, corrections, and uncertainty rather than polished final outputs.
+Based on [VoxYZ research](https://www.voxyz.space/insights/agent-work-logs-beat-polish-trust), this document outlines the implementation of **Raw Work Logs** for nanofolks - a transparency feature that shows users the agent's real-time thinking, decision points, corrections, and uncertainty rather than polished final outputs.
 
 **Core Principle:** Users trust AI agents more when they see messy, real-time work logs instead of clean summaries. Raw transparency beats perfection for building confidence.
 
@@ -95,7 +95,7 @@ Based on [VoxYZ research](https://www.voxyz.space/insights/agent-work-logs-beat-
 ## Problem Statement
 
 ### Current State
-- nanobot presents clean, polished outputs
+- nanofolks presents clean, polished outputs
 - Users cannot verify reasoning chains
 - Errors hidden until they compound
 - Smart routing and memory decisions are opaque
@@ -151,14 +151,14 @@ All multi-agent extension fields have been successfully implemented, tested, and
 - [x] `participants: list[str]` - Bots present in this workspace
 
 **New Bot Identity Fields:**
-- [x] `bot_name: str` - Which bot created entry ("nanobot", "researcher")
+- [x] `bot_name: str` - Which bot created entry ("nanofolks", "researcher")
 - [x] `bot_role: str` - "coordinator", "specialist", "user-proxy"
-- [x] `triggered_by: str` - "user", "nanobot", "@researcher"
+- [x] `triggered_by: str` - "user", "nanofolks", "@researcher"
 
 **New Communication Fields:**
 - [x] `mentions: list[str]` - ["@researcher", "@coder"]
 - [x] `response_to: Optional[int]` - Step this responds to
-- [x] `coordinator_mode: bool` - Was nanobot coordinating?
+- [x] `coordinator_mode: bool` - Was nanofolks coordinating?
 - [x] `escalation: bool` - Did this trigger user escalation?
 
 **New Learning Exchange Fields:**
@@ -179,7 +179,7 @@ All multi-agent extension fields have been successfully implemented, tested, and
 - Backward compatibility verified
 
 ```python
-# nanobot/agent/work_log.py
+# nanofolks/agent/work_log.py
 
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -201,7 +201,7 @@ class WorkspaceType(Enum):
     OPEN = "open"           # #general - casual, all bots
     PROJECT = "project"     # #project-alpha - focused team
     DIRECT = "direct"       # DM @researcher - 1-on-1
-    COORDINATION = "coordination"  # nanobot manages autonomously
+    COORDINATION = "coordination"  # nanofolks manages autonomously
 
 @dataclass
 class WorkLogEntry:
@@ -215,7 +215,7 @@ class WorkLogEntry:
     workspace_id: str            # "#general", "#project-refactor"
     workspace_type: WorkspaceType
     participants: list[str]      # Bots present in this workspace
-    triggered_by: str            # "user", "nanobot", "@researcher", etc.
+    triggered_by: str            # "user", "nanofolks", "@researcher", etc.
     
     # Bot identity
     bot_name: str                # Which bot created this entry
@@ -227,7 +227,7 @@ class WorkLogEntry:
     duration_ms: Optional[int] = None   # How long this step took
     
     # Coordinator mode
-    coordinator_mode: bool = False      # Was nanobot coordinating?
+    coordinator_mode: bool = False      # Was nanofolks coordinating?
     escalation: bool = False            # Did this trigger escalation?
     
     # Tool execution (for agent-to-agent handoffs)
@@ -279,7 +279,7 @@ class WorkLog:
     
     # Participants
     participants: list[str]      # All bots in this workspace
-    coordinator: Optional[str]   # "nanobot" if in coordinator mode
+    coordinator: Optional[str]   # "nanofolks" if in coordinator mode
     
     # Timing
     start_time: datetime
@@ -297,7 +297,7 @@ class WorkLog:
     insights_for_sharing: list = field(default_factory=list)  # High-confidence learnings
     
     def add_entry(self, level: LogLevel, category: str, message: str, 
-                  bot_name: str = "nanobot", triggered_by: str = "user",
+                  bot_name: str = "nanofolks", triggered_by: str = "user",
                   details: dict = None, confidence: float = None,
                   coordinator_mode: bool = False) -> WorkLogEntry:
         """Add a work log entry with workspace context."""
@@ -339,7 +339,7 @@ class WorkLog:
             coordinator_mode=(self.coordinator is not None)
         )
     
-    def add_escalation(self, reason: str, bot_name: str = "nanobot") -> WorkLogEntry:
+    def add_escalation(self, reason: str, bot_name: str = "nanofolks") -> WorkLogEntry:
         """Log an escalation that needs user attention."""
         return self.add_entry(
             level=LogLevel.COORDINATION,
@@ -396,7 +396,7 @@ class WorkspaceWorkLogManager:
     
     def _queue_for_learning_exchange(self, log: WorkLog):
         """Queue high-confidence insights for cross-bot sharing."""
-        from nanobot.learning.exchange import LearningExchange
+        from nanofolks.learning.exchange import LearningExchange
         
         exchange = LearningExchange()
         for entry in log.insights_for_sharing:
@@ -411,7 +411,7 @@ class WorkspaceWorkLogManager:
 
 #### 1.2 WorkLogManager
 ```python
-# nanobot/agent/work_log_manager.py
+# nanofolks/agent/work_log_manager.py
 
 class WorkLogManager:
     """Manages work logs for agent sessions."""
@@ -472,8 +472,8 @@ class WorkLogManager:
 All multi-agent extensions have been successfully implemented and tested:
 
 **Files Modified:**
-- `nanobot/agent/work_log.py` - Extended data models with multi-agent fields
-- `nanobot/agent/work_log_manager.py` - Updated DB schema and loading/saving logic
+- `nanofolks/agent/work_log.py` - Extended data models with multi-agent fields
+- `nanofolks/agent/work_log_manager.py` - Updated DB schema and loading/saving logic
 - `tests/test_work_logs.py` - Added 13 comprehensive multi-agent tests
 
 **Database Schema Updates:**
@@ -525,8 +525,8 @@ All multi-agent extensions have been successfully implemented and tested:
    - Rich table output showing workspace, type, bots, duration, status
 
 **Files Modified:**
-- `nanobot/agent/work_log_manager.py` - Added `get_logs_by_workspace()` and `get_all_logs()` methods
-- `nanobot/cli/commands.py` - Extended `explain` and `how` commands, added `workspace-logs` command
+- `nanofolks/agent/work_log_manager.py` - Added `get_logs_by_workspace()` and `get_all_logs()` methods
+- `nanofolks/cli/commands.py` - Extended `explain` and `how` commands, added `workspace-logs` command
 - `tests/test_cli_work_logs.py` - Added 9 CLI command tests
 
 **New API Methods:**
@@ -535,17 +535,17 @@ All multi-agent extensions have been successfully implemented and tested:
 
 **Commands Verified:**
 ```bash
-nanobot explain                              # Explain last interaction
-nanobot explain -w #project-alpha            # Explain specific workspace
-nanobot explain -b @researcher               # Filter by bot
-nanobot explain --mode coordination          # Show coordinator decisions
+nanofolks explain                              # Explain last interaction
+nanofolks explain -w #project-alpha            # Explain specific workspace
+nanofolks explain -b @researcher               # Filter by bot
+nanofolks explain --mode coordination          # Show coordinator decisions
 
-nanobot how "routing"                        # Search last log
-nanobot how "escalation" -w #coordination    # Search in workspace
+nanofolks how "routing"                        # Search last log
+nanofolks how "escalation" -w #coordination    # Search in workspace
 
-nanobot workspace-logs                       # List all recent logs
-nanobot workspace-logs -w #general           # Filter by workspace
-nanobot workspace-logs -n 20                 # Show 20 logs
+nanofolks workspace-logs                       # List all recent logs
+nanofolks workspace-logs -w #general           # Filter by workspace
+nanofolks workspace-logs -n 20                 # Show 20 logs
 ```
 
 #### 1.3 Workspace Integration Points
@@ -650,15 +650,15 @@ log = manager.start_workspace_session(
     workspace_id="#general",
     workspace_type=WorkspaceType.OPEN,
     query="What's the weather like?",
-    participants=["nanobot", "researcher", "coder", "social"]
+    participants=["nanofolks", "researcher", "coder", "social"]
 )
 
-# Simple query - nanobot handles directly
+# Simple query - nanofolks handles directly
 log.add_entry(
     level=LogLevel.INFO,
     category="routing",
     message="Simple query - classified as TIER_SIMPLE",
-    bot_name="nanobot",
+    bot_name="nanofolks",
     triggered_by="user",
     confidence=0.95
 )
@@ -668,7 +668,7 @@ log.add_entry(
     level=LogLevel.DECISION,
     category="tool",
     message="Calling weather API",
-    bot_name="nanobot",
+    bot_name="nanofolks",
     tool_name="weather_lookup",
     tool_input={"location": "auto-detect"},
     tool_output={"temp": 72, "condition": "sunny"},
@@ -681,7 +681,7 @@ log.add_entry(
     level=LogLevel.INFO,
     category="general",
     message="Response delivered to user",
-    bot_name="nanobot"
+    bot_name="nanofolks"
 )
 
 log.end_workspace_session("It's 72°F and sunny!")
@@ -690,7 +690,7 @@ log.end_workspace_session("It's 72°F and sunny!")
 **Log Characteristics:**
 - Simple, straightforward flow
 - No coordination needed
-- Single bot (nanobot) handling everything
+- Single bot (nanofolks) handling everything
 - Low complexity, high confidence
 
 ---
@@ -704,8 +704,8 @@ log = manager.start_workspace_session(
     workspace_id="#project-refactor",
     workspace_type=WorkspaceType.PROJECT,
     query="Refactor the authentication module",
-    participants=["nanobot", "researcher", "coder"],
-    coordinator="nanobot"  # Coordinator mode active
+    participants=["nanofolks", "researcher", "coder"],
+    coordinator="nanofolks"  # Coordinator mode active
 )
 
 # Initial assessment by coordinator
@@ -713,14 +713,14 @@ log.add_entry(
     level=LogLevel.THINKING,
     category="coordination",
     message="Assessing task complexity and required expertise",
-    bot_name="nanobot",
+    bot_name="nanofolks",
     triggered_by="user",
     coordinator_mode=True
 )
 
 # Coordinator delegates to researcher
 entry = log.add_bot_message(
-    bot_name="nanobot",
+    bot_name="nanofolks",
     message="@researcher Please analyze current auth implementation for security issues",
     mentions=["@researcher"]
 )
@@ -734,7 +734,7 @@ log.add_bot_message(
 
 # Coordinator delegates to coder
 log.add_bot_message(
-    bot_name="nanobot",
+    bot_name="nanofolks",
     message="@coder Can you implement rate limiting? @researcher found it as priority #1",
     mentions=["@coder", "@researcher"]
 )
@@ -750,7 +750,7 @@ log.add_entry(
     level=LogLevel.UNCERTAINTY,
     category="coordination",
     message="Rate limit choice unclear - defaulting to 100/min but user might prefer different",
-    bot_name="nanobot",
+    bot_name="nanofolks",
     coordinator_mode=True,
     confidence=0.6
 )
@@ -760,7 +760,7 @@ log.add_entry(
     level=LogLevel.DECISION,
     category="coordination",
     message="Proceeding with 100 req/min, flagging for user confirmation",
-    bot_name="nanobot",
+    bot_name="nanofolks",
     coordinator_mode=True
 )
 
@@ -779,7 +779,7 @@ log.add_entry(
 # Escalation: Need user decision on password policy
 escalation = log.add_escalation(
     reason="Password policy choice: Require special characters (strict) or allow passphrases (user-friendly)?",
-    bot_name="nanobot"
+    bot_name="nanofolks"
 )
 
 # Session ends with summary needed
@@ -813,7 +813,7 @@ log = manager.start_workspace_session(
     workspace_id="dm-researcher",
     workspace_type=WorkspaceType.DIRECT,
     query="Research quantum computing applications in cryptography",
-    participants=["nanobot", "researcher"],
+    participants=["nanofolks", "researcher"],
     coordinator=None  # No coordination - direct bot
 )
 
@@ -870,31 +870,31 @@ log.end_workspace_session("Comprehensive research report on quantum cryptography
 ---
 
 #### Example D: Coordination Workspace (#coordination-website)
-**Use case:** nanobot manages autonomously while user sleeps
+**Use case:** nanofolks manages autonomously while user sleeps
 
 ```python
 log = manager.start_workspace_session(
     workspace_id="#coordination-website",
     workspace_type=WorkspaceType.COORDINATION,
     query="Build company website",
-    participants=["nanobot", "researcher", "coder", "creative"],
-    coordinator="nanobot",
+    participants=["nanofolks", "researcher", "coder", "creative"],
+    coordinator="nanofolks",
     # User is offline
 )
 
-# nanobot acts as project manager
+# nanofolks acts as project manager
 log.add_entry(
     level=LogLevel.COORDINATION,
     category="coordination",
     message="Coordinator mode activated - user offline, managing autonomously",
-    bot_name="nanobot",
-    triggered_by="nanobot",
+    bot_name="nanofolks",
+    triggered_by="nanofolks",
     coordinator_mode=True
 )
 
 # Parallel task delegation
 log.add_bot_message(
-    bot_name="nanobot",
+    bot_name="nanofolks",
     message="@researcher Analyze 3 competitor websites. @creative Draft homepage designs. @coder Setup repo. Work in parallel.",
     mentions=["@researcher", "@creative", "@coder"]
 )
@@ -920,7 +920,7 @@ log.add_entry(
     level=LogLevel.COORDINATION,
     category="coordination",
     message="Parallel tasks complete. Blocking issues: Design choice (minimalist vs visual).",
-    bot_name="nanobot",
+    bot_name="nanofolks",
     coordinator_mode=True
 )
 
@@ -929,14 +929,14 @@ log.add_entry(
     level=LogLevel.DECISION,
     category="coordination",
     message="Choosing minimalist design - better performance aligns with competitor analysis findings",
-    bot_name="nanobot",
+    bot_name="nanofolks",
     coordinator_mode=True,
     confidence=0.85
 )
 
 # Delegate implementation
 log.add_bot_message(
-    bot_name="nanobot",
+    bot_name="nanofolks",
     message="@coder Proceed with minimalist design. @creative Provide specs to coder.",
     mentions=["@coder", "@creative"]
 )
@@ -950,7 +950,7 @@ log.add_bot_message(
 # Conflict! Must escalate
 log.add_escalation(
     reason="Design conflict: Coder wants minimalist (performance), Creative wants visual (brand). Both valid. Need user decision.",
-    bot_name="nanobot"
+    bot_name="nanofolks"
 )
 
 # Generate user notification summary
@@ -1018,8 +1018,8 @@ work_log.start_session(
     query="Refactor authentication module",
     workspace_id="#project-refactor",
     workspace_type=WorkspaceType.PROJECT,
-    participants=["nanobot", "researcher", "coder"],
-    coordinator="nanobot"
+    participants=["nanofolks", "researcher", "coder"],
+    coordinator="nanofolks"
 )
 
 # Log workspace creation
@@ -1029,15 +1029,15 @@ work_log.log(
     message="Created workspace #project-alpha",
     workspace_id="#project-alpha",
     workspace_type=WorkspaceType.PROJECT,
-    participants=["nanobot", "researcher", "coder"]
+    participants=["nanofolks", "researcher", "coder"]
 )
 ```
 
 **Bot-to-Bot Communication Logging:**
 ```python
-# Log when nanobot delegates to researcher
+# Log when nanofolks delegates to researcher
 work_log.log_bot_message(
-    bot_name="nanobot",
+    bot_name="nanofolks",
     message="@researcher Please analyze competitors",
     mentions=["@researcher"],
     coordinator_mode=True
@@ -1065,7 +1065,7 @@ work_log.log(
 # Log escalations
 work_log.log_escalation(
     reason="Tech stack decision needs user input",
-    bot_name="nanobot"
+    bot_name="nanofolks"
 )
 ```
 
@@ -1077,7 +1077,7 @@ work_log.log(
     category="routing",
     message="Classified as complex task",
     bot_name="researcher",  # Which bot made this decision
-    triggered_by="@nanobot"  # Who triggered this action
+    triggered_by="@nanofolks"  # Who triggered this action
 )
 ```
 
@@ -1089,7 +1089,7 @@ work_log.log(
 
 **All 46 tests passing** - Backward compatibility maintained
 ```python
-# In nanobot/agent/loop.py
+# In nanofolks/agent/loop.py
 
 class AgentLoop:
     def __init__(self, ...):
@@ -1156,7 +1156,7 @@ class AgentLoop:
 
 #### 2.2 Context Builder Logging
 ```python
-# In nanobot/agent/context.py
+# In nanofolks/agent/context.py
 
 def _build_context_with_logging(self, query: str) -> str:
     """Build context with work logging."""
@@ -1211,7 +1211,7 @@ def _build_context_with_logging(self, query: str) -> str:
 
 #### 2.3 Smart Routing Logging
 ```python
-# In nanobot/agent/stages/routing_stage.py
+# In nanofolks/agent/stages/routing_stage.py
 
 async def execute(self, context: Context) -> Context:
     """Execute routing with work logging."""
@@ -1255,7 +1255,7 @@ async def execute(self, context: Context) -> Context:
 
 #### 2.4 Tool Execution Logging with Artifacts
 ```python
-# In nanobot/agent/tools/base.py or tool implementations
+# In nanofolks/agent/tools/base.py or tool implementations
 
 async def execute_with_logging(self, *args, **kwargs):
     """
@@ -1447,7 +1447,7 @@ Agent B: Must parse natural language → Extract data → Act
 #### WorkLog as Agent Artifact
 
 ```python
-# nanobot/agent/work_log.py
+# nanofolks/agent/work_log.py
 
 @dataclass
 class WorkLog:
@@ -1521,13 +1521,13 @@ class WorkLog:
 #### Artifact Storage for Multi-Agent Workflows
 
 ```python
-# nanobot/agent/artifact_store.py
+# nanofolks/agent/artifact_store.py
 
 class AgentArtifactStore:
     """Store and retrieve artifacts for agent-to-agent handoffs."""
     
     def __init__(self, storage_path: Path):
-        self.storage_path = storage_path / ".nanobot" / "artifacts"
+        self.storage_path = storage_path / ".nanofolks" / "artifacts"
         self.storage_path.mkdir(parents=True, exist_ok=True)
     
     def save_artifact(self, artifact: dict, producer: str, consumer: Optional[str] = None) -> str:
@@ -1660,7 +1660,7 @@ def _queue_for_learning_exchange(log: WorkLog):
 **Example Flow:**
 
 1. **User asks in #general:** "I prefer short summaries first"
-2. **nanobot logs it:** High confidence (0.95), category="user_preference"
+2. **nanofolks logs it:** High confidence (0.95), category="user_preference"
 3. **Session ends:** Insight auto-queued for Learning Exchange
 4. **Next exchange cycle:** Insight shared with @researcher, @coder, etc.
 5. **Other bots learn:** Now all bots know user's preference
@@ -1735,14 +1735,14 @@ def _queue_for_learning_exchange(log: WorkLog):
    - Coordinator mode detection and logging
 
 **Files Modified:**
-- `nanobot/cli/commands.py` - Enhanced explain command, added visualization functions
-- `nanobot/agent/loop.py` - Added workspace properties and _log helper
-- `nanobot/agent/work_log_manager.py` - Already supports all features
+- `nanofolks/cli/commands.py` - Enhanced explain command, added visualization functions
+- `nanofolks/agent/loop.py` - Added workspace properties and _log helper
+- `nanofolks/agent/work_log_manager.py` - Already supports all features
 
 #### 3.2 New CLI Commands - Workspace-Aware
 
 ```python
-# In nanobot/cli/commands.py
+# In nanofolks/cli/commands.py
 
 @app.command("explain")
 def explain_last_decision(
@@ -1759,13 +1759,13 @@ def explain_last_decision(
     Show how decisions were made in a workspace.
     
     Examples:
-        nanobot explain                              # Explain last interaction
-        nanobot explain -w #project-refactor         # Explain project workspace
-        nanobot explain -w #coordination-website     # See overnight coordination
-        nanobot explain --mode coordination          # Focus on coordinator decisions
-        nanobot explain -b @researcher               # See what researcher did
+        nanofolks explain                              # Explain last interaction
+        nanofolks explain -w #project-refactor         # Explain project workspace
+        nanofolks explain -w #coordination-website     # See overnight coordination
+        nanofolks explain --mode coordination          # Focus on coordinator decisions
+        nanofolks explain -b @researcher               # See what researcher did
     """
-    from nanobot.agent.work_log_manager import WorkspaceWorkLogManager
+    from nanofolks.agent.work_log_manager import WorkspaceWorkLogManager
     
     manager = WorkspaceWorkLogManager()
     
@@ -1815,12 +1815,12 @@ def how_did_you_decide(
     Ask how a specific decision was made across workspaces.
     
     Examples:
-        nanobot how "why did you choose Claude"
-        nanobot how "what memories did you use"
-        nanobot how "why did you escalate" -w #coordination-website
-        nanobot how "what did @researcher find"
+        nanofolks how "why did you choose Claude"
+        nanofolks how "what memories did you use"
+        nanofolks how "why did you escalate" -w #coordination-website
+        nanofolks how "what did @researcher find"
     """
-    from nanobot.agent.work_log_manager import WorkspaceWorkLogManager
+    from nanofolks.agent.work_log_manager import WorkspaceWorkLogManager
     
     manager = WorkspaceWorkLogManager()
     
@@ -1860,11 +1860,11 @@ def list_workspace_logs(
     List recent work logs across workspaces.
     
     Examples:
-        nanobot workspace-logs              # Show all recent logs
-        nanobot workspace-logs -w #general  # Show only #general logs
-        nanobot workspace-logs -n 20        # Show last 20 logs
+        nanofolks workspace-logs              # Show all recent logs
+        nanofolks workspace-logs -w #general  # Show only #general logs
+        nanofolks workspace-logs -n 20        # Show last 20 logs
     """
-    from nanobot.agent.work_log_manager import WorkspaceWorkLogManager
+    from nanofolks.agent.work_log_manager import WorkspaceWorkLogManager
     
     manager = WorkspaceWorkLogManager()
     logs = manager.get_all_logs(limit=limit, workspace=workspace)
@@ -1948,8 +1948,8 @@ Alternative 'git-cli' was 67% confident."
 3. **Interactive Prompts**
    ```
    **What would you like to do?**
-   - `nanobot explain` - See how I made this decision
-   - `nanobot how "<query>"` - Search my reasoning
+   - `nanofolks explain` - See how I made this decision
+   - `nanofolks how "<query>"` - Search my reasoning
    - Ask me a follow-up question
    ```
 
@@ -1968,10 +1968,10 @@ formatted = self.format_response_with_log(
 - `work_logs.default_mode`: "summary", "detailed", or "debug"
 
 **Files Created:**
-- `nanobot/agent/response_formatter.py` - ResponseFormatter class
+- `nanofolks/agent/response_formatter.py` - ResponseFormatter class
 
 **Files Modified:**
-- `nanobot/agent/loop.py` - Added formatter instance and format_response_with_log()
+- `nanofolks/agent/loop.py` - Added formatter instance and format_response_with_log()
 
 #### 4.2 Response Formatting
 ```python
@@ -1995,7 +1995,7 @@ def format_response_with_log(self, result: str, log: WorkLog) -> str:
         # Just the result, with a hint
         return f"""{result}
 
-💡 Tip: Use `nanobot explain` to see how I made this decision."""
+💡 Tip: Use `nanofolks explain` to see how I made this decision."""
 ```
 
 #### 4.2 Interactive Mode
@@ -2065,7 +2065,7 @@ work_logs: dict[str, WorkLog] = {}  # session_id -> WorkLog
 
 #### Option C: JSON Files
 ```python
-# workspace/.nanobot/work-logs/{session_id}.json
+# workspace/.nanofolks/work-logs/{session_id}.json
 ```
 
 **Pros:** Human-readable, easy to inspect  
@@ -2444,11 +2444,11 @@ stats = exchange.distribute_insights()
 #### 5.7 File Structure
 
 **Files Created:**
-- `nanobot/agent/learning_exchange.py` - Core classes (690 lines)
+- `nanofolks/agent/learning_exchange.py` - Core classes (690 lines)
 - `tests/test_learning_exchange.py` - Comprehensive tests (650+ lines)
 
 **Files Modified:**
-- `nanobot/agent/work_log_manager.py` - Added insights methods
+- `nanofolks/agent/work_log_manager.py` - Added insights methods
 
 **Key Classes:**
 - `LearningPackage` - Insight dataclass with serialization
@@ -2543,8 +2543,8 @@ stats = exchange.distribute_insights()
 
 ## Success Metrics
 
-1. **Adoption:** % of users who run `nanobot explain` at least once
-2. **Trust:** User survey - "I understand how nanobot makes decisions" (1-5)
+1. **Adoption:** % of users who run `nanofolks explain` at least once
+2. **Trust:** User survey - "I understand how nanofolks makes decisions" (1-5)
 3. **Debugging:** Average time to diagnose agent issues (before vs after)
 4. **Error Detection:** # of errors caught by users reviewing work logs
 
@@ -2581,8 +2581,8 @@ Target: 80% of users report increased understanding after viewing work logs.
 - Cross-bot knowledge propagation
 
 **CLI Integration:**
-- `nanobot explain -w #workspace` - View workspace-specific logs
-- `nanobot workspace-logs` - List logs across workspaces
+- `nanofolks explain -w #workspace` - View workspace-specific logs
+- `nanofolks workspace-logs` - List logs across workspaces
 - Workspace filtering and bot filtering supported
 
 ---
@@ -2708,14 +2708,14 @@ USER FEEDBACK
 
 ### 1. Persistence Layer (InsightStore)
 
-**File:** `nanobot/agent/insight_store.py` (324 lines)
+**File:** `nanofolks/agent/insight_store.py` (324 lines)
 
 ```python
 class InsightStore:
     """SQLite persistence for Learning Exchange packages."""
     
     def __init__(self, db_path: Path = None):
-        # Uses ~/.nanobot/learning_exchange.db by default
+        # Uses ~/.nanofolks/learning_exchange.db by default
         # WAL mode for concurrent access
         
     def save_package(self, package: LearningPackage) -> None:
@@ -2759,7 +2759,7 @@ queued_packages (
 
 ### 2. Learning Exchange Enhancements
 
-**File:** `nanobot/agent/learning_exchange.py`
+**File:** `nanofolks/agent/learning_exchange.py`
 
 **New Methods:**
 ```python
@@ -2781,7 +2781,7 @@ def receive_learning_package(self, package: LearningPackage, store) -> Learning:
 
 ### 3. Turbo Memory Bridge
 
-**File:** `nanobot/memory/learning.py`
+**File:** `nanofolks/memory/learning.py`
 
 **New Mapping:**
 ```python
@@ -2814,13 +2814,13 @@ async def _queue_to_exchange(self, learning: Learning, detection: dict):
 
 ### 4. Agent Loop Integration
 
-**File:** `nanobot/agent/loop.py`
+**File:** `nanofolks/agent/loop.py`
 
 **New Initialization:**
 ```python
 # Added attributes
 self.workspace_id = str(workspace)  # For Learning Exchange
-self.bot_name = "nanobot"  # Can be overridden per instance
+self.bot_name = "nanofolks"  # Can be overridden per instance
 
 # Initialize Learning Exchange
 self.learning_exchange = LearningExchange(

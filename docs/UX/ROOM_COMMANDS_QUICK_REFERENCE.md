@@ -2,7 +2,7 @@
 
 ## Overview
 
-Complete guide to managing rooms and teams in nanobot CLI.
+Complete guide to managing rooms and teams in nanofolks CLI.
 
 ---
 
@@ -172,7 +172,7 @@ You can also ask the AI to create rooms and recommend bots:
 ```bash
 [#general] You: I need to create a room for building a website. Can you set it up?
 
-nanobot: I'll help you set up a dedicated room for your website!
+nanofolks: I'll help you set up a dedicated room for your website!
 
 🔍 Analyzing task requirements...
 
@@ -263,7 +263,7 @@ Room: #marketing-campaign • Team: 3 👑 🧠 🎨
 ```bash
 [#general] You: I need to build an API for my mobile app
 
-nanobot: 🔍 Analyzing task requirements...
+nanofolks: 🔍 Analyzing task requirements...
 Recommended: @coder, @researcher, @auditor
 Create room #mobile-api? [Y/n]: y
 
@@ -280,13 +280,13 @@ Create room #mobile-api? [Y/n]: y
 🔀 Switched to #marketing-campaign
 
 [#marketing-campaign] You: How's the campaign looking?
-nanobot: The campaign is ready. The team has prepared...
+nanofolks: The campaign is ready. The team has prepared...
 
 [#marketing-campaign] You: /switch website-redesign
 🔀 Switched to #website-redesign
 
 [#website-redesign] You: Status check on the redesign
-nanobot: The website redesign is progressing well...
+nanofolks: The website redesign is progressing well...
 ```
 
 ---
@@ -351,7 +351,7 @@ A: The general room cannot be deleted. Other rooms are archived when empty.
 A: All 6 bots can work together in a room.
 
 **Q: Do rooms persist after closing the CLI?**
-A: Yes! Rooms are saved and available the next time you start nanobot.
+A: Yes! Rooms are saved and available the next time you start nanofolks.
 
 ---
 
@@ -365,6 +365,6 @@ A: Yes! Rooms are saved and available the next time you start nanobot.
 
 ## Version
 
-This guide covers nanobot with Phase 1 UI improvements (Feb 2026).
+This guide covers nanofolks with Phase 1 UI improvements (Feb 2026).
 
-For the latest, run: `nanobot chat` and type `/help`
+For the latest, run: `nanofolks chat` and type `/help`

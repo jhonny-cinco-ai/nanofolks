@@ -67,7 +67,7 @@
 
 ### 1. First Setup (One-Time)
 ```
-User installs nanobot
+User installs nanofolks
   → Edit config or run setup
   → Set timezone: "America/New_York"
   → Done! ✅
@@ -191,11 +191,11 @@ This would make setup even more automatic for non-technical users.
 
 ## Implementation Files
 
-- `nanobot/utils/user_profile.py` - `get_user_timezone()` function
-- `nanobot/agent/tools/cron.py` - CronTool with timezone support
-- `nanobot/agent/loop.py` - Passes timezone to CronTool
-- `nanobot/cli/commands.py` - Reads from USER.md on startup
-- `nanobot/agent/context.py` - Already loads USER.md into context
+- `nanofolks/utils/user_profile.py` - `get_user_timezone()` function
+- `nanofolks/agent/tools/cron.py` - CronTool with timezone support
+- `nanofolks/agent/loop.py` - Passes timezone to CronTool
+- `nanofolks/cli/commands.py` - Reads from USER.md on startup
+- `nanofolks/agent/context.py` - Already loads USER.md into context
 
 ## Related Documentation
 

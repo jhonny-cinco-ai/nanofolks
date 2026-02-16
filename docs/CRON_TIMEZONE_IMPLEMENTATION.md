@@ -2,13 +2,13 @@
 
 ## Overview
 
-Implemented timezone-aware cron job scheduling based on commit d3f6c95 from the upstream repository, adapted for nanobot-turbo's use case.
+Implemented timezone-aware cron job scheduling based on commit d3f6c95 from the upstream repository, adapted for nanofolks-turbo's use case.
 
 **Key Design**: Uses a global **system_timezone** setting that applies to all cron jobs, optimized for non-technical users who interact through the AI agent.
 
 ## Changes Made
 
-### 1. **Cron Service (`nanobot/cron/service.py`)**
+### 1. **Cron Service (`nanofolks/cron/service.py`)**
 
 #### Imports Added
 - `datetime` module
@@ -31,21 +31,21 @@ next_dt = cron.get_next(datetime)
 return int(next_dt.timestamp() * 1000)
 ```
 
-### 2. **CLI Interface (`nanobot/cli/commands.py`)**
+### 2. **CLI Interface (`nanofolks/cli/commands.py`)**
 
 Added `--tz` parameter to `cron add` command:
 
 ```bash
 # Usage examples:
-nanobot cron add --name "Morning Briefing" --cron "0 9 * * *" --tz "America/New_York" --message "What's on my calendar?"
+nanofolks cron add --name "Morning Briefing" --cron "0 9 * * *" --tz "America/New_York" --message "What's on my calendar?"
 
-nanobot cron add --name "Tokyo Check" --cron "0 17 * * *" --tz "Asia/Tokyo" --message "Status update"
+nanofolks cron add --name "Tokyo Check" --cron "0 17 * * *" --tz "Asia/Tokyo" --message "Status update"
 
 # Defaults to local timezone if --tz not specified
-nanobot cron add --name "Local Job" --cron "0 14 * * *" --message "Reminder"
+nanofolks cron add --name "Local Job" --cron "0 14 * * *" --message "Reminder"
 ```
 
-### 3. **Agent Tool (`nanobot/agent/tools/cron.py`)**
+### 3. **Agent Tool (`nanofolks/agent/tools/cron.py`)**
 
 #### Constructor Enhanced
 - Added `default_timezone` parameter (defaults to "UTC")
@@ -65,7 +65,7 @@ nanobot cron add --name "Local Job" --cron "0 14 * * *" --message "Reminder"
 - `_add_job()`: Uses user's default timezone if not specified
 - `_add_calibration_job()`: Uses user's default timezone for background jobs
 
-### 4. **User Profile Utility (`nanobot/utils/user_profile.py`)**
+### 4. **User Profile Utility (`nanofolks/utils/user_profile.py`)**
 
 New utility functions:
 - `get_user_timezone(workspace)` - Extracts timezone from USER.md
@@ -83,7 +83,7 @@ New utility functions:
 - Single source of truth for user data
 - Easy for non-technical users to edit
 
-### 5. **Agent Loop (`nanobot/agent/loop.py`)**
+### 5. **Agent Loop (`nanofolks/agent/loop.py`)**
 
 - Receives `system_timezone` parameter
 - Passes it to `CronTool` during initialization
@@ -124,12 +124,12 @@ That's it! The system will automatically read this on startup.
 ### Via CLI
 ```bash
 # Uses the configured system_timezone automatically
-nanobot cron add --name "Morning Check" \
+nanofolks cron add --name "Morning Check" \
   --cron "0 9 * * *" \
   --message "What needs attention today?"
 
 # Override for specific timezone if needed
-nanobot cron add --name "Tokyo Check" \
+nanofolks cron add --name "Tokyo Check" \
   --cron "0 9 * * *" \
   --tz "Asia/Tokyo" \
   --message "Tokyo office status"
@@ -192,15 +192,15 @@ next_run = _compute_next_run(schedule, time.time() * 1000)  # Should use local T
 
 ## Files Modified
 
-1. `nanobot/cron/service.py` - Core timezone-aware scheduling
-2. `nanobot/cron/types.py` - Already had `tz` field (no changes)
-3. `nanobot/utils/user_profile.py` - **NEW** - Extract timezone from USER.md
-4. `nanobot/agent/tools/cron.py` - Agent tool with timezone support
-5. `nanobot/agent/loop.py` - Pass timezone to CronTool
-6. `nanobot/cli/commands.py` - Reads timezone from USER.md via `get_user_timezone()`
+1. `nanofolks/cron/service.py` - Core timezone-aware scheduling
+2. `nanofolks/cron/types.py` - Already had `tz` field (no changes)
+3. `nanofolks/utils/user_profile.py` - **NEW** - Extract timezone from USER.md
+4. `nanofolks/agent/tools/cron.py` - Agent tool with timezone support
+5. `nanofolks/agent/loop.py` - Pass timezone to CronTool
+6. `nanofolks/cli/commands.py` - Reads timezone from USER.md via `get_user_timezone()`
 
 ## Related Commit
 
 Based on upstream commit: `d3f6c95cebaf17d04f0d04655a98c0e795777bb1`
 
-Adapted to match nanobot-turbo's architecture with both agent-based and CLI-based scheduling interfaces.
+Adapted to match nanofolks-turbo's architecture with both agent-based and CLI-based scheduling interfaces.

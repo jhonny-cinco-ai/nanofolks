@@ -205,7 +205,7 @@ TEAM
   - ~25 lines
 
 ### Files Modified
-- `nanobot/cli/commands.py` - Main implementation
+- `nanofolks/cli/commands.py` - Main implementation
 
 ### Lines of Code
 - **Added**: ~120 lines
@@ -361,15 +361,15 @@ TEAM
 - ✅ Easy to rollback
 
 ### Deployment Steps
-1. Update `nanobot/cli/commands.py`
+1. Update `nanofolks/cli/commands.py`
 2. No configuration changes needed
 3. No migrations needed
-4. Restart nanobot
+4. Restart nanofolks
 5. Done!
 
 ### Verification
 ```bash
-nanobot chat
+nanofolks chat
 [#general] You: /create test-room
 # Should see spinner, then room context display
 

@@ -15,7 +15,7 @@ Complete polish and enhancement of the Inline Thinking Display with state tracki
 
 ### 1. Enhanced Input Handling
 
-**Module:** `nanobot/cli/ui/input_handler.py`
+**Module:** `nanofolks/cli/ui/input_handler.py`
 
 New `ThinkingInputHandler` class supporting:
 - **SPACE:** Toggle expanded/collapsed
@@ -30,7 +30,7 @@ Key functions:
 
 ### 2. Visual Polish
 
-**Module:** `nanobot/cli/ui/thinking_display.py`
+**Module:** `nanofolks/cli/ui/thinking_display.py`
 
 Enhanced `ThinkingDisplay` with:
 - **Color Support:** Optional colors for better readability (default on)
@@ -60,7 +60,7 @@ Expanded:  💭 Thinking [↓]
 
 ### 3. State Tracking System
 
-**Module:** `nanobot/cli/ui/thinking_state.py` - NEW MODULE
+**Module:** `nanofolks/cli/ui/thinking_state.py` - NEW MODULE
 
 Complete state management with:
 
@@ -100,7 +100,7 @@ Features:
 
 ### 4. Updated Integration
 
-**Module:** `nanobot/cli/commands.py`
+**Module:** `nanofolks/cli/commands.py`
 
 Enhanced `_handle_thinking_toggle()` to:
 - Use new `ThinkingInputHandler` class
@@ -238,13 +238,13 @@ All changes backward compatible with Phase 1-2 code.
 ## Files Added/Modified
 
 ### New Files
-- `nanobot/cli/ui/thinking_state.py` (300+ LOC)
+- `nanofolks/cli/ui/thinking_state.py` (300+ LOC)
 - `tests/test_thinking_phase3.py` (400+ LOC)
 
 ### Modified Files
-- `nanobot/cli/ui/input_handler.py` (+70 LOC)
-- `nanobot/cli/ui/thinking_display.py` (+65 LOC)
-- `nanobot/cli/commands.py` (updated `_handle_thinking_toggle()`)
+- `nanofolks/cli/ui/input_handler.py` (+70 LOC)
+- `nanofolks/cli/ui/thinking_display.py` (+65 LOC)
+- `nanofolks/cli/commands.py` (updated `_handle_thinking_toggle()`)
 
 ## Future Enhancements (Phase 4+)
 

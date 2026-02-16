@@ -11,9 +11,9 @@
 
 ## Executive Summary
 
-Currently, nanobot uses a single centralized heartbeat that processes all periodic tasks through one agent instance. This creates a bottleneck and doesn't leverage our multi-agent architecture.
+Currently, nanofolks uses a single centralized heartbeat that processes all periodic tasks through one agent instance. This creates a bottleneck and doesn't leverage our multi-agent architecture.
 
-**The Solution:** Implement **per-bot independent heartbeats** where each of the 6 bots (nanobot + 5 specialists) runs their own heartbeat with:
+**The Solution:** Implement **per-bot independent heartbeats** where each of the 6 bots (nanofolks + 5 specialists) runs their own heartbeat with:
 - **Standardized intervals** (60min default for all specialists, 30min for coordinator)
 - **User customization** (adjust intervals per bot via configuration)
 - **Domain-specific checklists** (coder checks repos, social checks posts)
@@ -22,7 +22,7 @@ Currently, nanobot uses a single centralized heartbeat that processes all period
 
 **Interval Strategy:**
 - **Default:** 60 minutes for all specialist bots (researcher, coder, social, creative, auditor)
-- **Coordinator:** 30 minutes for nanobot (needs faster coordination)
+- **Coordinator:** 30 minutes for nanofolks (needs faster coordination)
 - **User Control:** All intervals customizable via configuration (minimum: 5 minutes)
 - **Rationale:** Simple defaults that work for most use cases, with flexibility to optimize per domain
 
@@ -47,7 +47,7 @@ Currently, nanobot uses a single centralized heartbeat that processes all period
 │  └─ Review code quality (audit task)                         │
 │       │                                                      │
 │       ▼                                                      │
-│  Single Agent (nanobot only)                                 │
+│  Single Agent (nanofolks only)                                 │
 │  • Handles ALL tasks regardless of domain                    │
 │  • No expertise-based routing                                │
 │  • No load distribution                                      │
@@ -154,7 +154,7 @@ Currently, nanobot uses a single centralized heartbeat that processes all period
 **Goal:** Build base heartbeat service and config system
 
 #### 1.1: Data Models
-**File:** `nanobot/heartbeat/models.py`
+**File:** `nanofolks/heartbeat/models.py`
 
 ```python
 """Data models for multi-heartbeat system."""
@@ -367,7 +367,7 @@ class HeartbeatHistory:
 ```
 
 #### 1.2: Check Registry System
-**File:** `nanobot/heartbeat/check_registry.py`
+**File:** `nanofolks/heartbeat/check_registry.py`
 
 ```python
 """Pluggable check registry for heartbeat system."""
@@ -380,7 +380,7 @@ import asyncio
 
 from loguru import logger
 
-from nanobot.heartbeat.models import CheckDefinition, CheckResult, CheckStatus
+from nanofolks.heartbeat.models import CheckDefinition, CheckResult, CheckStatus
 
 
 @dataclass
@@ -426,7 +426,7 @@ class CheckRegistry:
         Returns:
             CheckDefinition for the registered check
         """
-        from nanobot.heartbeat.models import CheckDefinition, CheckPriority
+        from nanofolks.heartbeat.models import CheckDefinition, CheckPriority
         
         if name in self._checks:
             logger.warning(f"Check '{name}' already registered, overwriting")
@@ -629,7 +629,7 @@ def check(
 ```
 
 #### 1.3: Bot Heartbeat Service
-**File:** `nanobot/heartbeat/bot_heartbeat.py`
+**File:** `nanofolks/heartbeat/bot_heartbeat.py`
 
 ```python
 """Independent heartbeat service for each bot."""
@@ -641,12 +641,12 @@ from typing import Any, Callable, Dict, List, Optional
 
 from loguru import logger
 
-from nanobot.heartbeat.models import (
+from nanofolks.heartbeat.models import (
     HeartbeatConfig, HeartbeatTick, CheckResult, 
     CheckStatus, HeartbeatHistory
 )
-from nanobot.heartbeat.check_registry import check_registry
-from nanobot.coordinator.circuit_breaker import CircuitBreaker, CircuitState
+from nanofolks.heartbeat.check_registry import check_registry
+from nanofolks.coordinator.circuit_breaker import CircuitBreaker, CircuitState
 
 
 class BotHeartbeatService:
@@ -681,7 +681,7 @@ class BotHeartbeatService:
         # Circuit breaker for resilience
         self.circuit_breaker = None
         if config.circuit_breaker_enabled:
-            from nanobot.coordinator.circuit_breaker import CircuitBreakerConfig
+            from nanofolks.coordinator.circuit_breaker import CircuitBreakerConfig
             cb_config = CircuitBreakerConfig(
                 failure_threshold=config.circuit_breaker_threshold,
                 timeout=config.circuit_breaker_timeout_s
@@ -964,7 +964,7 @@ class BotHeartbeatService:
 **Goal:** Create heartbeat configs for each bot type
 
 #### 2.1: Researcher Bot Checks
-**File:** `nanobot/bots/checks/researcher_checks.py`
+**File:** `nanofolks/bots/checks/researcher_checks.py`
 
 ```python
 """Heartbeat checks for ResearcherBot (Navigator)."""
@@ -973,8 +973,8 @@ from datetime import datetime
 from typing import Dict, Any, List
 from loguru import logger
 
-from nanobot.heartbeat.check_registry import check
-from nanobot.heartbeat.models import CheckDefinition
+from nanofolks.heartbeat.check_registry import check
+from nanofolks.heartbeat.models import CheckDefinition
 
 
 @check(
@@ -1174,7 +1174,7 @@ async def update_competitor_tracking(bot, config: Dict[str, Any]) -> Dict[str, A
 ```
 
 #### 2.2: Coder Bot Checks
-**File:** `nanobot/bots/checks/coder_checks.py`
+**File:** `nanofolks/bots/checks/coder_checks.py`
 
 ```python
 """Heartbeat checks for CoderBot (Gunner)."""
@@ -1182,7 +1182,7 @@ async def update_competitor_tracking(bot, config: Dict[str, Any]) -> Dict[str, A
 from typing import Dict, Any, List
 from loguru import logger
 
-from nanobot.heartbeat.check_registry import check
+from nanofolks.heartbeat.check_registry import check
 
 
 @check(
@@ -1382,7 +1382,7 @@ async def check_dependency_updates(bot, config: Dict[str, Any]) -> Dict[str, Any
 ```
 
 #### 2.3: Social Bot Checks
-**File:** `nanobot/bots/checks/social_checks.py`
+**File:** `nanofolks/bots/checks/social_checks.py`
 
 ```python
 """Heartbeat checks for SocialBot (Lookout)."""
@@ -1390,7 +1390,7 @@ async def check_dependency_updates(bot, config: Dict[str, Any]) -> Dict[str, Any
 from datetime import datetime
 from typing import Dict, Any, List
 
-from nanobot.heartbeat.check_registry import check
+from nanofolks.heartbeat.check_registry import check
 
 
 @check(
@@ -1608,13 +1608,13 @@ async def track_trending_topics(bot, config: Dict[str, Any]) -> Dict[str, Any]:
 ```
 
 #### 2.4: Create Bot Configurations
-**File:** `nanobot/bots/heartbeat_configs.py`
+**File:** `nanofolks/bots/heartbeat_configs.py`
 
 ```python
 """Heartbeat configurations for each bot type."""
 
-from nanobot.heartbeat.models import HeartbeatConfig, CheckDefinition
-from nanobot.heartbeat.check_registry import check_registry
+from nanofolks.heartbeat.models import HeartbeatConfig, CheckDefinition
+from nanofolks.heartbeat.check_registry import check_registry
 
 
 def get_researcher_heartbeat_config() -> HeartbeatConfig:
@@ -1897,9 +1897,9 @@ def get_creative_heartbeat_config() -> HeartbeatConfig:
 
 
 def get_coordinator_heartbeat_config() -> HeartbeatConfig:
-    """Get heartbeat configuration for CoordinatorBot (nanobot)."""
+    """Get heartbeat configuration for CoordinatorBot (nanofolks)."""
     return HeartbeatConfig(
-        bot_name="nanobot",
+        bot_name="nanofolks",
         interval_s=30 * 60,  # 30 minutes - coordination needs regular check-ins
         max_execution_time_s=300,
         enabled=True,
@@ -1946,7 +1946,7 @@ BOT_HEARTBEAT_CONFIGS = {
     "social": get_social_heartbeat_config,
     "auditor": get_auditor_heartbeat_config,
     "creative": get_creative_heartbeat_config,
-    "nanobot": get_coordinator_heartbeat_config,
+    "nanofolks": get_coordinator_heartbeat_config,
 }
 
 
@@ -1980,7 +1980,7 @@ def get_heartbeat_config(bot_name: str) -> HeartbeatConfig:
 ---
 
 #### 2.5: User Configuration of Intervals
-**File:** `nanobot/config/heartbeat_config.py`
+**File:** `nanofolks/config/heartbeat_config.py`
 
 Users can customize heartbeat intervals per bot via configuration:
 
@@ -1990,8 +1990,8 @@ Users can customize heartbeat intervals per bot via configuration:
 from typing import Dict, Optional
 from dataclasses import dataclass
 
-from nanobot.heartbeat.models import HeartbeatConfig
-from nanobot.bots.heartbeat_configs import get_heartbeat_config, BOT_HEARTBEAT_CONFIGS
+from nanofolks.heartbeat.models import HeartbeatConfig
+from nanofolks.bots.heartbeat_configs import get_heartbeat_config, BOT_HEARTBEAT_CONFIGS
 
 
 @dataclass
@@ -2149,7 +2149,7 @@ EXAMPLE_CONFIG = """
 **CLI Commands for User Configuration:**
 
 ```python
-# nanobot/cli/commands.py
+# nanofolks/cli/commands.py
 
 @app.command()
 def heartbeat_config(
@@ -2160,7 +2160,7 @@ def heartbeat_config(
     enable: bool = typer.Option(False, "--enable", help="Enable heartbeat"),
 ):
     """Configure heartbeat interval for a bot."""
-    from nanobot.config.heartbeat_config import HeartbeatConfigLoader
+    from nanofolks.config.heartbeat_config import HeartbeatConfigLoader
     
     loader = HeartbeatConfigLoader()
     
@@ -2200,13 +2200,13 @@ def heartbeat_config(
 @app.command()
 def heartbeat_status():
     """Show status of all bot heartbeats."""
-    from nanobot.config.heartbeat_config import HeartbeatConfigLoader
+    from nanofolks.config.heartbeat_config import HeartbeatConfigLoader
     
     loader = HeartbeatConfigLoader()
     
     console.print("\n[bold]Bot Heartbeat Status[/bold]\n")
     
-    for bot_name in ["researcher", "coder", "social", "creative", "auditor", "nanobot"]:
+    for bot_name in ["researcher", "coder", "social", "creative", "auditor", "nanofolks"]:
         config = loader.get_bot_config(bot_name)
         interval_min = config.interval_s // 60
         
@@ -2234,7 +2234,7 @@ def heartbeat_status():
 **Goal:** Integrate heartbeat into SpecialistBot base class
 
 #### 3.1: Update SpecialistBot Base Class
-**File:** `nanobot/bots/base.py`
+**File:** `nanofolks/bots/base.py`
 
 ```python
 """Base class for all specialist bots with heartbeat support."""
@@ -2246,10 +2246,10 @@ import asyncio
 
 from loguru import logger
 
-from nanobot.models.role_card import RoleCard
-from nanobot.heartbeat.bot_heartbeat import BotHeartbeatService
-from nanobot.heartbeat.models import HeartbeatConfig, CheckResult, HeartbeatTick
-from nanobot.coordinator.bus import InterBotBus
+from nanofolks.models.role_card import RoleCard
+from nanofolks.heartbeat.bot_heartbeat import BotHeartbeatService
+from nanofolks.heartbeat.models import HeartbeatConfig, CheckResult, HeartbeatTick
+from nanofolks.coordinator.bus import InterBotBus
 
 
 class SpecialistBot(ABC):
@@ -2300,7 +2300,7 @@ class SpecialistBot(ABC):
         """
         if config is None:
             # Load default config for this bot type
-            from nanobot.bots.heartbeat_configs import get_heartbeat_config
+            from nanofolks.bots.heartbeat_configs import get_heartbeat_config
             config = get_heartbeat_config(self.role_card.bot_name)
         
         self._heartbeat_config = config
@@ -2405,7 +2405,7 @@ class SpecialistBot(ABC):
         """Internal handler for check completion."""
         # Log to work log if available
         if hasattr(self, 'work_log_manager') and self.work_log_manager:
-            from nanobot.agent.work_log_manager import LogLevel
+            from nanofolks.agent.work_log_manager import LogLevel
             
             if result.success:
                 self.work_log_manager.log(
@@ -2447,7 +2447,7 @@ class SpecialistBot(ABC):
             return False
         
         try:
-            from nanobot.coordinator.models import BotMessage, MessageType
+            from nanofolks.coordinator.models import BotMessage, MessageType
             
             msg = BotMessage(
                 sender_id=self.role_card.bot_name,
@@ -2559,8 +2559,8 @@ class SpecialistBot(ABC):
 from typing import Dict, Any, List
 from datetime import datetime
 
-from nanobot.bots.base import SpecialistBot
-from nanobot.models.role_card import RoleCard, BotDomain
+from nanofolks.bots.base import SpecialistBot
+from nanofolks.models.role_card import RoleCard, BotDomain
 
 
 # Researcher role card definition
@@ -2580,7 +2580,7 @@ class ResearcherBot(SpecialistBot):
         super().__init__(RESEARCHER_ROLE, bus, workspace_id)
         
         # Initialize with researcher-specific heartbeat
-        from nanobot.bots.heartbeat_configs import get_researcher_heartbeat_config
+        from nanofolks.bots.heartbeat_configs import get_researcher_heartbeat_config
         self.initialize_heartbeat(
             config=get_researcher_heartbeat_config()
         )
@@ -2633,7 +2633,7 @@ class ResearcherBot(SpecialistBot):
 **Goal:** Coordinate all bot heartbeats and handle cross-bot scenarios
 
 #### 4.1: MultiHeartbeatManager
-**File:** `nanobot/heartbeat/multi_manager.py`
+**File:** `nanofolks/heartbeat/multi_manager.py`
 
 ```python
 """Manager for coordinating multiple bot heartbeats."""
@@ -2645,10 +2645,10 @@ from datetime import datetime
 
 from loguru import logger
 
-from nanobot.bots.base import SpecialistBot
-from nanobot.heartbeat.models import HeartbeatTick
-from nanobot.coordinator.bus import InterBotBus
-from nanobot.coordinator.audit import AuditTrail, AuditEventType
+from nanofolks.bots.base import SpecialistBot
+from nanofolks.heartbeat.models import HeartbeatTick
+from nanofolks.coordinator.bus import InterBotBus
+from nanofolks.coordinator.audit import AuditTrail, AuditEventType
 
 
 @dataclass
@@ -2753,7 +2753,7 @@ class MultiHeartbeatManager:
                 logger.error(f"[MultiHeartbeatManager] Failed to start {bot_name} heartbeat: {e}")
         
         # Start coordinator checks
-        if "nanobot" in self._bots:
+        if "nanofolks" in self._bots:
             self._coordinator_check_task = asyncio.create_task(
                 self._run_coordinator_checks()
             )
@@ -2782,7 +2782,7 @@ class MultiHeartbeatManager:
     
     async def _run_coordinator_checks(self) -> None:
         """Run coordinator-specific cross-bot checks."""
-        coordinator = self._bots.get("nanobot")
+        coordinator = self._bots.get("nanofolks")
         if not coordinator or not coordinator._heartbeat:
             return
         
@@ -2896,12 +2896,12 @@ class MultiHeartbeatManager:
 **Goal:** Wire everything together and test
 
 #### 5.1: Integration in commands.py
-**File:** `nanobot/cli/commands.py` (modification)
+**File:** `nanofolks/cli/commands.py` (modification)
 
 ```python
 # In the run command, replace single heartbeat with multi-heartbeat
 
-from nanobot.heartbeat.multi_manager import MultiHeartbeatManager
+from nanofolks.heartbeat.multi_manager import MultiHeartbeatManager
 
 # Create multi-heartbeat manager
 multi_heartbeat = MultiHeartbeatManager(
@@ -2910,7 +2910,7 @@ multi_heartbeat = MultiHeartbeatManager(
 )
 
 # Register all bots
-for bot in [researcher, coder, social, creative, auditor, nanobot]:
+for bot in [researcher, coder, social, creative, auditor, nanofolks]:
     multi_heartbeat.register_bot(bot)
 
 # Start all heartbeats
@@ -2931,10 +2931,10 @@ import asyncio
 from datetime import datetime
 from unittest.mock import Mock, AsyncMock
 
-from nanobot.heartbeat.models import HeartbeatConfig, CheckDefinition
-from nanobot.heartbeat.bot_heartbeat import BotHeartbeatService
-from nanobot.heartbeat.multi_manager import MultiHeartbeatManager
-from nanobot.bots.base import SpecialistBot
+from nanofolks.heartbeat.models import HeartbeatConfig, CheckDefinition
+from nanofolks.heartbeat.bot_heartbeat import BotHeartbeatService
+from nanofolks.heartbeat.multi_manager import MultiHeartbeatManager
+from nanofolks.bots.base import SpecialistBot
 
 
 class TestBotHeartbeatService:
@@ -2976,7 +2976,7 @@ class TestBotHeartbeatService:
     async def test_heartbeat_executes_checks(self, mock_bot, config):
         """Test that heartbeat executes registered checks."""
         # Register a mock check
-        from nanobot.heartbeat.check_registry import check_registry
+        from nanofolks.heartbeat.check_registry import check_registry
         
         async def mock_check(bot, cfg):
             return {"success": True, "message": "Mock check passed"}
@@ -3087,7 +3087,7 @@ class TestCheckRegistry:
     @pytest.fixture
     def registry(self):
         """Create fresh registry."""
-        from nanobot.heartbeat.check_registry import CheckRegistry
+        from nanofolks.heartbeat.check_registry import CheckRegistry
         return CheckRegistry()
     
     def test_register_check(self, registry):
@@ -3159,12 +3159,12 @@ heartbeat = HeartbeatService(
 **New (Multi-Heartbeat):**
 ```python
 # Multi-heartbeat
-from nanobot.heartbeat.multi_manager import MultiHeartbeatManager
+from nanofolks.heartbeat.multi_manager import MultiHeartbeatManager
 
 manager = MultiHeartbeatManager(bus=bus)
 
 # Register bots with their own heartbeats
-for bot in [researcher, coder, social, auditor, creative, nanobot]:
+for bot in [researcher, coder, social, auditor, creative, nanofolks]:
     manager.register_bot(bot)
 
 # Start all

@@ -8,7 +8,7 @@
 
 ### Phase 1: Core Components ✅ COMPLETE
 
-#### 1. `ThinkingSummaryBuilder` (`nanobot/cli/ui/thinking_summary.py`)
+#### 1. `ThinkingSummaryBuilder` (`nanofolks/cli/ui/thinking_summary.py`)
 - ✅ One-line summary generation from work logs
 - ✅ Detailed breakdown with step numbers and icons
 - ✅ Key entry filtering (decisions, tools, corrections, errors)
@@ -35,7 +35,7 @@ Step 2 🎯 Decision: Medium tier sufficient for code generation
 Step 3 🔧 Tool: llm_call() → success [2300ms]
 ```
 
-#### 2. `ThinkingDisplay` (`nanobot/cli/ui/thinking_display.py`)
+#### 2. `ThinkingDisplay` (`nanofolks/cli/ui/thinking_display.py`)
 - ✅ Collapsible component with toggle state
 - ✅ Collapsed view rendering
 - ✅ Expanded view rendering with proper formatting
@@ -63,7 +63,7 @@ Expanded:
 [Press any key to continue...]
 ```
 
-#### 3. `InputHandler` (`nanobot/cli/ui/input_handler.py`)
+#### 3. `InputHandler` (`nanofolks/cli/ui/input_handler.py`)
 - ✅ Async key input handling (Unix/Windows/macOS)
 - ✅ Non-blocking single key reads
 - ✅ Timeout support for key waiting
@@ -74,7 +74,7 @@ Expanded:
 - `async_input(prompt, timeout)` - Read full line
 - `wait_for_key(message)` - Friendly waiting wrapper
 
-#### 4. UI Module Structure (`nanobot/cli/ui/__init__.py`)
+#### 4. UI Module Structure (`nanofolks/cli/ui/__init__.py`)
 - ✅ Clean exports for thinking components
 - ✅ Module documentation
 
@@ -94,7 +94,7 @@ Expanded:
 
 ## Phase 2: Integration ✅ COMPLETE
 
-### 2.1 Integration Functions (`nanobot/cli/commands.py`)
+### 2.1 Integration Functions (`nanofolks/cli/commands.py`)
 
 Added two helper functions for command integration:
 
@@ -112,7 +112,7 @@ Added two helper functions for command integration:
 
 ### 2.2 Agent Command Integration
 
-Modified the `agent` command in `nanobot/cli/commands.py`:
+Modified the `agent` command in `nanofolks/cli/commands.py`:
 
 **Single Message Mode** (line ~1316):
 ```python
@@ -147,7 +147,7 @@ if thinking_display:
 
 ## Phase 3: Polish & Enhancement ✅ COMPLETE
 
-### 3.1 Enhanced Input Handling (`nanobot/cli/ui/input_handler.py`)
+### 3.1 Enhanced Input Handling (`nanofolks/cli/ui/input_handler.py`)
 
 Added `ThinkingInputHandler` class with support for:
 - **SPACE:** Toggle expanded/collapsed (existing)
@@ -160,7 +160,7 @@ New functions:
 - `is_ctrl_c(key)` - Detect Ctrl+C (ASCII 3)
 - `ThinkingInputHandler.get_thinking_action()` - Get user action
 
-### 3.2 Visual Polish (`nanobot/cli/ui/thinking_display.py`)
+### 3.2 Visual Polish (`nanofolks/cli/ui/thinking_display.py`)
 
 Enhanced `ThinkingDisplay` with:
 - **Optional Colors:** `use_colors` parameter (default True)
@@ -179,7 +179,7 @@ ThinkingDisplay(
 )
 ```
 
-### 3.3 State Tracking (`nanobot/cli/ui/thinking_state.py`) - NEW MODULE
+### 3.3 State Tracking (`nanofolks/cli/ui/thinking_state.py`) - NEW MODULE
 
 Complete state management system with:
 
@@ -211,7 +211,7 @@ Key methods:
   - `max_summary_length` - Truncation limit
 - Serializable to/from dict
 
-### 3.4 Updated Integration (`nanobot/cli/commands.py`)
+### 3.4 Updated Integration (`nanofolks/cli/commands.py`)
 
 Enhanced `_handle_thinking_toggle()` to:
 - Use `ThinkingInputHandler` for actions
@@ -291,13 +291,13 @@ User sees collapsible thinking in chat
 ## Component Dependencies
 
 ```
-nanobot/cli/ui/thinking_display.py
+nanofolks/cli/ui/thinking_display.py
   └─ depends on: thinking_summary.py
 
-nanobot/cli/ui/thinking_summary.py
-  └─ depends on: nanobot/agent/work_log.py
+nanofolks/cli/ui/thinking_summary.py
+  └─ depends on: nanofolks/agent/work_log.py
 
-nanobot/cli/ui/input_handler.py
+nanofolks/cli/ui/input_handler.py
   └─ no dependencies (standalone)
 ```
 
@@ -335,32 +335,32 @@ nanobot/cli/ui/input_handler.py
 ## Files Created/Modified
 
 ### Phase 1-2: New Files
-1. `nanobot/cli/ui/__init__.py` - Module exports (20 LOC)
-2. `nanobot/cli/ui/thinking_summary.py` - Summary generation (400+ LOC)
-3. `nanobot/cli/ui/thinking_display.py` - Display component (170+ LOC)
-4. `nanobot/cli/ui/input_handler.py` - Input handling (230+ LOC after Phase 3)
+1. `nanofolks/cli/ui/__init__.py` - Module exports (20 LOC)
+2. `nanofolks/cli/ui/thinking_summary.py` - Summary generation (400+ LOC)
+3. `nanofolks/cli/ui/thinking_display.py` - Display component (170+ LOC)
+4. `nanofolks/cli/ui/input_handler.py` - Input handling (230+ LOC after Phase 3)
 5. `tests/test_thinking_display.py` - Unit tests (350+ LOC)
 6. `tests/test_thinking_integration.py` - Integration tests (300+ LOC)
 
 ### Phase 3: New Files
-7. `nanobot/cli/ui/thinking_state.py` - State tracking (300+ LOC)
+7. `nanofolks/cli/ui/thinking_state.py` - State tracking (300+ LOC)
 8. `tests/test_thinking_phase3.py` - Phase 3 tests (400+ LOC)
 
 ### Modified Files
-1. `nanobot/cli/commands.py` - Added thinking display integration:
+1. `nanofolks/cli/commands.py` - Added thinking display integration:
    - Phase 2: `_show_thinking_logs()` async function (20 lines)
    - Phase 2: `_handle_thinking_toggle()` async function (20 lines)
    - Phase 3: Enhanced `_handle_thinking_toggle()` with new handlers
    - Integration in single message mode (6 lines)
    - Integration in interactive mode (6 lines)
 
-2. `nanobot/cli/ui/input_handler.py` - Phase 3 enhancements:
+2. `nanofolks/cli/ui/input_handler.py` - Phase 3 enhancements:
    - Added `is_escape_key()` function (10 lines)
    - Added `is_ctrl_c()` function (10 lines)
    - Added `ThinkingInputHandler` class (50+ lines)
    - Total additions: ~70 lines
 
-3. `nanobot/cli/ui/thinking_display.py` - Phase 3 enhancements:
+3. `nanofolks/cli/ui/thinking_display.py` - Phase 3 enhancements:
    - Added color configuration (15+ lines)
    - Enhanced `render_collapsed()` for colors (15+ lines)
    - Enhanced `render_expanded()` with stats (35+ lines)

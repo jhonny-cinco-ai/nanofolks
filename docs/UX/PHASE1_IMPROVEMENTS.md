@@ -14,7 +14,7 @@ Implemented all 4 quick-win improvements to enhance the CLI UX without major ref
 
 ### 1. ✅ Show Team Roster After Room Creation
 
-**File**: `nanobot/cli/commands.py` (lines 1153-1160)  
+**File**: `nanofolks/cli/commands.py` (lines 1153-1160)  
 **Function**: `_handle_room_creation_intent()`
 
 **What Changed**:
@@ -51,7 +51,7 @@ TEAM
 
 ### 2. ✅ Enhance /switch Command with Room List
 
-**File**: `nanobot/cli/commands.py` (lines 1401-1440)  
+**File**: `nanofolks/cli/commands.py` (lines 1401-1440)  
 **Function**: Interactive loop `/switch` handler
 
 **What Changed**:
@@ -84,7 +84,7 @@ Usage: /switch <room-name>
 
 ### 3. ✅ Add /status Command
 
-**File**: `nanobot/cli/commands.py` (lines 1496-1524)  
+**File**: `nanofolks/cli/commands.py` (lines 1496-1524)  
 **Function**: Interactive loop `/status` and `/info` handlers
 
 **What Changed**:
@@ -121,7 +121,7 @@ TEAM
 
 ### 4. ✅ Add /help Command
 
-**File**: `nanobot/cli/commands.py` (lines 1467-1495)  
+**File**: `nanofolks/cli/commands.py` (lines 1467-1495)  
 **Function**: Interactive loop `/help` handler
 
 **What Changed**:
@@ -164,7 +164,7 @@ Available Room Commands:
 
 ### Imports Added
 ```python
-from nanobot.cli.room_ui import TeamRoster, RoomList, StatusBar
+from nanofolks.cli.room_ui import TeamRoster, RoomList, StatusBar
 ```
 
 ### Components Used
@@ -187,7 +187,7 @@ from nanobot.cli.room_ui import TeamRoster, RoomList, StatusBar
 ### Quick Manual Test
 ```bash
 # Start interactive mode
-nanobot chat
+nanofolks chat
 
 # Test 1: Create room with AI
 [#general] You: Create a room for building a website
@@ -284,7 +284,7 @@ For further improvements, consider:
 **Lines Removed**: 0  
 **Breaking Changes**: None  
 
-**File**: `nanobot/cli/commands.py`
+**File**: `nanofolks/cli/commands.py`
 - Import additions (line 27)
 - Room creation enhancement (lines 1153-1160)
 - /switch command enhancement (lines 1401-1440)

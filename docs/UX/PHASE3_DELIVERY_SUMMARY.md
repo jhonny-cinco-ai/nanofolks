@@ -18,7 +18,7 @@ Phase 3 of the CLI UX improvements is **60% complete**. The core advanced layout
 
 ### 1. Production Code ✅
 
-**File**: `nanobot/cli/advanced_layout.py` (406 lines)
+**File**: `nanofolks/cli/advanced_layout.py` (406 lines)
 
 ```
 Classes Implemented:
@@ -169,7 +169,7 @@ Six comprehensive documentation files:
 
 ### Created Files
 ```
-✅ nanobot/cli/advanced_layout.py         (406 lines, production code)
+✅ nanofolks/cli/advanced_layout.py         (406 lines, production code)
 ✅ PHASE3_IMPLEMENTATION_PLAN.md          (comprehensive planning)
 ✅ PHASE3_IMPROVEMENTS.md                 (implementation details)
 ✅ PHASE3_INTEGRATION_GUIDE.md            (step-by-step guide)

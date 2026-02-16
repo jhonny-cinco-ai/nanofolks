@@ -1,4 +1,4 @@
-# Multi-stage build for nanobot
+# Multi-stage build for nanofolks
 # Stage 1: Build Python wheel with dependencies
 # Stage 2: Build WhatsApp bridge
 # Stage 3: Final runtime image (minimal)
@@ -19,7 +19,7 @@ RUN apt-get update && \
 
 # Copy source code
 COPY pyproject.toml README.md LICENSE ./
-COPY nanobot/ nanobot/
+COPY nanofolks/ nanofolks/
 
 # Create empty bridge directory (referenced in pyproject.toml but built separately)
 RUN mkdir -p bridge && touch bridge/.gitkeep
@@ -66,7 +66,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Create config directory
-RUN mkdir -p /root/.nanobot
+RUN mkdir -p /root/.nanofolks
 
 # Copy and install Python wheel with all dependencies
 COPY --from=python-builder /wheels/*.whl /tmp/
@@ -82,5 +82,5 @@ COPY --from=bridge-builder /build/package.json ./bridge/
 # Gateway port
 EXPOSE 18790
 
-ENTRYPOINT ["nanobot"]
+ENTRYPOINT ["nanofolks"]
 CMD ["status"]

@@ -2,7 +2,7 @@
 
 **Status**: 🚀 IN PROGRESS  
 **Started**: February 15, 2026  
-**Module**: `nanobot/cli/advanced_layout.py`
+**Module**: `nanofolks/cli/advanced_layout.py`
 
 ---
 
@@ -50,7 +50,7 @@
 ### Module Structure
 
 ```
-nanobot/cli/advanced_layout.py
+nanofolks/cli/advanced_layout.py
 ├── AdvancedLayout (200 lines)
 │   ├── Terminal dimension tracking
 │   ├── Layout creation
@@ -192,7 +192,7 @@ layout_manager.update(
 
 **In commands.py:**
 ```python
-from nanobot.cli.advanced_layout import (
+from nanofolks.cli.advanced_layout import (
     AdvancedLayout,
     LayoutManager,
     SidebarManager,
@@ -352,7 +352,7 @@ sidebar_manager.update_room_list(room_list_content)
 # First update
 layout_manager.update(
     header=advanced_layout.render_header(room_id, team_count),
-    chat="Welcome to nanobot!",
+    chat="Welcome to nanofolks!",
     sidebar=sidebar_manager.get_content(),
     footer=advanced_layout.render_footer("[#general] You: ")
 )
@@ -581,5 +581,5 @@ Phase 3 enhances the CLI with professional-grade terminal UI capabilities:
 ---
 
 **Date**: February 15, 2026  
-**Module**: `nanobot/cli/advanced_layout.py`  
+**Module**: `nanofolks/cli/advanced_layout.py`  
 **Status**: Ready for integration

@@ -33,7 +33,7 @@ Enable users to see bot thinking/reasoning inline in the chat flow through a col
 
 ### 1. Summary Generator (`ThinkingSummaryBuilder`)
 
-**Location:** `nanobot/cli/ui/thinking_summary.py`
+**Location:** `nanofolks/cli/ui/thinking_summary.py`
 
 ```python
 class ThinkingSummaryBuilder:
@@ -64,7 +64,7 @@ class ThinkingSummaryBuilder:
 
 ### 2. Collapsible Display Component (`ThinkingDisplay`)
 
-**Location:** `nanobot/cli/ui/thinking_display.py`
+**Location:** `nanofolks/cli/ui/thinking_display.py`
 
 ```python
 class ThinkingDisplay:
@@ -97,7 +97,7 @@ class ThinkingDisplay:
 
 ### 3. Integration Point in Chat Flow
 
-**Location:** `nanobot/cli/commands.py` (agent command, interactive mode)
+**Location:** `nanofolks/cli/commands.py` (agent command, interactive mode)
 
 **Current flow (line 1701-1703):**
 ```python
@@ -189,7 +189,7 @@ Continue to next prompt
 ```
 User: What's a good project structure?
 
-🤖 nanobot
+🤖 nanofolks
 Here's a recommended structure...
 
 💭 Thinking: Selected model, generated response [SPACE]
@@ -210,7 +210,7 @@ Expanded:
 ```
 User: Set up a project coordination room with researcher and coder
 
-🤖 nanobot
+🤖 nanofolks
 Coordination room created with researcher and coder ready for collaboration.
 
 💭 Thinking: Created room, invited 2 bots [SPACE]
@@ -233,7 +233,7 @@ Expanded:
 ```
 User: Analyze the config file
 
-🤖 nanobot
+🤖 nanofolks
 Configuration analysis complete. Found 3 optimization opportunities...
 
 💭 Thinking: Executed 3 tools, fixed encoding issue [SPACE]
@@ -310,13 +310,13 @@ Expanded:
 ## Dependencies & Changes
 
 ### New Files
-- `nanobot/cli/ui/thinking_summary.py` (ThinkingSummaryBuilder)
-- `nanobot/cli/ui/thinking_display.py` (ThinkingDisplay)
-- `nanobot/cli/ui/input_handler.py` (async key reading)
+- `nanofolks/cli/ui/thinking_summary.py` (ThinkingSummaryBuilder)
+- `nanofolks/cli/ui/thinking_display.py` (ThinkingDisplay)
+- `nanofolks/cli/ui/input_handler.py` (async key reading)
 
 ### Modified Files
-- `nanobot/cli/commands.py` - agent command integration
-- `nanobot/cli/ui/__init__.py` - exports
+- `nanofolks/cli/commands.py` - agent command integration
+- `nanofolks/cli/ui/__init__.py` - exports
 
 ### No Breaking Changes
 - Backward compatible (can be toggled off)
@@ -372,7 +372,7 @@ Expanded:
 
 ## References
 
-- Current work log implementation: `nanobot/agent/work_log.py`
-- Work log manager: `nanobot/agent/work_log_manager.py`
-- Interactive mode: `nanobot/cli/commands.py` (lines 1351-1720)
-- UI components: `nanobot/cli/ui/` (StatusBar, TeamRoster, etc.)
+- Current work log implementation: `nanofolks/agent/work_log.py`
+- Work log manager: `nanofolks/agent/work_log_manager.py`
+- Interactive mode: `nanofolks/cli/commands.py` (lines 1351-1720)
+- UI components: `nanofolks/cli/ui/` (StatusBar, TeamRoster, etc.)

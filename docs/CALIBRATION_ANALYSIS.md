@@ -8,7 +8,7 @@
    - CalibrationManager initialized in routing_stage.py
    - Records classifications after each routing decision
    - Auto-triggers based on time/count thresholds
-   - CLI command available: `nanobot routing calibrate`
+   - CLI command available: `nanofolks routing calibrate`
 
 2. **Data Collection**
    - Records Layer 1 vs Layer 2 disagreements

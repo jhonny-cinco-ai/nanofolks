@@ -11,7 +11,7 @@ Analysis of the ADVANCED_CLI_UX_DESIGN.md document versus what's currently imple
 ### ✅ **IMPLEMENTED & FUNCTIONAL**
 
 #### 1. **Room Management (Core)**
-- [x] **RoomManager class** - Fully implemented at `nanobot/bots/room_manager.py`
+- [x] **RoomManager class** - Fully implemented at `nanofolks/bots/room_manager.py`
   - Create rooms with `create_room(name, room_type, participants)`
   - List rooms with `list_rooms()`
   - Get room by ID with `get_room(room_id)`
@@ -21,7 +21,7 @@ Analysis of the ADVANCED_CLI_UX_DESIGN.md document versus what's currently imple
   - Default "general" room created automatically
 
 #### 2. **Room UI Components**
-- [x] **room_ui.py module** - Comprehensive UI components at `nanobot/cli/room_ui.py`
+- [x] **room_ui.py module** - Comprehensive UI components at `nanofolks/cli/room_ui.py`
   - `TeamRoster` class - Display available bots with emoji indicators
   - `RoomList` class - Display available rooms with render modes
   - `StatusBar` class - Current room status display
@@ -147,17 +147,17 @@ Analysis of the ADVANCED_CLI_UX_DESIGN.md document versus what's currently imple
 
 | Feature | File | Lines |
 |---------|------|-------|
-| RoomManager class | `nanobot/bots/room_manager.py` | 1-265 |
-| TeamRoster | `nanobot/cli/room_ui.py` | 20-100 |
-| RoomList | `nanobot/cli/room_ui.py` | 102-184 |
-| StatusBar | `nanobot/cli/room_ui.py` | 186-208 |
-| /create command | `nanobot/cli/commands.py` | 1275-1320 |
-| /invite command | `nanobot/cli/commands.py` | 1340-1380 |
-| /switch command | `nanobot/cli/commands.py` | 1400-1430 |
-| /list-rooms command | `nanobot/cli/commands.py` | 1422-1445 |
-| Intent detection | `nanobot/cli/commands.py` | 1004-1052 |
-| Intent handling | `nanobot/cli/commands.py` | 1054-1161 |
-| Interactive loop | `nanobot/cli/commands.py` | 1220-1480 |
+| RoomManager class | `nanofolks/bots/room_manager.py` | 1-265 |
+| TeamRoster | `nanofolks/cli/room_ui.py` | 20-100 |
+| RoomList | `nanofolks/cli/room_ui.py` | 102-184 |
+| StatusBar | `nanofolks/cli/room_ui.py` | 186-208 |
+| /create command | `nanofolks/cli/commands.py` | 1275-1320 |
+| /invite command | `nanofolks/cli/commands.py` | 1340-1380 |
+| /switch command | `nanofolks/cli/commands.py` | 1400-1430 |
+| /list-rooms command | `nanofolks/cli/commands.py` | 1422-1445 |
+| Intent detection | `nanofolks/cli/commands.py` | 1004-1052 |
+| Intent handling | `nanofolks/cli/commands.py` | 1054-1161 |
+| Interactive loop | `nanofolks/cli/commands.py` | 1220-1480 |
 
 ---
 

@@ -7,7 +7,7 @@
 
 ## Overview
 
-These themes extend the core nanobot experience with specialized vibes for different user personalities and work styles. While the MVP launches with 4-5 core themes, these are ready-to-implement expansions.
+These themes extend the core nanofolks experience with specialized vibes for different user personalities and work styles. While the MVP launches with 4-5 core themes, these are ready-to-implement expansions.
 
 **Launch Themes (MVP)**:
 - 🏴‍☠️ Pirate Crew (Bold, adventurous)
@@ -39,7 +39,7 @@ THEME = {
     "name": "Ninja Clan",
     "description": "Silent precision operators who strike with surgical accuracy",
     "bots": {
-        "nanobot": {
+        "nanofolks": {
             "title": "Sensei",
             "personality": "Calm master, speaks little, observes everything",
             "greeting": "I am watching. What needs to be done?"
@@ -101,7 +101,7 @@ THEME = {
     "name": "Startup Garage",
     "description": "Lean team shipping MVPs fast, iterating in real-time, embracing chaos",
     "bots": {
-        "nanobot": {
+        "nanofolks": {
             "title": "Founder",
             "personality": "Visionary, scrappy, resource-constrained genius, pivot-ready",
             "greeting": "What's the minimum viable solution? Let's ship today."
@@ -164,7 +164,7 @@ THEME = {
     "name": "Workshop Collective",
     "description": "Artisans crafting with care, building to last, teaching while doing",
     "bots": {
-        "nanobot": {
+        "nanofolks": {
             "title": "Foreman",
             "personality": "Master craftsman, quality obsessed, teaches by doing, guild leader",
             "greeting": "Welcome to the workshop. Let's build something that lasts."
@@ -227,7 +227,7 @@ THEME = {
     "name": "Forest Circle",
     "description": "Organic growth, sustainable practices, community wisdom, seasonal rhythms",
     "bots": {
-        "nanobot": {
+        "nanofolks": {
             "title": "Elder",
             "personality": "Wise guide, patient, roots run deep, seasonal wisdom, slow and steady",
             "greeting": "The forest grows at its own pace. What seeds shall we plant today?"
@@ -290,7 +290,7 @@ THEME = {
     "name": "Desert Caravan",
     "description": "Nomadic traders surviving scarcity, finding opportunity in barren lands",
     "bots": {
-        "nanobot": {
+        "nanofolks": {
             "title": "Caravan Master",
             "personality": "Navigator of shifting sands, finds water in desert, keeps moving forward",
             "greeting": "The sun is high. We move at dusk. Which oasis next?"
@@ -353,7 +353,7 @@ THEME = {
     "name": "Circus Troupe",
     "description": "Dazzling performers turning work into spectacle, variety and entertainment",
     "bots": {
-        "nanobot": {
+        "nanofolks": {
             "title": "Ringmaster",
             "personality": "Commands attention, directs the show, drum roll please, charismatic leader",
             "greeting": "Ladies and gentlemen! Welcome to the greatest show in tech! What act shall we perform?"
@@ -425,7 +425,7 @@ THEME = {
 ```
 User: "I want to change my theme"
 
-nanobot: "Choose your team's personality:
+nanofolks: "Choose your team's personality:
 
 [Launch Themes - Battle-Tested]
 [1] 🏴‍☠️ Pirate Crew     - Bold adventures, treasure hunting

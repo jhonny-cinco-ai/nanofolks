@@ -1,6 +1,6 @@
 # Smart Routing System
 
-**nanobot-turbo** features an intelligent routing system that automatically selects the most appropriate and cost-effective LLM model based on message complexity.
+**nanofolks-turbo** features an intelligent routing system that automatically selects the most appropriate and cost-effective LLM model based on message complexity.
 
 ## Overview
 
@@ -105,7 +105,7 @@ Based on confidence score:
 
 ### Basic Configuration
 
-Add to `~/.nanobot/config.json`:
+Add to `~/.nanofolks/config.json`:
 
 ```json
 {
@@ -218,7 +218,7 @@ Each tier defines a model to use and its cost for analytics:
 ### Status
 
 ```bash
-nanobot routing status
+nanofolks routing status
 ```
 
 Shows:
@@ -232,10 +232,10 @@ Shows:
 
 ```bash
 # Basic test
-nanobot routing test "What is Python?"
+nanofolks routing test "What is Python?"
 
 # Verbose output with all 14 dimensions
-nanobot routing test "Write a function to parse JSON" --verbose
+nanofolks routing test "Write a function to parse JSON" --verbose
 ```
 
 Shows:
@@ -250,13 +250,13 @@ Shows:
 
 ```bash
 # Show all patterns
-nanobot routing patterns
+nanofolks routing patterns
 
 # Show top 10
-nanobot routing patterns --limit 10
+nanofolks routing patterns --limit 10
 
 # Filter by tier
-nanobot routing patterns --tier complex
+nanofolks routing patterns --tier complex
 ```
 
 Shows:
@@ -269,7 +269,7 @@ Shows:
 ### Analytics
 
 ```bash
-nanobot routing analytics
+nanofolks routing analytics
 ```
 
 Shows:
@@ -283,10 +283,10 @@ Shows:
 
 ```bash
 # Show what would be done
-nanobot routing calibrate --dry-run
+nanofolks routing calibrate --dry-run
 
 # Actually run calibration
-nanobot routing calibrate
+nanofolks routing calibrate
 ```
 
 ## How Sticky Routing Works
@@ -365,7 +365,7 @@ Total patterns: 45
 ### Using Python
 
 ```python
-from nanobot.agent.router import classify_content
+from nanofolks.agent.router import classify_content
 
 # Test classification
 decision, scores = classify_content("Write a Python function to sort a list")
@@ -384,14 +384,14 @@ for dimension, score in scores.to_dict().items():
 ### Using CLI
 
 ```bash
-nanobot routing test "Your message here" --verbose
+nanofolks routing test "Your message here" --verbose
 ```
 
 ## Customization
 
 ### Adding Custom Patterns
 
-Edit `~/.nanobot/workspace/memory/ROUTING_PATTERNS.json`:
+Edit `~/.nanofolks/workspace/memory/ROUTING_PATTERNS.json`:
 
 ```json
 {
@@ -411,7 +411,7 @@ Edit `~/.nanobot/workspace/memory/ROUTING_PATTERNS.json`:
 
 ### Adjusting Dimension Weights
 
-Currently, weights are hardcoded in `nanobot/agent/router/classifier.py`:
+Currently, weights are hardcoded in `nanofolks/agent/router/classifier.py`:
 
 ```python
 DEFAULT_WEIGHTS = {
@@ -421,7 +421,7 @@ DEFAULT_WEIGHTS = {
 }
 ```
 
-To customize, modify the weights and restart nanobot.
+To customize, modify the weights and restart nanofolks.
 
 ## Troubleshooting
 
@@ -431,8 +431,8 @@ To customize, modify the weights and restart nanobot.
 
 **Solutions**:
 1. Check `min_confidence` setting - may be too high
-2. Test with `nanobot routing test` to see actual confidence
-3. Review patterns in `nanobot routing patterns`
+2. Test with `nanofolks routing test` to see actual confidence
+3. Review patterns in `nanofolks routing patterns`
 
 ### Too Many LLM Calls
 
@@ -449,7 +449,7 @@ To customize, modify the weights and restart nanobot.
 
 **Check**:
 1. Are you actually using simple queries?
-2. Verify tier distribution in `nanobot routing analytics`
+2. Verify tier distribution in `nanofolks routing analytics`
 3. Check if `cost_per_mtok` values are correct for your models
 
 ### Calibration Not Running
@@ -457,12 +457,12 @@ To customize, modify the weights and restart nanobot.
 **Check**:
 1. `auto_calibration.enabled` is true
 2. At least 50 classifications recorded
-3. Check `nanobot routing status` for last calibration time
+3. Check `nanofolks routing status` for last calibration time
 
 ## Best Practices
 
 1. **Start with defaults**: Default settings work well for most use cases
-2. **Monitor analytics**: Check `nanobot routing analytics` weekly
+2. **Monitor analytics**: Check `nanofolks routing analytics` weekly
 3. **Test edge cases**: Use `routing test` for uncertain queries
 4. **Let it learn**: Allow auto-calibration to run for a few days
 5. **Review patterns**: Check learned patterns periodically

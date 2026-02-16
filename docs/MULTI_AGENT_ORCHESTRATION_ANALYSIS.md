@@ -1,7 +1,7 @@
 # Multi-Agent Orchestration Architecture v2.0
 
 **Date:** February 12, 2026  
-**Project:** nanobot-turbo  
+**Project:** nanofolks-turbo  
 **Status:** Architecture Design - Ready for Implementation  
 **Version:** 2.0 - Workspace & Contextual Team Model
 
@@ -17,25 +17,25 @@
 - **#general** - Everyone participates, casual chat
 - **#project-alpha** - Specific team for focused work  
 - **DM @researcher** - Deep 1-on-1 discussion
-- **nanobot coordinates** when you're offline
+- **nanofolks coordinates** when you're offline
 
 **Key Innovations:**
 1. **Workspace Model** - Contextual conversations (not one-size-fits-all)
 2. **Personality Themes** - Pirate crew, Rock band, SWAT team (accessible UX)
 3. **Hybrid Memory** - Private learnings + shared knowledge
 4. **Tagging System** - @botname, #workspace (familiar UX)
-5. **Coordinator Mode** - nanobot manages when you're away
+5. **Coordinator Mode** - nanofolks manages when you're away
 
 ---
 
 ## Architecture Overview
 
-### The "nanobot Workspace" System
+### The "nanofolks Workspace" System
 
 ```
 User (You, the Boss)
   │
-  ├─ nanobot 🐈 (Your Personalized Companion)
+  ├─ nanofolks 🐈 (Your Personalized Companion)
   │    ├─ SOUL.md (Personality you choose: Pirate/Rockstar/Pro)
   │    ├─ ROLE_CARD (Authority level: micro-manage to autonomous)
   │    └─ PRIVATE_MEMORY (Personal learnings about you)
@@ -61,7 +61,7 @@ User (You, the Boss)
 
 ### Key Principles
 
-1. **nanobot is always your main interface** - Single entry point, builds relationship
+1. **nanofolks is always your main interface** - Single entry point, builds relationship
 2. **Workspaces are contextual** - Right bots for right job, no notification spam
 3. **Bots talk without you** - Autonomous collaboration, you're notified of decisions
 4. **Memory is hybrid** - Private insights + shared knowledge (cross-pollination)
@@ -85,8 +85,8 @@ Like managing employees:
 class Workspace:
     id: str                      # "general", "project-refactor", "dm-researcher"
     type: str                    # "open", "project", "direct", "coordination"
-    participants: list[str]       # ["nanobot", "researcher", "coder"]
-    owner: str                   # "user" or "nanobot" (when coordinating)
+    participants: list[str]       # ["nanofolks", "researcher", "coder"]
+    owner: str                   # "user" or "nanofolks" (when coordinating)
     
     # Memory
     shared_context: dict         # Shared memory for THIS workspace
@@ -94,7 +94,7 @@ class Workspace:
     
     # Behavior
     auto_archive: bool          # Archive after 30 days of inactivity?
-    coordinator_mode: bool       # Can nanobot decide when user offline?
+    coordinator_mode: bool       # Can nanofolks decide when user offline?
     escalation_threshold: str    # "low", "medium", "high"
     
     # Messages
@@ -109,7 +109,7 @@ class Workspace:
 {
     "id": "general",
     "type": "open",
-    "participants": ["nanobot", "researcher", "coder", "social", "auditor"],
+    "participants": ["nanofolks", "researcher", "coder", "social", "auditor"],
     "coordinator_mode": False,  # User always present
     "escalation_threshold": "high"  # Only major issues escalate
 }
@@ -121,9 +121,9 @@ class Workspace:
 {
     "id": "project-refactor",
     "type": "project",
-    "participants": ["nanobot", "researcher", "coder"],  # Specific team
+    "participants": ["nanofolks", "researcher", "coder"],  # Specific team
     "deadline": "2026-03-15",
-    "coordinator_mode": True,  # nanobot can coordinate when user away
+    "coordinator_mode": True,  # nanofolks can coordinate when user away
     "escalation_threshold": "medium"
 }
 ```
@@ -134,7 +134,7 @@ class Workspace:
 {
     "id": "dm-researcher",
     "type": "direct",
-    "participants": ["nanobot", "researcher"],  # Just you and researcher
+    "participants": ["nanofolks", "researcher"],  # Just you and researcher
     "coordinator_mode": False,
     "context": "deep_research"  # Researcher loads expertise context
 }
@@ -146,27 +146,27 @@ class Workspace:
 {
     "id": "coordination-website",
     "type": "coordination",
-    "participants": ["nanobot", "researcher", "coder", "creative"],
-    "owner": "nanobot",  # nanobot runs this
+    "participants": ["nanofolks", "researcher", "coder", "creative"],
+    "owner": "nanofolks",  # nanofolks runs this
     "user_presence": "offline",  # User not here
     "coordinator_mode": True,
     "auto_archive": True  # Clean up after project done
 }
 ```
-**Use case:** nanobot manages project while you sleep/are busy
+**Use case:** nanofolks manages project while you sleep/are busy
 
 ---
 
-## 2. The Team: nanobot + Specialists
+## 2. The Team: nanofolks + Specialists
 
-### nanobot: Your Personalized Companion
+### nanofolks: Your Personalized Companion
 
 **Role:** Main interface, coordinator, your "right hand"
 
 **Personalization:**
 ```python
-nanobot_config = {
-    "name": "nanobot",  # Or "Captain", "Rex", "Sirius", etc.
+nanofolks_config = {
+    "name": "nanofolks",  # Or "Captain", "Rex", "Sirius", etc.
     "soul": SOUL_MD,    # Personality document
     "role_card": {
         "authority_level": "high",  # Can coordinate autonomously
@@ -202,7 +202,7 @@ role_card = {
     ],
     "voice": "Measured, analytical, skeptical. Asks for data.",
     "affinity": {
-        "nanobot": 0.7,   # Works well
+        "nanofolks": 0.7,   # Works well
         "coder": 0.2,     # Tension (caution vs speed) - PRODUCTIVE
         "social": 0.3     # Some friction (depth vs breadth)
     }
@@ -222,7 +222,7 @@ role_card = {
     ],
     "voice": "Pragmatic, direct, hates unnecessary complexity.",
     "affinity": {
-        "nanobot": 0.6,
+        "nanofolks": 0.6,
         "researcher": 0.2,  # Tension (speed vs caution) - PRODUCTIVE
         "auditor": 0.8      # Good relationship
     }
@@ -242,7 +242,7 @@ role_card = {
     ],
     "voice": "Responsive, engaging, careful with public voice.",
     "affinity": {
-        "nanobot": 0.7,
+        "nanofolks": 0.7,
         "researcher": 0.3,  # Some friction (impulse vs caution)
         "creative": 0.9     # Great collaboration
     }
@@ -262,7 +262,7 @@ role_card = {
     ],
     "voice": "Evidence-based, process-focused, constructive.",
     "affinity": {
-        "nanobot": 0.8,
+        "nanofolks": 0.8,
         "coder": 0.8,     # Good relationship
         "social": 0.2     # Some friction (caution vs action)
     }
@@ -285,7 +285,7 @@ THEME = {
     "name": "Pirate Crew",
     "description": "Bold adventurers exploring uncharted territories",
     "bots": {
-        "nanobot": {
+        "nanofolks": {
             "title": "Captain",
             "personality": "Commanding, bold, decisive",
             "greeting": "Ahoy! What treasure we seeking today?"
@@ -323,7 +323,7 @@ THEME = {
     "name": "Rock Band",
     "description": "Creative team making hits together",
     "bots": {
-        "nanobot": {
+        "nanofolks": {
             "title": "Lead Singer",
             "personality": "Charismatic frontman, sets the vibe",
             "greeting": "Hey! Ready to make some hits?"
@@ -358,7 +358,7 @@ THEME = {
     "name": "SWAT Team",
     "description": "Elite tactical unit handling critical operations",
     "bots": {
-        "nanobot": {
+        "nanofolks": {
             "title": "Commander",
             "personality": "Tactical leader, mission-focused",
             "greeting": "Situation report. What's the objective?"
@@ -414,7 +414,7 @@ THEME = {
 # Tag with action
 create #new-workspace for Q2 planning
 
-# nanobot handles the orchestration
+# nanofolks handles the orchestration
 ```
 
 ### Implementation:
@@ -560,7 +560,7 @@ if researcher_memory.lesson_count("crypto") >= 5:
 
 ### When You're Offline or Busy
 
-**Concept:** nanobot acts as project manager
+**Concept:** nanofolks acts as project manager
 
 ```python
 coordinator_config = {
@@ -585,9 +585,9 @@ coordinator_config = {
 ### Example Workflow:
 
 ```markdown
-User: "I'm going to sleep. nanobot, coordinate the website project."
+User: "I'm going to sleep. nanofolks, coordinate the website project."
 
-[nanobot activates coordinator mode for #website-project]
+[nanofolks activates coordinator mode for #website-project]
 
 Researcher: "Found 3 competitor sites to analyze"
 Coder: "Setup the repo structure"  
@@ -603,7 +603,7 @@ Creative: "Specs incoming..."
 
 Coder: "We're blocked - need user's choice on tech stack"
 
-nanobot: "🚨 Escalation: Tech stack decision needed
+nanofolks: "🚨 Escalation: Tech stack decision needed
    Options: React vs Vue
    Researcher prefers React (better ecosystem)
    Coder prefers Vue (faster dev)
@@ -620,9 +620,9 @@ nanobot: "🚨 Escalation: Tech stack decision needed
 
 ```bash
 # Interactive onboarding
-nanobot
+nanofolks
 
-Welcome to nanobot! Let's set up your AI team.
+Welcome to nanofolks! Let's set up your AI team.
 
 Step 1: Choose your companion's personality theme:
 [1] 🏴‍☠️ Pirate Crew (Bold, adventurous)
@@ -641,7 +641,7 @@ Step 2: What do you need help with?
 [ ] Project management
 
 Recommended team:
-- nanobot (Lead Singer, Coordinator)
+- nanofolks (Lead Singer, Coordinator)
 - Scout (Researcher, Lead Guitar)
 - Spark (Social, Manager)
 - Quill (Creative, Drummer)
@@ -653,18 +653,18 @@ Create workspace #general with this team? [Y/n]: Y
 Commands:
 - @scout research AI agents market
 - #general what's our strategy?
-- nanobot coordinate while I'm away
+- nanofolks coordinate while I'm away
 ```
 
 ### Power User Mode
 
 ```bash
 # Advanced configuration
-nanobot --advanced
+nanofolks --advanced
 
 # Direct workspace management
-nanobot workspace create refactor --participants nanobot,coder,researcher
-echo "{"hard_bans": ["no_direct_posting"]}" | nanobot role-card edit social --stdin
+nanofolks workspace create refactor --participants nanofolks,coder,researcher
+echo "{"hard_bans": ["no_direct_posting"]}" | nanofolks role-card edit social --stdin
 ```
 
 ---
@@ -715,8 +715,8 @@ echo "{"hard_bans": ["no_direct_posting"]}" | nanobot role-card edit social --st
 
 ## Conclusion
 
-**The "nanobot Workspace" model combines:**
-- ✅ Personal relationship (nanobot as companion)
+**The "nanofolks Workspace" model combines:**
+- ✅ Personal relationship (nanofolks as companion)
 - ✅ Contextual teams (workspaces like Discord channels)
 - ✅ Autonomous collaboration (bots work while you sleep)
 - ✅ Accessible UX (personality themes, no JSON required)
@@ -728,4 +728,4 @@ echo "{"hard_bans": ["no_direct_posting"]}" | nanobot role-card edit social --st
 3. Design personality theme system
 4. Prototype with 2-3 specialist bots
 
-**This is achievable, practical, and brings real value while keeping nanobot lightweight and accessible.** 🚀
+**This is achievable, practical, and brings real value while keeping nanofolks lightweight and accessible.** 🚀

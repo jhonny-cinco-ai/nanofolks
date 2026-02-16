@@ -252,27 +252,27 @@ Final Decision
 
 ```bash
 # Test classifications
-nanobot routing test "Write a Python function"
-nanobot routing test "Don't write code, explain"
-nanobot routing test "Good night!"
-nanobot routing test "Great job today!"
-nanobot routing test "git push origin main"
-nanobot routing test "npm install lodash"
+nanofolks routing test "Write a Python function"
+nanofolks routing test "Don't write code, explain"
+nanofolks routing test "Good night!"
+nanofolks routing test "Great job today!"
+nanofolks routing test "git push origin main"
+nanofolks routing test "npm install lodash"
 
 # Check routing status
-nanobot routing status
+nanofolks routing status
 
 # View analytics
-nanobot routing analytics
+nanofolks routing analytics
 ```
 
 ---
 
 ## Files Modified
 
-1. `nanobot/agent/router/classifier.py` - 80+ patterns, smart negation
-2. `nanobot/agent/router/llm_router.py` - Enhanced prompt, context passing
-3. `nanobot/agent/router/sticky.py` - Context extraction and passing
+1. `nanofolks/agent/router/classifier.py` - 80+ patterns, smart negation
+2. `nanofolks/agent/router/llm_router.py` - Enhanced prompt, context passing
+3. `nanofolks/agent/router/sticky.py` - Context extraction and passing
 
 ---
 

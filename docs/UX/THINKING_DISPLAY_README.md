@@ -8,7 +8,7 @@ The inline thinking display allows users to see how Nanobot reasons through prob
 
 ### Single Message Mode
 ```bash
-nanobot agent --message "What should I build?"
+nanofolks agent --message "What should I build?"
 ```
 
 After the response, you'll see:
@@ -18,10 +18,10 @@ After the response, you'll see:
 
 ### Interactive Mode
 ```bash
-nanobot agent
+nanofolks agent
 You: [#general] What's a good project structure?
 
-🤖 nanobot
+🤖 nanofolks
 Here's a recommended structure...
 
 💭 Thinking: Analyzed requirements, selected medium model [SPACE to expand]
@@ -70,7 +70,7 @@ You: [#general] _
 ```
 User: What's the capital of France?
 
-🤖 nanobot
+🤖 nanofolks
 The capital of France is Paris...
 
 💭 Thinking: Selected model, generated response [SPACE to expand]
@@ -80,7 +80,7 @@ The capital of France is Paris...
 ```
 User: Set up a project coordination room with researcher and coder
 
-🤖 nanobot
+🤖 nanofolks
 Coordination room created. Researcher and coder ready.
 
 💭 Thinking: Created coordination room, invited 2 bots [SPACE to expand]
@@ -97,7 +97,7 @@ Expanded shows:
 ```
 User: Analyze the config file
 
-🤖 nanobot
+🤖 nanofolks
 Configuration analysis complete. Found 3 issues...
 
 💭 Thinking: Executed 3 tools, fixed encoding issue [SPACE to expand]
@@ -173,16 +173,16 @@ The display pulls from bot work logs at these levels:
 
 See all thinking/work logs from current session:
 ```bash
-nanobot explain          # Show full thinking process
-nanobot logs             # Show work log summary
-nanobot logs --mode detailed  # Show detailed breakdown
+nanofolks explain          # Show full thinking process
+nanofolks logs             # Show work log summary
+nanofolks logs --mode detailed  # Show detailed breakdown
 ```
 
 ## Configuration
 
 The thinking display is enabled by default. To see work logs as they happen:
 ```bash
-nanobot agent --logs  # Show runtime logs while processing
+nanofolks agent --logs  # Show runtime logs while processing
 ```
 
 ## Future Enhancements (Phase 3+)

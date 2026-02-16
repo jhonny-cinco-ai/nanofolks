@@ -53,7 +53,7 @@ This document outlines the concrete implementation steps to bring the Workspace 
 - ✅ Implement core Workspace data model
 - ✅ Build tag parsing system
 - ✅ Create role card structure
-- ✅ Deploy 1 leader bot (nanobot) + 5 specialist bots
+- ✅ Deploy 1 leader bot (nanofolks) + 5 specialist bots
 
 **Status:** All deliverables implemented and tested (107 tests passing)
 
@@ -61,7 +61,7 @@ This document outlines the concrete implementation steps to bring the Workspace 
 
 The system has **6 bots total**: 1 Leader + 5 Specialists
 
-1. **nanobot** (The Leader/Coordinator)
+1. **nanofolks** (The Leader/Coordinator)
    - Domain: Coordination, user interface, team management
    - Role: Your personalized companion, always present
    - Responsibilities: Route messages, manage escalations, create workspaces
@@ -74,14 +74,14 @@ The system has **6 bots total**: 1 Leader + 5 Specialists
 6. **@auditor** (Specialist Domain: Quality & Compliance)
 
 **Key distinction:**
-- nanobot has a **Coordinator role card** (not a specialist domain)
+- nanofolks has a **Coordinator role card** (not a specialist domain)
 - The 5 specialists have **Domain role cards** (research, development, community, design, quality)
 - All 6 follow the same role card structure with hard bans and affinities
 
 ### Deliverables
 
 #### 1.1: Workspace Data Model
-**File:** `nanobot/models/workspace.py`
+**File:** `nanofolks/models/workspace.py`
 
 ```python
 from dataclasses import dataclass, field
@@ -93,7 +93,7 @@ class WorkspaceType(Enum):
     OPEN = "open"          # #general - all bots, casual
     PROJECT = "project"    # #project-x - specific team, deadline
     DIRECT = "direct"      # DM @bot - 1-on-1 focused
-    COORDINATION = "coordination"  # nanobot manages
+    COORDINATION = "coordination"  # nanofolks manages
 
 @dataclass
 class Message:
@@ -114,7 +114,7 @@ class SharedContext:
 class Workspace:
     id: str
     type: WorkspaceType
-    participants: List[str]  # ["nanobot", "researcher", "coder"]
+    participants: List[str]  # ["nanofolks", "researcher", "coder"]
     owner: str  # "user" or bot name if coordination mode
     created_at: datetime
     
@@ -172,7 +172,7 @@ class Workspace:
 ---
 
 #### 1.2: Tag Parsing System
-**File:** `nanobot/systems/tag_handler.py`
+**File:** `nanofolks/systems/tag_handler.py`
 
 ```python
 import re
@@ -265,7 +265,7 @@ class TagHandler:
 ---
 
 #### 1.3: Role Card Structure
-**File:** `nanobot/models/role_card.py`
+**File:** `nanofolks/models/role_card.py`
 
 ```python
 from dataclasses import dataclass, field
@@ -347,14 +347,14 @@ class RoleCard:
         return rule.lower() in action.lower()
 ```
 
-**File:** `nanobot/bots/specialist_definitions.py`
+**File:** `nanofolks/bots/specialist_definitions.py`
 
 Contains role cards for all 5 bots (1 coordinator + 4 specialists):
 
 ```python
 # THE LEADER/COORDINATOR
 NANOBOT_ROLE = RoleCard(
-    bot_name="nanobot",
+    bot_name="nanofolks",
     domain=BotDomain.COORDINATION,
     title="Your Companion",  # Themed: "Captain", "Lead Singer", "Commander", etc.
     description="Team coordinator, user interface, relationship builder",
@@ -420,7 +420,7 @@ RESEARCHER_ROLE = RoleCard(
     greeting="Navigator here. What waters shall we explore?",
     emoji="🧭",
     affinities=[
-        Affinity("nanobot", 0.8, "Works well with coordinator"),
+        Affinity("nanofolks", 0.8, "Works well with coordinator"),
         Affinity("coder", 0.3, "Tension: caution vs speed (productive)", True),
         Affinity("social", 0.4, "Some friction: depth vs breadth"),
     ],
@@ -454,7 +454,7 @@ CODER_ROLE = RoleCard(
     greeting="Gunner ready. What needs fixing?",
     emoji="🔧",
     affinities=[
-        Affinity("nanobot", 0.7, "Strong working relationship"),
+        Affinity("nanofolks", 0.7, "Strong working relationship"),
         Affinity("researcher", 0.3, "Tension: speed vs caution (productive)", True),
         Affinity("auditor", 0.9, "Great collaboration"),
     ],
@@ -488,7 +488,7 @@ SOCIAL_ROLE = RoleCard(
     greeting="Lookout on duty. What's the vibe?",
     emoji="📢",
     affinities=[
-        Affinity("nanobot", 0.8, "Strong partnership"),
+        Affinity("nanofolks", 0.8, "Strong partnership"),
         Affinity("researcher", 0.4, "Some friction: impulse vs caution"),
         Affinity("creative", 0.95, "Exceptional collaboration"),
     ],
@@ -522,7 +522,7 @@ CREATIVE_ROLE = RoleCard(
     greeting="Let's create something amazing! What's the vision?",
     emoji="🎨",
     affinities=[
-        Affinity("nanobot", 0.7, "Good partnership on vision"),
+        Affinity("nanofolks", 0.7, "Good partnership on vision"),
         Affinity("social", 0.95, "Exceptional collaboration - content & community"),
         Affinity("researcher", 0.5, "Some friction: inspiration vs data"),
         Affinity("coder", 0.6, "Good collaboration - design meets tech"),
@@ -558,7 +558,7 @@ AUDITOR_ROLE = RoleCard(
     greeting="Quartermaster reporting. Status check?",
     emoji="✅",
     affinities=[
-        Affinity("nanobot", 0.9, "Excellent coordination"),
+        Affinity("nanofolks", 0.9, "Excellent coordination"),
         Affinity("coder", 0.9, "Great partnership"),
         Affinity("social", 0.4, "Some friction: caution vs action"),
         Affinity("creative", 0.5, "Some friction: creative freedom vs quality standards"),
@@ -575,13 +575,13 @@ AUDITOR_ROLE = RoleCard(
 ---
 
 #### 1.4: Implement Leader + 5 Specialist Bots
-**File:** `nanobot/bots/specialist_bot.py`
+**File:** `nanofolks/bots/specialist_bot.py`
 
 ```python
 from abc import ABC, abstractmethod
 from typing import Optional
-from nanobot.models.role_card import RoleCard
-from nanobot.models.workspace import Workspace
+from nanofolks.models.role_card import RoleCard
+from nanofolks.models.workspace import Workspace
 
 class SpecialistBot(ABC):
     """Base class for all specialist bots."""
@@ -748,7 +748,7 @@ class AuditorBot(SpecialistBot):
 ### Deliverables
 
 #### 2.1: Theme System
-**File:** `nanobot/themes/theme_system.py`
+**File:** `nanofolks/themes/theme_system.py`
 
 ```python
 from dataclasses import dataclass
@@ -776,7 +776,7 @@ class Theme:
     """Complete personality theme for team."""
     name: ThemeName
     description: str
-    nanobot: BotTheming
+    nanofolks: BotTheming
     researcher: BotTheming
     coder: BotTheming
     social: BotTheming
@@ -788,13 +788,13 @@ class Theme:
         return getattr(self, bot_name)
 ```
 
-**File:** `nanobot/themes/presets.py`
+**File:** `nanofolks/themes/presets.py`
 
 ```python
 PIRATE_CREW = Theme(
     name=ThemeName.PIRATE_CREW,
     description="Bold adventurers exploring uncharted territories",
-    nanobot=BotTheming(
+    nanofolks=BotTheming(
         title="Captain",
         personality="Commanding, bold, decisive",
         greeting="Ahoy! What treasure we seeking today?",
@@ -814,7 +814,7 @@ PIRATE_CREW = Theme(
 ROCK_BAND = Theme(
     name=ThemeName.ROCK_BAND,
     description="Creative team making hits together",
-    nanobot=BotTheming(
+    nanofolks=BotTheming(
         title="Lead Singer",
         personality="Charismatic frontman, sets the vibe",
         greeting="Hey! Ready to make some hits?",
@@ -845,7 +845,7 @@ SPACE_CREW = Theme(
 AVAILABLE_THEMES = [PIRATE_CREW, ROCK_BAND, SWAT_TEAM, PROFESSIONAL, SPACE_CREW]
 ```
 
-**File:** `nanobot/themes/theme_manager.py`
+**File:** `nanofolks/themes/theme_manager.py`
 
 ```python
 class ThemeManager:
@@ -896,7 +896,7 @@ class ThemeManager:
 ---
 
 #### 2.2: Onboarding Wizard
-**File:** `nanobot/cli/onboarding.py`
+**File:** `nanofolks/cli/onboarding.py`
 
 ```python
 import inquirer
@@ -907,7 +907,7 @@ class OnboardingWizard:
     
     def run(self) -> Dict[str, Any]:
         """Run complete onboarding flow."""
-        print("\n🤖 Welcome to nanobot! Let's set up your AI team.\n")
+        print("\n🤖 Welcome to nanofolks! Let's set up your AI team.\n")
         
         # Step 1: Theme selection
         theme_choice = self._select_theme()
@@ -970,7 +970,7 @@ class OnboardingWizard:
     
     def _recommend_team(self, capabilities: List[str], theme: str) -> Dict[str, Any]:
         """Recommend which specialists based on capabilities."""
-        team = {"nanobot": {"role": "Coordinator"}}
+        team = {"nanofolks": {"role": "Coordinator"}}
         
         if any(c in capabilities for c in ["Research", "analysis"]):
             team["researcher"] = {"role": "Research and Analysis"}
@@ -1000,7 +1000,7 @@ class OnboardingWizard:
         """Create #general workspace with selected team."""
         # Create workspace in system
         # Add all team members
-        # Send greeting from nanobot
+        # Send greeting from nanofolks
         pass
     
     def _manual_team_selection(self) -> Dict[str, Any]:
@@ -1019,9 +1019,9 @@ class OnboardingWizard:
 ---
 
 #### 2.3: SOUL.md Integration (Multi-Bot Architecture)
-**File:** `nanobot/soul/soul_manager.py`
+**File:** `nanofolks/soul/soul_manager.py`
 
-Integrate theme system with per-bot SOUL.md personality definitions. Each of the 6 bots (nanobot + 5 specialists) has its own personality file that gets updated when themes are applied.
+Integrate theme system with per-bot SOUL.md personality definitions. Each of the 6 bots (nanofolks + 5 specialists) has its own personality file that gets updated when themes are applied.
 
 **Key Change from v1.0:** Single-bot SOUL.md → Multi-bot per-file architecture
 
@@ -1029,7 +1029,7 @@ Integrate theme system with per-bot SOUL.md personality definitions. Each of the
 ```
 workspace/
 ├── bots/
-│   ├── nanobot/
+│   ├── nanofolks/
 │   │   └── SOUL.md           # Leader personality
 │   ├── researcher/
 │   │   └── SOUL.md           # Analyst personality
@@ -1185,7 +1185,7 @@ Custom edits persist until theme is reapplied with `force=True`.
     def _get_role_description(self, bot_name: str) -> str:
         """Get role-specific description for a bot."""
         roles = {
-            "nanobot": (
+            "nanofolks": (
                 "I lead the team, make strategic decisions, and ensure "
                 "coordination between team members. I prioritize alignment "
                 "and overall mission success."
@@ -1250,7 +1250,7 @@ Custom edits persist until theme is reapplied with `force=True`.
 **Integration with ContextBuilder:**
 
 ```python
-# nanobot/agent/context.py (modified _load_bootstrap_files)
+# nanofolks/agent/context.py (modified _load_bootstrap_files)
 
 def _load_bootstrap_files(self, bot_name: str = None) -> str:
     """Load bootstrap files with bot-specific SOUL if available."""
@@ -1306,7 +1306,7 @@ def _apply_theme_to_workspace(self, workspace_path: Path) -> None:
 ```
 
 **Acceptance Criteria:**
-- ✅ SoulManager handles all 6 bots (not just nanobot)
+- ✅ SoulManager handles all 6 bots (not just nanofolks)
 - ✅ Each bot gets `bots/{name}/SOUL.md` file
 - ✅ Theme application updates all team members' SOUL files atomically
 - ✅ ContextBuilder loads bot-specific SOUL when bot is activated
@@ -1341,9 +1341,9 @@ def _apply_theme_to_workspace(self, workspace_path: Path) -> None:
 **Status:** Memory system fully functional with cross-pollination (24 tests passing)
 
 ### Key Files
-- `nanobot/memory/shared_memory.py` - Shared facts, events, entities
-- `nanobot/memory/private_memory.py` - Per-bot learnings
-- `nanobot/memory/cross_pollination.py` - Promotion mechanism
+- `nanofolks/memory/shared_memory.py` - Shared facts, events, entities
+- `nanofolks/memory/private_memory.py` - Per-bot learnings
+- `nanofolks/memory/cross_pollination.py` - Promotion mechanism
 
 ### Implementation Notes
 
@@ -1378,7 +1378,7 @@ def _apply_theme_to_workspace(self, workspace_path: Path) -> None:
 **Status:** InterBotBus and CoordinatorBot fully operational (20 tests passing)
 
 ### Key Components
-- Coordinator role for nanobot
+- Coordinator role for nanofolks
 - Decision routing (escalate vs decide)
 - Async message queuing
 - Notification dispatch

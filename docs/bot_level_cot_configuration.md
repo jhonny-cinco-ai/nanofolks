@@ -70,7 +70,7 @@ User Request
 ### 1. Data Model
 
 ```python
-# nanobot/reasoning/config.py
+# nanofolks/reasoning/config.py
 from dataclasses import dataclass
 from typing import Optional, Set
 from enum import Enum
@@ -161,8 +161,8 @@ class ReasoningConfig:
 ### 2. Bot-Specific Configurations
 
 ```python
-# nanobot/bots/reasoning_configs.py
-from nanobot.reasoning.config import ReasoningConfig, CoTLevel
+# nanofolks/bots/reasoning_configs.py
+from nanofolks.reasoning.config import ReasoningConfig, CoTLevel
 
 # ResearcherBot: Analytical work benefits from reflection
 RESEARCHER_REASONING = ReasoningConfig(
@@ -223,14 +223,14 @@ COORDINATOR_REASONING = ReasoningConfig(
 ### 3. Integration with Agent Loop
 
 ```python
-# nanobot/agent/loop.py modifications
+# nanofolks/agent/loop.py modifications
 
 class AgentLoop:
     def __init__(self, ...):
         # ... existing init ...
         
         # Load reasoning config for this bot
-        from nanobot.reasoning.config import get_reasoning_config
+        from nanofolks.reasoning.config import get_reasoning_config
         self.reasoning_config = get_reasoning_config(bot_name)
     
     async def _process_message(self, msg: InboundMessage) -> OutboundMessage | None:
@@ -268,7 +268,7 @@ class AgentLoop:
 ### 4. Integration with Routing System
 
 ```python
-# nanobot/agent/routing/stage.py
+# nanofolks/agent/routing/stage.py
 
 class RoutingStage:
     """Enhanced routing with reasoning awareness."""
@@ -335,7 +335,7 @@ DATA_SCIENTIST_REASONING = ReasoningConfig(
 ## Implementation Plan
 
 ### Phase 1: Core Infrastructure
-1. Create `nanobot/reasoning/config.py` with data models
+1. Create `nanofolks/reasoning/config.py` with data models
 2. Add reasoning configs to bot definitions
 3. Modify `AgentLoop` to check reasoning config
 

@@ -8,7 +8,7 @@
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `nanobot/cli/advanced_layout.py` | Core module | 450 |
+| `nanofolks/cli/advanced_layout.py` | Core module | 450 |
 | `PHASE3_IMPLEMENTATION_PLAN.md` | Architecture & planning | 350 |
 | `PHASE3_IMPROVEMENTS.md` | Implementation details | 300 |
 | `PHASE3_INTEGRATION_GUIDE.md` | Step-by-step integration | 250 |
@@ -102,7 +102,7 @@ content = ResponsiveLayout.render_for_mode(mode, content_dict)
 
 - [ ] **Step 1**: Add imports (5 min)
   ```python
-  from nanobot.cli.advanced_layout import (
+  from nanofolks.cli.advanced_layout import (
       AdvancedLayout, LayoutManager, SidebarManager,
       TransitionEffect, ResponsiveLayout,
   )
@@ -216,7 +216,7 @@ if layout_manager:
 ## Key Files to Modify
 
 ### Primary
-- `nanobot/cli/commands.py` - Add ~94 lines
+- `nanofolks/cli/commands.py` - Add ~94 lines
 
 ### Support
 - `CLI_UX_IMPLEMENTATION_STATUS.md` - Mark Phase 3 complete
@@ -226,7 +226,7 @@ if layout_manager:
 ## Imports to Add
 
 ```python
-from nanobot.cli.advanced_layout import (
+from nanofolks.cli.advanced_layout import (
     AdvancedLayout,
     LayoutManager,
     SidebarManager,
@@ -279,7 +279,7 @@ except Exception:
 
 ### Check Terminal Width
 ```python
-from nanobot.cli.advanced_layout import AdvancedLayout
+from nanofolks.cli.advanced_layout import AdvancedLayout
 al = AdvancedLayout()
 print(f"Width: {al.width}, Height: {al.height}")
 print(f"Can use layout: {al.can_use_layout()}")
@@ -287,7 +287,7 @@ print(f"Can use layout: {al.can_use_layout()}")
 
 ### Test Layout Creation
 ```python
-from nanobot.cli.advanced_layout import AdvancedLayout
+from nanofolks.cli.advanced_layout import AdvancedLayout
 al = AdvancedLayout()
 layout = al.create_layout()
 console.print(layout)  # See if it renders
@@ -295,7 +295,7 @@ console.print(layout)  # See if it renders
 
 ### Test Sidebar Manager
 ```python
-from nanobot.cli.advanced_layout import SidebarManager
+from nanofolks.cli.advanced_layout import SidebarManager
 sm = SidebarManager()
 sm.update_team_roster("ROSTER")
 sm.update_room_list("ROOMS")
@@ -356,7 +356,7 @@ When Phase 3 integration is complete:
 - **Details**: `PHASE3_IMPROVEMENTS.md`
 - **Integration**: `PHASE3_INTEGRATION_GUIDE.md`
 - **Status**: `PHASE3_STATUS_SUMMARY.md`
-- **Code**: `nanobot/cli/advanced_layout.py`
+- **Code**: `nanofolks/cli/advanced_layout.py`
 
 ---
 

@@ -24,8 +24,8 @@ The memory system is **FULLY PRODUCTION-READY** with **ALL 10 PHASES COMPLETE**!
 - ✅ **Tool Output Management** (Phase 10) - Prevents 396KB crashes, SQLite storage
 
 ### ✅ CLI Commands (Phase 7) - DONE!
-- ✅ `nanobot memory init/status/search/entities/entity/forget/doctor`
-- ✅ `nanobot session compact/status/reset`
+- ✅ `nanofolks memory init/status/search/entities/entity/forget/doctor`
+- ✅ `nanofolks session compact/status/reset`
 
 **Production Status:** ✅ **COMPLETE AND HARDENED** - Ready for conversations of any length!
 
@@ -98,9 +98,9 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 **Files:**
 | File | Status |
 |------|--------|
-| `nanobot/memory/__init__.py` | ✅ Complete |
-| `nanobot/memory/models.py` | ✅ Complete |
-| `nanobot/memory/store.py` | ✅ Complete |
+| `nanofolks/memory/__init__.py` | ✅ Complete |
+| `nanofolks/memory/models.py` | ✅ Complete |
+| `nanofolks/memory/store.py` | ✅ Complete |
 
 **Notes:**
 - `events.py` was proposed as separate file but integrated into store.py
@@ -121,8 +121,8 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 **Files:**
 | File | Status |
 |------|--------|
-| `nanobot/memory/embeddings.py` | ✅ Complete |
-| `nanobot/config/schema.py` | ✅ Complete (MemoryConfig) |
+| `nanofolks/memory/embeddings.py` | ✅ Complete |
+| `nanofolks/config/schema.py` | ✅ Complete (MemoryConfig) |
 | `pyproject.toml` | ✅ Complete (fastembed dependency) |
 
 **Dependencies:**
@@ -138,7 +138,7 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 - ✅ Basic entity and relationship extraction
 - ✅ Entity storage in database
 - ✅ Activity backoff (pauses when user is chatting)
-- ✅ **`nanobot/memory/graph.py`** - KnowledgeGraphManager with:
+- ✅ **`nanofolks/memory/graph.py`** - KnowledgeGraphManager with:
   - Entity resolution (duplicate detection, alias management)
   - Entity merging (consolidate duplicates)
   - Edge management (create, update, deduplication)
@@ -150,9 +150,9 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 **Files:**
 | File | Status | Notes |
 |------|--------|-------|
-| `nanobot/memory/extraction.py` | ✅ Complete | GLiNER2 extraction only |
-| `nanobot/memory/background.py` | ✅ Complete | ActivityTracker, BackgroundProcessor |
-| `nanobot/memory/graph.py` | ✅ Complete | Entity resolution, edge/fact management |
+| `nanofolks/memory/extraction.py` | ✅ Complete | GLiNER2 extraction only |
+| `nanofolks/memory/background.py` | ✅ Complete | ActivityTracker, BackgroundProcessor |
+| `nanofolks/memory/graph.py` | ✅ Complete | Entity resolution, edge/fact management |
 
 **New Store Methods (10 total):**
 - `delete_entity()` - Remove entity from DB
@@ -177,7 +177,7 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 ### ✅ Phase 4: Hierarchical Summaries - 100% COMPLETE
 
 **What's Done:**
-- ✅ **`nanobot/memory/summaries.py`** - SummaryTreeManager with full tree management
+- ✅ **`nanofolks/memory/summaries.py`** - SummaryTreeManager with full tree management
 - ✅ Hierarchical structure: root → channel → entity/topic
 - ✅ Staleness tracking (events_since_update counter)
 - ✅ Refresh logic (threshold-based, batch refresh)
@@ -187,7 +187,7 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 **Files:**
 | File | Status | Notes |
 |------|--------|-------|
-| `nanobot/memory/summaries.py` | ✅ Complete | SummaryTreeManager, tree operations |
+| `nanofolks/memory/summaries.py` | ✅ Complete | SummaryTreeManager, tree operations |
 
 **Store Methods Added (6):**
 - `create_summary_node()` - Create node
@@ -213,16 +213,16 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 ### ✅ Phase 5: Context Assembly + Retrieval + Privacy Controls - 100% COMPLETE ⭐ CRITICAL
 
 **What's Done:**
-- ✅ **`nanobot/memory/context.py`** - ContextAssembler with token budgeting
+- ✅ **`nanofolks/memory/context.py`** - ContextAssembler with token budgeting
   - Configurable budgets per section (identity, entities, knowledge, etc.)
   - Automatic truncation to fit token limits
   - Relevant entity detection
-- ✅ **`nanobot/memory/retrieval.py`** - MemoryRetrieval query interface
+- ✅ **`nanofolks/memory/retrieval.py`** - MemoryRetrieval query interface
   - `search()` - Semantic and text search
   - `get_entity()` - Entity lookup
   - `get_relationships()` - Graph traversal
   - `recall()` - Context-aware retrieval
-- ✅ **Memory tools for agent** (`nanobot/agent/tools/memory.py`):
+- ✅ **Memory tools for agent** (`nanofolks/agent/tools/memory.py`):
   - `search_memory` - Search for information
   - `get_entity` - Look up entity details  
   - `get_relationships` - Find connections
@@ -236,9 +236,9 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 **Files:**
 | File | Status | Notes |
 |------|--------|-------|
-| `nanobot/memory/context.py` | ✅ Complete | ContextAssembler, token budgeting |
-| `nanobot/memory/retrieval.py` | ✅ Complete | MemoryRetrieval, query interface |
-| `nanobot/agent/tools/memory.py` | ✅ Complete | 4 memory tools |
+| `nanofolks/memory/context.py` | ✅ Complete | ContextAssembler, token budgeting |
+| `nanofolks/memory/retrieval.py` | ✅ Complete | MemoryRetrieval, query interface |
+| `nanofolks/agent/tools/memory.py` | ✅ Complete | 4 memory tools |
 
 **Impact:**
 ✅ **CRITICAL COMPLETE**: The memory system is now **FULLY CONNECTED** to the agent! The bot can:
@@ -252,13 +252,13 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 ### ✅ Phase 6: Learning + User Preferences + Relevance Decay - 100% COMPLETE
 
 **What's Done:**
-- ✅ **`nanobot/memory/learning.py`** - Complete learning lifecycle
+- ✅ **`nanofolks/memory/learning.py`** - Complete learning lifecycle
   - `FeedbackDetector` with regex patterns (FREE, 70-75% accuracy)
   - `LearningManager` for creating and managing learnings
   - Relevance decay: 14-day half-life (5% per day)
   - Re-boost on access: 20% boost when used
   - Contradiction detection: Auto-resolve conflicts
-- ✅ **`nanobot/memory/preferences.py`** - Preferences aggregation
+- ✅ **`nanofolks/memory/preferences.py`** - Preferences aggregation
   - `PreferencesAggregator` compiles learnings into summary
   - `user_preferences` summary node (always in context)
   - Categorization: communication, formatting, tools, workflow
@@ -275,8 +275,8 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 **Files:**
 | File | Status | Notes |
 |------|--------|-------|
-| `nanobot/memory/learning.py` | ✅ Complete | FeedbackDetector, LearningManager |
-| `nanobot/memory/preferences.py` | ✅ Complete | PreferencesAggregator |
+| `nanofolks/memory/learning.py` | ✅ Complete | FeedbackDetector, LearningManager |
+| `nanofolks/memory/preferences.py` | ✅ Complete | PreferencesAggregator |
 
 **Configuration:**
 - `decay_days: 14` (half-life)
@@ -301,22 +301,22 @@ Recent analysis of OpenClaw's production-hardened context management revealed cr
 - ✅ Comprehensive tests (48 tests in `tests/memory/`)
 - ✅ TUI model downloads (automatic via onboarding)
 - ✅ Automatic model downloads with progress bars
-- ✅ `nanobot memory init` - Initialize memory database
-- ✅ `nanobot memory status` - Show memory statistics
-- ✅ `nanobot memory search` - Search memory content
-- ✅ `nanobot memory entities` - List all entities
-- ✅ `nanobot memory entity` - Get entity details
-- ✅ `nanobot memory forget` - Remove entity
-- ✅ `nanobot memory doctor` - Memory health check
-- ✅ `nanobot session compact` - Manual compaction trigger
-- ✅ `nanobot session status` - Show context usage percentage
-- ✅ `nanobot session reset` - Reset session
+- ✅ `nanofolks memory init` - Initialize memory database
+- ✅ `nanofolks memory status` - Show memory statistics
+- ✅ `nanofolks memory search` - Search memory content
+- ✅ `nanofolks memory entities` - List all entities
+- ✅ `nanofolks memory entity` - Get entity details
+- ✅ `nanofolks memory forget` - Remove entity
+- ✅ `nanofolks memory doctor` - Memory health check
+- ✅ `nanofolks session compact` - Manual compaction trigger
+- ✅ `nanofolks session status` - Show context usage percentage
+- ✅ `nanofolks session reset` - Reset session
 
 **Files:**
 | File | Status | Notes |
 |------|--------|-------|
-| `nanobot/cli/memory_commands.py` | ✅ Complete | Memory and session CLI commands |
-| `nanobot/cli/commands.py` | ✅ Updated | Registered memory_app and session_app |
+| `nanofolks/cli/memory_commands.py` | ✅ Complete | Memory and session CLI commands |
+| `nanofolks/cli/commands.py` | ✅ Updated | Registered memory_app and session_app |
 
 **Impact:**
 Users can now fully inspect and manage memory via CLI, trigger compaction manually, and check context usage in real-time.
@@ -326,12 +326,12 @@ Users can now fully inspect and manage memory via CLI, trigger compaction manual
 ### ✅ Phase 8: Token-Aware Session Compaction - 100% COMPLETE ⭐⭐⭐ CRITICAL
 
 **What's Done:**
-- ✅ **`nanobot/memory/token_counter.py`** - Accurate tiktoken-based token counting
+- ✅ **`nanofolks/memory/token_counter.py`** - Accurate tiktoken-based token counting
   - Replaces unreliable 4 chars ≈ 1 token estimation
   - Supports multiple encodings (cl100k_base for Claude/GPT-4)
   - Handles structured content (tool_use/tool_result blocks)
   
-- ✅ **`nanobot/memory/session_compactor.py`** - SessionCompactor with multiple modes
+- ✅ **`nanofolks/memory/session_compactor.py`** - SessionCompactor with multiple modes
   - `SummaryCompactionMode` - Smart LLM-based summarization (default)
   - `TokenLimitCompactionMode` - Emergency truncation at safe boundaries
   - `off` mode - Manual compaction only
@@ -364,7 +364,7 @@ Users can now fully inspect and manage memory via CLI, trigger compaction manual
   - Keep recent messages verbatim (adaptive count based on token budget)
   - Real token counting using tiktoken
 
-**Configuration (in `~/.nanobot/openclaw.json`):**
+**Configuration (in `~/.nanofolks/openclaw.json`):**
 ```json
 {
   "memory": {
@@ -387,15 +387,15 @@ Users can now fully inspect and manage memory via CLI, trigger compaction manual
 **Files Created:**
 | File | Purpose | Status |
 |------|---------|--------|
-| `nanobot/memory/token_counter.py` | Tiktoken-based accurate counting | ✅ Complete |
-| `nanobot/memory/session_compactor.py` | Main compactor with multiple modes | ✅ Complete |
+| `nanofolks/memory/token_counter.py` | Tiktoken-based accurate counting | ✅ Complete |
+| `nanofolks/memory/session_compactor.py` | Main compactor with multiple modes | ✅ Complete |
 
 **Files Modified:**
 | File | Changes | Status |
 |------|---------|--------|
-| `nanobot/session/manager.py` | Tool chain preservation, safe boundaries | ✅ Complete |
-| `nanobot/agent/loop.py` | Compaction integration, flush hook | ✅ Complete |
-| `nanobot/config/schema.py` | SessionCompactionConfig | ✅ Complete |
+| `nanofolks/session/manager.py` | Tool chain preservation, safe boundaries | ✅ Complete |
+| `nanofolks/agent/loop.py` | Compaction integration, flush hook | ✅ Complete |
+| `nanofolks/config/schema.py` | SessionCompactionConfig | ✅ Complete |
 
 **Real-World Performance:**
 ```
@@ -445,17 +445,17 @@ Critical overflow (4500/4000 tokens):
 **Files to Create:**
 | File | Purpose |
 |------|---------|
-| `nanobot/memory/session_compactor.py` | SessionCompactor with multiple modes |
-| `nanobot/memory/token_counter.py` | Tiktoken-based accurate token counting |
-| `nanobot/memory/compaction_modes.py` | Mode implementations (summary, token-limit) |
+| `nanofolks/memory/session_compactor.py` | SessionCompactor with multiple modes |
+| `nanofolks/memory/token_counter.py` | Tiktoken-based accurate token counting |
+| `nanofolks/memory/compaction_modes.py` | Mode implementations (summary, token-limit) |
 
 **Files to Modify:**
 | File | Changes |
 |------|---------|
-| `nanobot/session/manager.py` | Replace fixed 50-message limit with adaptive |
-| `nanobot/agent/loop.py` | Integrate compactor with real-time monitoring |
-| `nanobot/config/schema.py` | Add SessionCompactionConfig |
-| `nanobot/memory/context.py` | Add compaction integration hooks |
+| `nanofolks/session/manager.py` | Replace fixed 50-message limit with adaptive |
+| `nanofolks/agent/loop.py` | Integrate compactor with real-time monitoring |
+| `nanofolks/config/schema.py` | Add SessionCompactionConfig |
+| `nanofolks/memory/context.py` | Add compaction integration hooks |
 
 **Critical Requirements (from OpenClaw lessons):**
 1. ✅ **Tool pair preservation** - Never break tool_use → tool_result chains (causes API errors)
@@ -564,7 +564,7 @@ class TokenAwareAssembler:
         return current_tokens > (max_tokens * 0.8)
 ```
 
-**Configuration (in `~/.nanobot/openclaw.json`):**
+**Configuration (in `~/.nanofolks/openclaw.json`):**
 ```json
 {
   "memory": {
@@ -616,8 +616,8 @@ if self.memory_config and self.memory_config.enhanced_context.show_context_perce
 **Files Modified:**
 | File | Changes | Status |
 |------|---------|--------|
-| `nanobot/agent/loop.py` | Context monitoring, percentage display | ✅ Complete |
-| `nanobot/config/schema.py` | EnhancedContextConfig | ✅ Complete |
+| `nanofolks/agent/loop.py` | Context monitoring, percentage display | ✅ Complete |
+| `nanofolks/config/schema.py` | EnhancedContextConfig | ✅ Complete |
 
 **User Experience:**
 ```
@@ -658,10 +658,10 @@ Runtime: claude-3.5-sonnet | context=65% | tokens=5200/8000 | 🧹 Compactions: 
 **Files to Modify:**
 | File | Changes |
 |------|---------|
-| `nanobot/memory/context.py` | Add token counting, priority assembly, usage tracking |
-| `nanobot/agent/loop.py` | Integrate context monitoring before each request |
-| `nanobot/config/schema.py` | Add EnhancedContextConfig |
-| `nanobot/session/manager.py` | Add context usage to session metadata |
+| `nanofolks/memory/context.py` | Add token counting, priority assembly, usage tracking |
+| `nanofolks/agent/loop.py` | Integrate context monitoring before each request |
+| `nanofolks/config/schema.py` | Add EnhancedContextConfig |
+| `nanofolks/session/manager.py` | Add context usage to session metadata |
 
 **Impact:**
 ⭐ **HIGH**: Prevents token limit errors, provides visibility into context usage, enables proactive compaction, and ensures reliable operation with any conversation length.
@@ -680,7 +680,7 @@ Runtime: claude-3.5-sonnet | context=65% | tokens=5200/8000 | 🧹 Compactions: 
 ### ✅ Phase 10: Tool Output Management & Emergency Protocols - 100% COMPLETE ⭐ MEDIUM PRIORITY
 
 **What's Done:**
-- ✅ **`nanobot/memory/tool_compaction.py`** - Smart tool output management
+- ✅ **`nanofolks/memory/tool_compaction.py`** - Smart tool output management
   - `ToolOutputStore` - SQLite storage for full outputs
   - `ToolOutputCompactor` - Automatic truncation and storage
   - `process_tool_result()` - Truncates to 2000 chars, stores full version
@@ -736,7 +736,7 @@ Impact: Auto-compaction fails, bot becomes unresponsive
 **Proposed Solution (Two-Layer Approach):**
 
 **Layer 1: Tool Output Compaction (Primary Defense)**
-- **`nanobot/memory/tool_compaction.py`** - Smart tool output management
+- **`nanofolks/memory/tool_compaction.py`** - Smart tool output management
   - **Automatic truncation** - Cap tool outputs at 2000 chars in context
   - **Full output storage** - Store complete output in SQLite with reference ID
   - **Link-based access** - Reference full output via link, not inline
@@ -781,7 +781,7 @@ CREATE TABLE tool_outputs (
 ```
 
 **Layer 2: Emergency Compaction (Last Resort)**
-- **`nanobot/memory/emergency_compaction.py`** - Crisis mode
+- **`nanofolks/memory/emergency_compaction.py`** - Crisis mode
   - **Critical trigger** - Only when >95% of context limit
   - **Aggressive rules:**
     1. Truncate ALL tool outputs to 100 chars max
@@ -844,7 +844,7 @@ class EmergencyCompaction:
 **Files Created:**
 | File | Purpose | Status |
 |------|---------|--------|
-| `nanobot/memory/tool_compaction.py` | Tool output management | ✅ Complete |
+| `nanofolks/memory/tool_compaction.py` | Tool output management | ✅ Complete |
 
 **Usage Example:**
 ```python
@@ -909,16 +909,16 @@ After: read_file("config.json") [collapsed 3 identical calls]
 **Files to Create:**
 | File | Purpose |
 |------|---------|
-| `nanobot/memory/tool_compaction.py` | Tool output management and storage |
-| `nanobot/memory/emergency_compaction.py` | Last-resort emergency compaction |
-| `nanobot/memory/output_store.py` | Full tool output storage in SQLite |
+| `nanofolks/memory/tool_compaction.py` | Tool output management and storage |
+| `nanofolks/memory/emergency_compaction.py` | Last-resort emergency compaction |
+| `nanofolks/memory/output_store.py` | Full tool output storage in SQLite |
 
 **Files to Modify:**
 | File | Changes |
 |------|---------|
-| `nanobot/memory/store.py` | Add tool_outputs table |
-| `nanobot/agent/loop.py` | Integrate tool compaction before assembly |
-| `nanobot/config/schema.py` | Add ToolOutputConfig and EmergencyCompactionConfig |
+| `nanofolks/memory/store.py` | Add tool_outputs table |
+| `nanofolks/agent/loop.py` | Integrate tool compaction before assembly |
+| `nanofolks/config/schema.py` | Add ToolOutputConfig and EmergencyCompactionConfig |
 
 **Impact:**
 ⭐ **MEDIUM**: Prevents tool outputs from overwhelming context. Critical for sessions with file reads, shell commands, or API calls that return large responses. Without this, one large tool response can crash the entire session (as seen in OpenClaw production).
@@ -961,7 +961,7 @@ The memory system is **fully functional, self-improving, and connected to the ag
    - **Solution:** Adaptive token-based compaction with multiple modes (summary/token-limit), proactive 80% trigger, tool chain preservation
    - **Lessons from OpenClaw:** Tool pair preservation (issue #4839), smart boundaries, pre-compaction memory flush
    - **Effort:** 3-4 days
-   - **Files to create:** `nanobot/memory/session_compactor.py`, `nanobot/memory/token_counter.py`, `nanobot/memory/compaction_modes.py`
+   - **Files to create:** `nanofolks/memory/session_compactor.py`, `nanofolks/memory/token_counter.py`, `nanofolks/memory/compaction_modes.py`
    - **Files to modify:** `session/manager.py`, `agent/loop.py`, `config/schema.py`, `memory/context.py`
 
 **2. Phase 9: Real-Time Context Monitoring & Priority Assembly** ⭐⭐ **HIGH PRIORITY**
@@ -970,7 +970,7 @@ The memory system is **fully functional, self-improving, and connected to the ag
    - **Solution:** Real-time monitoring with tiktoken + priority-based truncation + context percentage display
    - **Lessons from OpenClaw:** Context percentage in status (issue #2597), proactive compaction at 80%, priority hierarchy
    - **Effort:** 2-3 days
-   - **Files to modify:** `nanobot/memory/context.py`, `agent/loop.py`, `config/schema.py`, `session/manager.py`
+   - **Files to modify:** `nanofolks/memory/context.py`, `agent/loop.py`, `config/schema.py`, `session/manager.py`
 
 ---
 
@@ -982,7 +982,7 @@ The memory system is **fully functional, self-improving, and connected to the ag
    - **Solution:** Automatic truncation + SQLite storage + emergency compaction protocol
    - **Lessons from OpenClaw:** Issue #2254 - Telegram sessions grew to 2-3MB, hit 208K tokens, bot became unresponsive
    - **Effort:** 3 days
-   - **Files to create:** `nanobot/memory/tool_compaction.py`, `nanobot/memory/emergency_compaction.py`, `nanobot/memory/output_store.py`
+   - **Files to create:** `nanofolks/memory/tool_compaction.py`, `nanofolks/memory/emergency_compaction.py`, `nanofolks/memory/output_store.py`
    - **Files to modify:** `memory/store.py`, `agent/loop.py`, `config/schema.py`
 
 ### LOW Priority (User Experience)
@@ -1017,36 +1017,36 @@ The memory system is **fully functional, self-improving, and connected to the ag
 **Core Memory Files (Phases 1-6):**
 | File | Status | Notes |
 |------|--------|-------|
-| `nanobot/memory/__init__.py` | ✅ Complete | Module initialization |
-| `nanobot/memory/models.py` | ✅ Complete | All data models |
-| `nanobot/memory/store.py` | ✅ Complete | SQLite operations |
-| `nanobot/memory/embeddings.py` | ✅ Complete | Embedding generation |
-| `nanobot/memory/extraction.py` | ✅ Complete | Entity extraction |
-| `nanobot/memory/graph.py` | ✅ Complete | Graph operations |
-| `nanobot/memory/summaries.py` | ✅ Complete | Summary tree manager |
-| `nanobot/memory/context.py` | ✅ Complete | ContextAssembler, token budgeting |
-| `nanobot/memory/retrieval.py` | ✅ Complete | MemoryRetrieval, query interface |
-| `nanobot/agent/tools/memory.py` | ✅ Complete | 4 memory tools |
-| `nanobot/memory/background.py` | ✅ Complete | Background processor |
-| `nanobot/memory/learning.py` | ✅ Complete | FeedbackDetector, LearningManager |
-| `nanobot/memory/preferences.py` | ✅ Complete | PreferencesAggregator |
+| `nanofolks/memory/__init__.py` | ✅ Complete | Module initialization |
+| `nanofolks/memory/models.py` | ✅ Complete | All data models |
+| `nanofolks/memory/store.py` | ✅ Complete | SQLite operations |
+| `nanofolks/memory/embeddings.py` | ✅ Complete | Embedding generation |
+| `nanofolks/memory/extraction.py` | ✅ Complete | Entity extraction |
+| `nanofolks/memory/graph.py` | ✅ Complete | Graph operations |
+| `nanofolks/memory/summaries.py` | ✅ Complete | Summary tree manager |
+| `nanofolks/memory/context.py` | ✅ Complete | ContextAssembler, token budgeting |
+| `nanofolks/memory/retrieval.py` | ✅ Complete | MemoryRetrieval, query interface |
+| `nanofolks/agent/tools/memory.py` | ✅ Complete | 4 memory tools |
+| `nanofolks/memory/background.py` | ✅ Complete | Background processor |
+| `nanofolks/memory/learning.py` | ✅ Complete | FeedbackDetector, LearningManager |
+| `nanofolks/memory/preferences.py` | ✅ Complete | PreferencesAggregator |
 
 **Context Compaction Files (Phases 8-10):**
 | File | Status | Purpose |
 |------|--------|-------|
-| `nanobot/memory/token_counter.py` | ✅ Complete | Tiktoken-based accurate token counting |
-| `nanobot/memory/session_compactor.py` | ✅ Complete | SessionCompactor with multiple modes |
-| `nanobot/memory/tool_compaction.py` | ✅ Complete | Tool output management & SQLite storage |
-| `nanobot/memory/emergency_compaction.py` | ✅ Complete | Emergency fallback compaction (not implemented separately) |
-| `nanobot/memory/output_store.py` | ✅ Complete | Full tool output storage (integrated in tool_compaction.py) |
-| `nanobot/session/manager.py` | ✅ Enhanced | Tool chain preservation logic |
-| `nanobot/agent/loop.py` | ✅ Enhanced | Compaction integration, context monitoring |
-| `nanobot/config/schema.py` | ✅ Enhanced | SessionCompactionConfig, EnhancedContextConfig, Tool configs |
+| `nanofolks/memory/token_counter.py` | ✅ Complete | Tiktoken-based accurate token counting |
+| `nanofolks/memory/session_compactor.py` | ✅ Complete | SessionCompactor with multiple modes |
+| `nanofolks/memory/tool_compaction.py` | ✅ Complete | Tool output management & SQLite storage |
+| `nanofolks/memory/emergency_compaction.py` | ✅ Complete | Emergency fallback compaction (not implemented separately) |
+| `nanofolks/memory/output_store.py` | ✅ Complete | Full tool output storage (integrated in tool_compaction.py) |
+| `nanofolks/session/manager.py` | ✅ Enhanced | Tool chain preservation logic |
+| `nanofolks/agent/loop.py` | ✅ Enhanced | Compaction integration, context monitoring |
+| `nanofolks/config/schema.py` | ✅ Enhanced | SessionCompactionConfig, EnhancedContextConfig, Tool configs |
 
 **Existing CLI (Basic):**
 | File | Status | Notes |
 |------|--------|-------|
-| `nanobot/cli/commands.py` | ✅ Complete | Basic CLI commands (status, configure, etc.) |
+| `nanofolks/cli/commands.py` | ✅ Complete | Basic CLI commands (status, configure, etc.) |
 
 ---
 
@@ -1056,25 +1056,25 @@ The memory system is **fully functional, self-improving, and connected to the ag
 - ✅ Comprehensive tests (48 tests in `tests/memory/`)
 - ✅ TUI model downloads (automatic via onboarding)
 - ✅ Automatic model downloads with progress bars
-- ✅ Basic system status command (`nanobot status`)
+- ✅ Basic system status command (`nanofolks status`)
 - ✅ **Memory management commands:**
-  - `nanobot memory init` - Initialize memory database
-  - `nanobot memory status` - Show memory statistics
-  - `nanobot memory search` - Search memory content
-  - `nanobot memory entities` - List all entities
-  - `nanobot memory entity <name>` - Get entity details
-  - `nanobot memory forget <entity>` - Remove entity
-  - `nanobot memory doctor` - Memory system health check
+  - `nanofolks memory init` - Initialize memory database
+  - `nanofolks memory status` - Show memory statistics
+  - `nanofolks memory search` - Search memory content
+  - `nanofolks memory entities` - List all entities
+  - `nanofolks memory entity <name>` - Get entity details
+  - `nanofolks memory forget <entity>` - Remove entity
+  - `nanofolks memory doctor` - Memory system health check
 - ✅ **Session management commands:**
-  - `nanobot session compact` - Manual compaction trigger
-  - `nanobot session status` - Show context=X%, message count
-  - `nanobot session reset` - Reset/clear session
+  - `nanofolks session compact` - Manual compaction trigger
+  - `nanofolks session status` - Show context=X%, message count
+  - `nanofolks session reset` - Reset/clear session
 
 **Files Created:**
-- `nanobot/cli/memory_commands.py` - Memory and session CLI interface
+- `nanofolks/cli/memory_commands.py` - Memory and session CLI interface
 
 **Files Modified:**
-- `nanobot/cli/commands.py` - Registered memory_app and session_app
+- `nanofolks/cli/commands.py` - Registered memory_app and session_app
 
 **Priority:** Low (UX improvement, not production critical) - ✅ COMPLETED
 
@@ -1090,22 +1090,22 @@ User-facing commands now available:
 
 ```bash
 # Session management commands
-nanobot session status       # Show context=X%, message count, compaction stats
-nanobot session compact      # Manual compaction trigger
-nanobot session reset        # Full session reset
+nanofolks session status       # Show context=X%, message count, compaction stats
+nanofolks session compact      # Manual compaction trigger
+nanofolks session reset        # Full session reset
 
 # Memory inspection commands  
-nanobot memory status        # Database stats, entity count, learning count
-nanobot memory search        # Search memory content
-nanobot memory entities      # List all entities
-nanobot memory entity <name> # Get entity details
-nanobot memory forget <name> # Remove entity from memory
-nanobot memory doctor        # Run health check
+nanofolks memory status        # Database stats, entity count, learning count
+nanofolks memory search        # Search memory content
+nanofolks memory entities      # List all entities
+nanofolks memory entity <name> # Get entity details
+nanofolks memory forget <name> # Remove entity from memory
+nanofolks memory doctor        # Run health check
 ```
 
 **Files created/modified:**
-- `nanobot/cli/memory_commands.py` - Memory and session CLI commands
-- `nanobot/cli/commands.py` - Registered memory_app and session_app
+- `nanofolks/cli/memory_commands.py` - Memory and session CLI commands
+- `nanofolks/cli/commands.py` - Registered memory_app and session_app
 
 ---
 
@@ -1212,15 +1212,15 @@ The bot can now:
 ### All Phases Complete! ✅
 
 **Phase 7 (CLI Commands) - DONE:**
-- ✅ `nanobot memory status` - Show memory statistics
-- ✅ `nanobot memory search` - Search memory content  
-- ✅ `nanobot memory entities` - List all entities
-- ✅ `nanobot memory entity <name>` - Get entity details
-- ✅ `nanobot memory forget <name>` - Remove entity
-- ✅ `nanobot memory doctor` - Health check
-- ✅ `nanobot session compact` - Manual compaction
-- ✅ `nanobot session status` - Show context percentage
-- ✅ `nanobot session reset` - Reset session
+- ✅ `nanofolks memory status` - Show memory statistics
+- ✅ `nanofolks memory search` - Search memory content  
+- ✅ `nanofolks memory entities` - List all entities
+- ✅ `nanofolks memory entity <name>` - Get entity details
+- ✅ `nanofolks memory forget <name>` - Remove entity
+- ✅ `nanofolks memory doctor` - Health check
+- ✅ `nanofolks session compact` - Manual compaction
+- ✅ `nanofolks session status` - Show context percentage
+- ✅ `nanofolks session reset` - Reset session
 - Effort: 2-3 days
 - Status: **COMPLETED**
 

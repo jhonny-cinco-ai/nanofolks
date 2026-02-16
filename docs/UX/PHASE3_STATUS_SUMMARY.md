@@ -14,7 +14,7 @@
 - ✅ `SidebarManager` class - Content management
 - ✅ `TransitionEffect` class - Animations
 - ✅ `ResponsiveLayout` class - Terminal adaptation
-- ✅ File: `nanobot/cli/advanced_layout.py`
+- ✅ File: `nanofolks/cli/advanced_layout.py`
 
 ### 2. Documentation (3 files)
 - ✅ `PHASE3_IMPLEMENTATION_PLAN.md` - Architecture & planning
@@ -330,7 +330,7 @@ Tasks:
 
 ### Created Files
 ```
-nanobot/cli/advanced_layout.py          ← Core module (450 lines)
+nanofolks/cli/advanced_layout.py          ← Core module (450 lines)
 PHASE3_IMPLEMENTATION_PLAN.md           ← Planning (350 lines)
 PHASE3_IMPROVEMENTS.md                  ← Details (300 lines)
 PHASE3_INTEGRATION_GUIDE.md             ← Integration (250 lines)
@@ -339,7 +339,7 @@ PHASE3_STATUS_SUMMARY.md                ← This file
 
 ### Files to Modify
 ```
-nanobot/cli/commands.py                 ← Add ~94 lines
+nanofolks/cli/commands.py                 ← Add ~94 lines
 CLI_UX_IMPLEMENTATION_STATUS.md         ← Mark Phase 3 status
 ```
 

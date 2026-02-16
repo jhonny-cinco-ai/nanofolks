@@ -13,7 +13,7 @@ Complete room context integration into the CLI agent experience. Users can now:
 
 ## Changes by Component
 
-### CLI Commands (`nanobot/cli/commands.py`)
+### CLI Commands (`nanofolks/cli/commands.py`)
 
 #### Added Features
 
@@ -76,7 +76,7 @@ Complete room context integration into the CLI agent experience. Users can now:
 
 ---
 
-### Agent Loop (`nanobot/agent/loop.py`)
+### Agent Loop (`nanofolks/agent/loop.py`)
 
 #### Added Fields
 
@@ -114,12 +114,12 @@ self._current_room_participants: list[str] = ["leader"]
 #### Imports Added
 
 ```python
-from nanobot.agent.work_log import RoomType
+from nanofolks.agent.work_log import RoomType
 ```
 
 ---
 
-### Context Builder (`nanobot/agent/context.py`)
+### Context Builder (`nanofolks/agent/context.py`)
 
 #### Modified Methods
 
@@ -163,13 +163,13 @@ Use @botname to mention specific bots when you need their expertise.
 
 ```bash
 # Default general room
-nanobot agent
+nanofolks agent
 
 # Specific room
-nanobot agent --room project-alpha
+nanofolks agent --room project-alpha
 
 # Single message in room
-nanobot agent --room project-alpha --message "hello team"
+nanofolks agent --room project-alpha --message "hello team"
 ```
 
 ### In Interactive Mode
@@ -189,13 +189,13 @@ exit      # Leave room
 
 ```bash
 # All logs for a room
-nanobot explain -w #project-alpha
+nanofolks explain -w #project-alpha
 
 # Room-specific bot actions
-nanobot explain -b @coder -w #project-alpha
+nanofolks explain -b @coder -w #project-alpha
 
 # Coordination decisions in a room
-nanobot explain --mode coordination -w #project-alpha
+nanofolks explain --mode coordination -w #project-alpha
 ```
 
 ---
@@ -204,7 +204,7 @@ nanobot explain --mode coordination -w #project-alpha
 
 ### Test 1: Default Room
 ```bash
-$ nanobot agent
+$ nanofolks agent
 # Should load "general" room
 # Header shows: 🌐 #general (open) • 1 bot • Status
 # Prompt shows: [#general] You:
@@ -212,8 +212,8 @@ $ nanobot agent
 
 ### Test 2: Existing Project Room
 ```bash
-$ nanobot room create website-redesign --bots nanobot,coder
-$ nanobot agent --room website-redesign
+$ nanofolks room create website-redesign --bots nanofolks,coder
+$ nanofolks agent --room website-redesign
 # Header shows: 📁 #website-redesign (project) • 2 bots
 # Prompt shows: [#website-redesign] You:
 ```
@@ -226,7 +226,7 @@ $ nanobot agent --room website-redesign
 
 ### Test 4: Multi-Bot Coordination
 ```bash
-$ nanobot agent --room website-redesign
+$ nanofolks agent --room website-redesign
 [#website-redesign] You: Design the homepage
 # Agent response includes room context
 # Can use @coder, @creative mentions
@@ -237,19 +237,19 @@ $ nanobot agent --room website-redesign
 [#website-redesign] You: Design the homepage
 [#website-redesign] You: /explain
 # Shows: Room: #website-redesign (project)
-#        Participants: nanobot, coder, creative
+#        Participants: nanofolks, coder, creative
 ```
 
 ### Test 6: Room Not Found
 ```bash
-$ nanobot agent --room nonexistent
+$ nanofolks agent --room nonexistent
 # Output: Room 'nonexistent' not found. Using 'general' room.
 # Falls back to default room gracefully
 ```
 
 ### Test 7: Work Log Filtering
 ```bash
-$ nanobot explain -w #website-redesign
+$ nanofolks explain -w #website-redesign
 # Shows only logs from that room
 # Displays room context in header
 ```
@@ -259,7 +259,7 @@ $ nanobot explain -w #website-redesign
 ## Data Flow Diagram
 
 ```
-User: nanobot agent --room project-alpha
+User: nanofolks agent --room project-alpha
           │
           ▼
     ┌──────────────────┐
@@ -382,9 +382,9 @@ User: nanobot agent --room project-alpha
 
 | File | Lines | Changes |
 |------|-------|---------|
-| `nanobot/cli/commands.py` | ~100 | Room parameter, header display, /room command, work log enhancement |
-| `nanobot/agent/loop.py` | ~20 | Room context fields, pass to context builder, work log integration |
-| `nanobot/agent/context.py` | ~10 | Room parameters, system prompt addition |
+| `nanofolks/cli/commands.py` | ~100 | Room parameter, header display, /room command, work log enhancement |
+| `nanofolks/agent/loop.py` | ~20 | Room context fields, pass to context builder, work log integration |
+| `nanofolks/agent/context.py` | ~10 | Room parameters, system prompt addition |
 | `docs/room_integration_cli.md` | NEW | Complete user guide |
 | `docs/room_integration_changelog.md` | NEW | This file |
 

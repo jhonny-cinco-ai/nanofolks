@@ -103,7 +103,7 @@ Phase 2 builds on Phase 1 by integrating UI components into the interactive loop
 
 #### Task 1: Sidebar Integration (1 hour)
 
-**File**: `nanobot/cli/commands.py`  
+**File**: `nanofolks/cli/commands.py`  
 **Target**: Interactive loop after command execution
 
 **Changes needed**:
@@ -164,7 +164,7 @@ _display_room_context(current_room, room_manager)
 
 #### Task 3: Status Bar Integration (1 hour)
 
-**File**: `nanobot/cli/commands.py`  
+**File**: `nanofolks/cli/commands.py`  
 **Target**: Key output points
 
 **Where to add**:
@@ -190,7 +190,7 @@ _display_room_context(current_room, room_manager)
 
 #### Task 4: Visual Feedback with Spinners (1.5 hours)
 
-**File**: `nanobot/cli/commands.py`  
+**File**: `nanofolks/cli/commands.py`  
 **Dependencies**: Rich `Status` and `Progress`
 
 **Add spinners to**:
@@ -217,7 +217,7 @@ _display_room_context(current_room, room_manager)
 
 #### Task 5: Enhanced Room Creation (1 hour)
 
-**File**: `nanobot/cli/commands.py`  
+**File**: `nanofolks/cli/commands.py`  
 **Target**: `_handle_room_creation_intent()` function
 
 **Enhancements**:
@@ -345,7 +345,7 @@ _display_room_context(current_room, room_manager)
 - `_show_spinner()` - Visual feedback helper (optional, use console.status)
 
 ### Files to Modify
-- `nanobot/cli/commands.py` - Main implementation
+- `nanofolks/cli/commands.py` - Main implementation
 
 ### Existing Components to Leverage
 - `TeamRoster.render()` - Team display

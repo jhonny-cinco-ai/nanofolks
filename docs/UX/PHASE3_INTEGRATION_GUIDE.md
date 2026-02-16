@@ -8,7 +8,7 @@
 
 ## Pre-Integration Checklist
 
-- [x] Module created: `nanobot/cli/advanced_layout.py`
+- [x] Module created: `nanofolks/cli/advanced_layout.py`
 - [x] All classes implemented (5 classes, 450 lines)
 - [x] Implementation plan documented
 - [x] Testing strategy defined
@@ -21,11 +21,11 @@
 
 ### Step 1: Add Imports to commands.py (5 minutes)
 
-**Location**: `nanobot/cli/commands.py` line 27
+**Location**: `nanofolks/cli/commands.py` line 27
 
 **Add after existing imports:**
 ```python
-from nanobot.cli.advanced_layout import (
+from nanofolks.cli.advanced_layout import (
     AdvancedLayout,
     LayoutManager,
     SidebarManager,
@@ -40,7 +40,7 @@ from nanobot.cli.advanced_layout import (
 
 ### Step 2: Initialize Layout in Interactive Mode (20 minutes)
 
-**Location**: `nanobot/cli/commands.py` in `async def run_interactive()` function
+**Location**: `nanofolks/cli/commands.py` in `async def run_interactive()` function
 
 **Before** (line ~1302):
 ```python
@@ -111,7 +111,7 @@ async def run_interactive():
 
 ### Step 3: Add Layout Redraw Helper (15 minutes)
 
-**Location**: `nanobot/cli/commands.py` before `async def run_interactive()`
+**Location**: `nanofolks/cli/commands.py` before `async def run_interactive()`
 
 **Add new helper function:**
 ```python
@@ -438,8 +438,8 @@ Before deployment:
 
 ### Files to Modify
 ```
-nanobot/cli/commands.py        ← Add 94 lines across 7 locations
-nanobot/cli/advanced_layout.py ← New file (450 lines, pre-created)
+nanofolks/cli/commands.py        ← Add 94 lines across 7 locations
+nanofolks/cli/advanced_layout.py ← New file (450 lines, pre-created)
 ```
 
 ### Key Functions to Hook

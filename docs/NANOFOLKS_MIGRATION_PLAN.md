@@ -4,7 +4,7 @@
 
 This document outlines a comprehensive migration from **nanobot** to **nanofolks** - a complete rebranding of the entire project. This is not a partial migration with fallbacks, but a full, systematic rename across all files, directories, configurations, and code.
 
-**Current State:** 199 files containing "nanobot" references
+**Current State:** ~150 Python files with "nanobot" references
 **Target State:** Zero "nanobot" references, complete "nanofolks" branding
 
 ---
@@ -51,8 +51,38 @@ Current:                          Target:
 | Workspace | `~/.nanobot/workspace/` | `~/.nanofolks/workspace/` |
 | Work Logs | `~/.nanobot/work_logs.db` | `~/.nanofolks/work_logs.db` |
 | Memory DB | `~/.nanobot/memory.db` | `~/.nanofolks/memory.db` |
+| Media | `~/.nanobot/media/` | `~/.nanofolks/media/` |
+| Bridge | `~/.nanobot/bridge/` | `~/.nanofolks/bridge/` |
+| History | `~/.nanobot/history/` | `~/.nanofolks/history/` |
+| Cron Jobs | `~/.nanobot/cron/` | `~/.nanofolks/cron/` |
+| Skill Verification | `.nanobot/skill-verification/` | `.nanofolks/skill-verification/` |
 
-### 4. Python Import Migration
+### 4. Environment Variable Migration
+
+| Current | Target |
+|---------|--------|
+| `NANOBOT_*` | `NANOFOLKS_*` |
+
+### 5. Hardcoded Path Migration
+
+| Location | Current Path | Target Path |
+|----------|-------------|-------------|
+| `schema.py` | `~/.nanobot/workspace` | `~/.nanofolks/workspace` |
+| `schema.py` | `~/.nanobot/config.json` | `~/.nanofolks/config.json` |
+| `schema.py` | `NANOBOT_` env prefix | `NANOFOLKS_` env prefix |
+| `configure.py` | `/projects/nanobot-turbo` | Update or remove |
+| `configure.py` | `~/.nanobot` | `~/.nanofolks` |
+| `loader.py` | `~/.nanobot/config.json` | `~/.nanofolks/config.json` |
+| `loop.py` | `~/.nanobot/config.json` | `~/.nanofolks/config.json` |
+| `commands.py` | `~/.nanobot/bridge/` | `~/.nanofolks/bridge/` |
+| `commands.py` | `~/.nanobot/history/` | `~/.nanofolks/history/` |
+| `skills.py` | `.nanobot/skill-verification/` | `.nanofolks/skill-verification/` |
+| `telegram.py` | `~/.nanobot/media/` | `~/.nanofolks/media/` |
+| `discord.py` | `~/.nanobot/media/` | `~/.nanofolks/media/` |
+| `routing_stage.py` | `~/.nanobot/cron/` | `~/.nanofolks/cron/` |
+| `helpers.py` | `~/.nanobot` | `~/.nanofolks` |
+
+### 6. Python Import Migration
 
 ```python
 # Before
@@ -90,6 +120,9 @@ The `nanobot` → `leader` migration is already complete. All bot roles are now:
 - `creative`
 - `social`
 - `auditor`
+- `coordinator`
+
+**Note:** CLI help text still references `nanobot` in some places (e.g., `bot_name` argument descriptions). These should be updated to use `leader` instead of `nanobot`.
 
 ---
 
@@ -114,15 +147,17 @@ The `nanobot` → `leader` migration is already complete. All bot roles are now:
 | `nanobot/cli/memory_commands.py` | Update app name, imports |
 | `nanobot/cli/room_ui.py` | Update imports |
 
-### Phase 3: All Python Modules (147 files)
+### Phase 3: All Python Modules (150 files)
 
 Every Python file needs:
 1. Update import statements (`from nanobot.X` → `from nanofolks.X`)
 2. Update internal references
 3. Update docstrings mentioning "nanobot"
+4. Update hardcoded paths (`~/.nanobot/` → `~/.nanofolks/`)
+5. Update environment variable prefixes (`NANOBOT_` → `NANOFOLKS_`)
 
 **Affected Directories:**
-- `nanobot/agent/` (10 files) - tools, loop, context, etc.
+- `nanobot/agent/` (15+ files) - tools, loop, context, etc.
 - `nanobot/bots/` (8 files) - base, implementations, dispatch, etc.
 - `nanobot/channels/` (12 files)
 - `nanobot/config/` (3 files)
@@ -134,15 +169,26 @@ Every Python file needs:
 - `nanobot/session/` (multiple)
 - `nanobot/soul/` (multiple)
 - `nanobot/themes/` (3 files)
-- `nanobot/utils/` (2 files)
+- `nanobot/utils/` (3 files)
 
-### Phase 4: Configuration Files
+### Phase 4: Configuration Files & Hardcoded Paths
 
 | File | Changes Required |
 |------|------------------|
 | `~/.nanobot/config.json` | Rename to `~/.nanofolks/config.json` |
 | `~/.nanobot/theme_config.json` | Migrate to new location |
 | `~/.nanobot/bot_custom_names.json` | Migrate to new location |
+| `nanobot/config/schema.py` | Update hardcoded paths (~/.nanobot → ~/.nanofolks, NANOBOT_ → NANOFOLKS_) |
+| `nanobot/config/loader.py` | Update config path |
+| `nanobot/agent/loop.py` | Update protected_paths default |
+| `nanobot/cli/configure.py` | Update example paths |
+| `nanobot/cli/commands.py` | Update bridge, history paths |
+| `nanobot/utils/helpers.py` | Update data directory path |
+| `nanobot/channels/telegram.py` | Update media path |
+| `nanobot/channels/discord.py` | Update media path |
+| `nanobot/session/manager.py` | Update sessions path |
+| `nanobot/agent/skills.py` | Update verification dir |
+| `nanobot/agent/stages/routing_stage.py` | Update cron path |
 
 ### Phase 5: Documentation Files (52+ files)
 
@@ -196,7 +242,24 @@ find nanofolks -name "*.py" -exec sed -i '' 's/name="nanobot"/name="nanofolks"/g
 name = "nanofolks"
 ```
 
-### Step 5: Update Data Directory References
+### Step 5: Update Environment Variable Prefixes
+
+```bash
+# Replace environment variable prefixes
+find nanofolks -name "*.py" -exec sed -i '' 's/NANOBOT_/NANOFOLKS_/g' {} \;
+```
+
+### Step 6: Update Hardcoded Paths
+
+```bash
+# Replace ~/.nanobot with ~/.nanofolks
+find nanofolks -name "*.py" -exec sed -i '' 's|~/.nanobot|~/.nanofolks|g' {} \;
+
+# Replace example paths like /projects/nanobot-turbo
+find nanofolks -name "*.py" -exec sed -i '' 's|/projects/nanobot-turbo|/projects/nanofolks|g' {} \;
+```
+
+### Step 7: Update Data Directory References
 
 ```bash
 # Create new config directory
@@ -269,12 +332,12 @@ nanofolks --help
 |-------|-------|----------------|
 | Phase 1: Core | 3 | 30 min |
 | Phase 2: CLI | 6 | 1 hour |
-| Phase 3: Python | 147 | 4-6 hours |
-| Phase 4: Config | 5 | 30 min |
+| Phase 3: Python | 150 | 5-7 hours |
+| Phase 4: Config & Paths | 15+ | 1 hour |
 | Phase 5: Docs | 52+ | 2 hours |
 | Phase 6: Templates | 20+ | 1 hour |
 
-**Total Estimated: 9-11 hours**
+**Total Estimated: 10-13 hours**
 
 ---
 

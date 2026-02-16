@@ -16,10 +16,11 @@ class CronTool(Tool):
     2. System calibration (optimizes routing performance in background)
     """
     
-    def __init__(self, cron_service: CronService):
+    def __init__(self, cron_service: CronService, default_timezone: str = "UTC"):
         self._cron = cron_service
         self._channel = ""
         self._chat_id = ""
+        self._default_timezone = default_timezone  # User's configured timezone
     
     def set_context(self, channel: str, chat_id: str) -> None:
         """Set the current session context for delivery."""
@@ -33,9 +34,10 @@ class CronTool(Tool):
     @property
     def description(self) -> str:
         return (
-            "Schedule reminders, recurring tasks, and routing calibration. "
+            "Schedule reminders, recurring tasks, and routing calibration with timezone support. "
             "Actions: add (reminders/tasks), calibrate (routing optimization), list, remove. "
-            "Use 'calibrate' to schedule automatic routing performance optimization."
+            "Use 'calibrate' to schedule automatic routing performance optimization. "
+            "Supports timezones like 'America/New_York', 'Europe/London', 'Asia/Tokyo'."
         )
     
     @property
@@ -60,6 +62,10 @@ class CronTool(Tool):
                     "type": "string",
                     "description": "Cron expression for precise scheduling (e.g., '0 2 * * *' for 2am daily)"
                 },
+                "timezone": {
+                    "type": "string",
+                    "description": "Timezone for cron execution (e.g., 'America/New_York', 'Asia/Tokyo'). Defaults to local timezone."
+                },
                 "at": {
                     "type": "string",
                     "description": "ISO datetime for one-time execution (e.g. '2026-02-12T10:30:00')"
@@ -78,33 +84,37 @@ class CronTool(Tool):
         message: str = "",
         every_seconds: int | None = None,
         cron_expr: str | None = None,
+        timezone: str | None = None,
         at: str | None = None,
         job_id: str | None = None,
         **kwargs: Any
     ) -> str:
         if action == "add":
-            return self._add_job(message, every_seconds, cron_expr, at)
+            return self._add_job(message, every_seconds, cron_expr, at, timezone)
         elif action == "calibrate":
-            return self._add_calibration_job(every_seconds, cron_expr)
+            return self._add_calibration_job(every_seconds, cron_expr, timezone)
         elif action == "list":
             return self._list_jobs()
         elif action == "remove":
             return self._remove_job(job_id)
         return f"Unknown action: {action}"
     
-    def _add_job(self, message: str, every_seconds: int | None, cron_expr: str | None, at: str | None) -> str:
+    def _add_job(self, message: str, every_seconds: int | None, cron_expr: str | None, at: str | None, timezone: str | None = None) -> str:
         """Add a user reminder or task job."""
         if not message:
             return "Error: message is required for add"
         if not self._channel or not self._chat_id:
             return "Error: no session context (channel/chat_id)"
         
+        # Use provided timezone or fall back to user's default timezone
+        effective_tz = timezone or self._default_timezone
+        
         # Build schedule
         delete_after = False
         if every_seconds:
             schedule = CronSchedule(kind="every", every_ms=every_seconds * 1000)
         elif cron_expr:
-            schedule = CronSchedule(kind="cron", expr=cron_expr)
+            schedule = CronSchedule(kind="cron", expr=cron_expr, tz=effective_tz)
         elif at:
             from datetime import datetime
             dt = datetime.fromisoformat(at)
@@ -125,7 +135,7 @@ class CronTool(Tool):
         )
         return f"Created reminder '{job.name}' (id: {job.id}). You'll receive this message as scheduled."
     
-    def _add_calibration_job(self, every_seconds: int | None, cron_expr: str | None) -> str:
+    def _add_calibration_job(self, every_seconds: int | None, cron_expr: str | None, timezone: str | None = None) -> str:
         """
         Add a routing calibration job to optimize classification performance.
         
@@ -134,11 +144,14 @@ class CronTool(Tool):
         
         This is a system job that runs in background - no user delivery.
         """
+        # Use provided timezone or fall back to user's default timezone
+        effective_tz = timezone or self._default_timezone
+        
         # Default to daily calibration if no schedule specified
         if not every_seconds and not cron_expr:
             # Default: daily at 2:00 AM
             cron_expr = "0 2 * * *"
-            schedule = CronSchedule(kind="cron", expr=cron_expr)
+            schedule = CronSchedule(kind="cron", expr=cron_expr, tz=effective_tz)
             schedule_desc = "daily at 2:00 AM"
         elif every_seconds:
             schedule = CronSchedule(kind="every", every_ms=every_seconds * 1000)
@@ -152,7 +165,7 @@ class CronTool(Tool):
                 days = every_seconds / 86400
                 schedule_desc = f"every {days:.1f} days" if days != int(days) else f"every {int(days)} days"
         elif cron_expr:
-            schedule = CronSchedule(kind="cron", expr=cron_expr)
+            schedule = CronSchedule(kind="cron", expr=cron_expr, tz=effective_tz)
             schedule_desc = f"on schedule '{cron_expr}'"
         else:
             return "Error: either every_seconds or cron_expr is required"

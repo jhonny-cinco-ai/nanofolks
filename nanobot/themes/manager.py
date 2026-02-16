@@ -60,27 +60,27 @@ class ThemeManager:
             return self.current_theme.name.value
         return None
 
-    def get_bot_theming(self, bot_name: str) -> dict:
+    def get_bot_theming(self, bot_role: str) -> dict:
         """Get theming for a specific bot in current theme.
 
         Args:
-            bot_name: Name of bot (nanobot, researcher, coder, social, creative, auditor)
+            bot_role: Role identifier (leader, researcher, coder, social, creative, auditor)
 
         Returns:
-            Dictionary with bot theming info (title, personality, greeting, voice, emoji, default_name)
+            Dictionary with bot theming info (bot_title, bot_name, personality, greeting, voice, emoji)
         """
         if not self.current_theme:
             return {}
 
-        theming = self.current_theme.get_bot_theming(bot_name)
+        theming = self.current_theme.get_bot_theming(bot_role)
         if theming:
             return {
-                "title": theming.title,
+                "bot_title": theming.bot_title,
+                "bot_name": theming.bot_name,
                 "personality": theming.personality,
                 "greeting": theming.greeting,
                 "voice": theming.voice_directive,
                 "emoji": theming.emoji,
-                "default_name": theming.default_name,
             }
         return {}
 
@@ -88,15 +88,16 @@ class ThemeManager:
         """Get theming for all bots in current theme.
 
         Returns:
-            Dictionary mapping bot names to their theming
+            Dictionary mapping bot roles to their theming
         """
         if not self.current_theme:
             return {}
 
         all_theming = {}
-        for bot_name, theming in self.current_theme.get_all_bots_theming().items():
-            all_theming[bot_name] = {
-                "title": theming.title,
+        for bot_role, theming in self.current_theme.get_all_bots_theming().items():
+            all_theming[bot_role] = {
+                "bot_title": theming.bot_title,
+                "bot_name": theming.bot_name,
                 "personality": theming.personality,
                 "greeting": theming.greeting,
                 "voice": theming.voice_directive,

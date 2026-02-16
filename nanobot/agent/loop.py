@@ -27,6 +27,7 @@ from nanobot.session.manager import SessionManager, Session
 from nanobot.agent.work_log_manager import get_work_log_manager, LogLevel
 from nanobot.agent.work_log import RoomType
 from nanobot.reasoning.config import get_reasoning_config, ReasoningConfig
+from nanobot.themes import ThemeManager
 
 
 class AgentLoop:
@@ -53,6 +54,7 @@ class AgentLoop:
         brave_api_key: str | None = None,
         exec_config: "ExecToolConfig | None" = None,
         cron_service: "CronService | None" = None,
+        system_timezone: str = "UTC",
         restrict_to_workspace: bool = False,
         session_manager: SessionManager | None = None,
         routing_config: RoutingConfig | None = None,
@@ -90,6 +92,7 @@ class AgentLoop:
         self.brave_api_key = brave_api_key
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
+        self.system_timezone = system_timezone
         self.restrict_to_workspace = restrict_to_workspace
         self.evolutionary = evolutionary
         self.allowed_paths = allowed_paths or []
@@ -288,11 +291,179 @@ class AgentLoop:
         # Ensure theme is applied to nanobot SOUL on first agent start
         self._apply_theme_if_needed()
         
-        self._running = False
-        self._mcp_servers = mcp_servers or {}
-        self._mcp_stack: AsyncExitStack | None = None
-        self._mcp_connected = False
-        self._register_default_tools()
+    def _init_chat_onboarding(self) -> None:
+        """Initialize chat onboarding system."""
+        self._chat_onboarding: "ChatOnboarding | None" = None
+        
+        # We'll initialize the actual ChatOnboarding when needed (lazy init)
+        # to avoid circular imports and ensure workspace is ready
+        logger.debug("Chat onboarding system initialized (lazy)")
+    
+    def _get_chat_onboarding(self, session: Session) -> "ChatOnboarding | None":
+        """Get or create ChatOnboarding instance for this session."""
+        from nanobot.agent.chat_onboarding import ChatOnboarding  # Lazy import
+        
+        # Check if onboarding exists in session metadata
+        onboarding_data = session.metadata.get("_chat_onboarding")
+        
+        if onboarding_data:
+            # Restore from session
+            self._chat_onboarding = ChatOnboarding.from_dict(
+                onboarding_data,
+                self.workspace,
+                self._theme_manager
+            )
+        elif self._chat_onboarding is None:
+            # Create new instance
+            self._theme_manager = ThemeManager()
+            self._chat_onboarding = ChatOnboarding(
+                workspace_path=self.workspace,
+                theme_manager=self._theme_manager
+            )
+        
+        return self._chat_onboarding
+    
+    def _save_chat_onboarding(self, session: Session) -> None:
+        """Save onboarding state to session."""
+        if self._chat_onboarding:
+            session.metadata["_chat_onboarding"] = self._chat_onboarding.to_dict()
+    
+    def _check_onboarding_needed(self, session: Session) -> bool:
+        """Check if first-time user needs onboarding."""
+        # Check if onboarding already completed in this session
+        onboarding_data = session.metadata.get("_chat_onboarding")
+        if onboarding_data:
+            from nanobot.agent.chat_onboarding import OnboardingState
+            state = onboarding_data.get("state")
+            if state in [OnboardingState.COMPLETED.value, OnboardingState.TEAM_INTRO.value]:
+                return False
+        
+        # If session already has messages, user is returning
+        if session.messages and len(session.messages) > 2:
+            return False
+        
+        # Check USER.md for placeholders
+        user_file = self.workspace / "USER.md"
+        if user_file.exists():
+            content = user_file.read_text()
+            placeholders = ["(your name)", "(your timezone)", "(your role)"]
+            if not any(p in content for p in placeholders):
+                return False
+        
+        return True
+    
+    async def _handle_chat_onboarding(
+        self, msg: InboundMessage, session: Session
+    ) -> OutboundMessage | None:
+        """Handle conversational onboarding for first-time users."""
+        from nanobot.agent.chat_onboarding import ChatOnboarding, OnboardingState
+        from nanobot.themes import ThemeManager
+        
+        # Initialize onboarding
+        if not hasattr(self, "_chat_onboarding") or self._chat_onboarding is None:
+            self._theme_manager = ThemeManager()
+            self._chat_onboarding = ChatOnboarding(
+                workspace_path=self.workspace,
+                theme_manager=self._theme_manager
+            )
+        
+        onboarding = self._chat_onboarding
+        user_message = msg.content.strip()
+        
+        # Check if this is a special command during onboarding
+        cmd = user_message.lower()
+        
+        # Handle /help during onboarding
+        if cmd == "/help":
+            return OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content="🐚 I'm getting to know you first! Answer a few questions "
+                       "and I'll introduce you to the team. 😊"
+            )
+        
+        # Handle "tell me about X" during onboarding
+        if user_message.lower().startswith("tell me about "):
+            bot_name = user_message.lower().replace("tell me about ", "").strip()
+            # Map common names to bot roles
+            bot_map = {
+                "leader": "leader", "captain": "leader", "blackbeard": "leader",
+                "researcher": "researcher", "navigator": "researcher",
+                "coder": "coder", "builder": "coder", "quartermaster": "coder",
+                "creative": "creative", "artist": "creative", "carpenter": "creative",
+                "social": "social", "crewman": "social", "boatswain": "social",
+                "auditor": "auditor", "logkeeper": "auditor", "scop": "auditor",
+            }
+            actual_bot = bot_map.get(bot_name, bot_name)
+            if actual_bot in ["leader", "researcher", "coder", "creative", "social", "auditor"]:
+                intro = onboarding.introduce_bot(actual_bot)
+                return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, content=intro)
+        
+        # Check onboarding state
+        if onboarding.state == OnboardingState.NOT_STARTED:
+            # First message - start onboarding with greeting
+            onboarding.state = OnboardingState.IN_PROGRESS
+            first_question = onboarding.get_next_question()
+            
+            # Get leader greeting from theme
+            theme = self._theme_manager.get_current_theme()
+            greeting = theme.leader.greeting if theme else "Ahoy there!"
+            
+            response = f"{greeting} 🎉\n\nI'm excited to get to know you! "
+            if first_question:
+                response += first_question["question"]
+            
+            # Save state
+            self._save_chat_onboarding(session)
+            session.add_message("user", user_message)
+            session.add_message("assistant", response)
+            self.sessions.save(session)
+            
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, content=response)
+        
+        elif onboarding.state == OnboardingState.IN_PROGRESS:
+            # Process answer and get next question
+            response = onboarding.process_answer(user_message)
+            
+            # Check if we moved to team intro
+            if onboarding.state == OnboardingState.TEAM_INTRO:
+                # Save state and complete
+                self._save_chat_onboarding(session)
+                onboarding.complete()
+                self._save_chat_onboarding(session)
+            
+            # Save to session
+            session.add_message("user", user_message)
+            session.add_message("assistant", response)
+            self.sessions.save(session)
+            
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, content=response)
+        
+        elif onboarding.state == OnboardingState.TEAM_INTRO:
+            # Handle questions about bots
+            if user_message.lower().startswith("tell me about "):
+                bot_name = user_message.lower().replace("tell me about ", "").strip()
+                bot_map = {
+                    "leader": "leader", "captain": "leader",
+                    "researcher": "researcher", "navigator": "researcher",
+                    "coder": "coder", "builder": "coder", "quartermaster": "coder",
+                    "creative": "creative", "artist": "creative", "carpenter": "creative",
+                    "social": "social", "crewman": "social", "boatswain": "social",
+                    "auditor": "auditor", "logkeeper": "auditor", "scop": "auditor",
+                }
+                actual_bot = bot_map.get(bot_name, bot_name)
+                if actual_bot in ["leader", "researcher", "coder", "creative", "social", "auditor"]:
+                    intro = onboarding.introduce_bot(actual_bot)
+                    return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id, content=intro)
+            
+            # Otherwise, normal conversation after onboarding
+            onboarding.complete()
+            self._save_chat_onboarding(session)
+            # Return None to signal "continue with normal processing"
+            return None
+        
+        # If onboarding completed, return None to continue with normal processing
+        return None
     
     def _apply_theme_if_needed(self) -> None:
         """Apply the selected theme to all team members' SOUL files on first start.
@@ -399,7 +570,7 @@ class AgentLoop:
         
         # Cron tool (for scheduling)
         if self.cron_service:
-            self.tools.register(CronTool(self.cron_service))
+            self.tools.register(CronTool(self.cron_service, default_timezone=self.system_timezone))
         
         # Config update tool
         self.tools.register(UpdateConfigTool())
@@ -641,6 +812,16 @@ class AgentLoop:
         # Get or create session
         key = msg.session_key
         session = self.sessions.get_or_create(key)
+        
+        # Check if onboarding is needed for first-time users
+        onboarding_response = None
+        if self._check_onboarding_needed(session):
+            onboarding_response = await self._handle_chat_onboarding(msg, session)
+            # If onboarding returns a response, send it
+            if onboarding_response is not None:
+                return onboarding_response
+            # If onboarding returns None, it completed - continue with normal processing
+            # Message will be sanitized and added in normal flow below
         
         # Handle slash commands
         cmd = msg.content.strip().lower()

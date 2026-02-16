@@ -32,27 +32,27 @@ AVAILABLE_BOTS = {
     "researcher": {
         "domain": "research",
         "description": "Deep research, analysis, and information gathering",
-        "default_name": "Navigator",
+        "bot_role": "Navigator",
     },
     "coder": {
         "domain": "development", 
         "description": "Code implementation, debugging, and technical solutions",
-        "default_name": "Gunner",
+        "bot_role": "Gunner",
     },
     "social": {
         "domain": "community",
         "description": "Community engagement, communication, and user relations",
-        "default_name": "Lookout",
+        "bot_role": "Lookout",
     },
     "creative": {
         "domain": "design",
         "description": "Creative brainstorming, design, and content creation",
-        "default_name": "Artist",
+        "bot_role": "Artist",
     },
     "auditor": {
         "domain": "quality",
         "description": "Quality review, validation, and compliance checking",
-        "default_name": "Quartermaster",
+        "bot_role": "Quartermaster",
     },
 }
 
@@ -106,7 +106,7 @@ class BotInvoker:
     
     async def invoke(
         self,
-        bot_name: str,
+        bot_role: str,
         task: str,
         context: Optional[str] = None,
         session_id: str = "invoke:default",
@@ -120,7 +120,7 @@ class BotInvoker:
         This is always async - the main agent continues immediately.
         
         Args:
-            bot_name: Name of bot to invoke (researcher, coder, social, creative, auditor)
+            bot_role: Role identifier (researcher, coder, social, creative, auditor)
             task: Task description for the bot
             context: Additional context from the main conversation
             session_id: Session ID for this invocation
@@ -130,10 +130,10 @@ class BotInvoker:
         Returns:
             Confirmation message that the bot was invoked
         """
-        if bot_name not in AVAILABLE_BOTS:
-            return f"Error: Unknown bot '{bot_name}'. Available bots: {', '.join(AVAILABLE_BOTS.keys())}"
+        if bot_role not in AVAILABLE_BOTS:
+            return f"Error: Unknown bot '{bot_role}'. Available bots: {', '.join(AVAILABLE_BOTS.keys())}"
         
-        if bot_name == "leader":
+        if bot_role == "leader":
             return "Error: Cannot invoke leader (Leader) - use @leader directly"
         
         invocation_id = str(uuid.uuid4())[:8]
@@ -141,7 +141,7 @@ class BotInvoker:
         # Always async - fire and forget
         return await self._invoke_async(
             invocation_id=invocation_id,
-            bot_name=bot_name,
+            bot_role=bot_role,
             task=task,
             context=context,
             session_id=session_id,
@@ -152,7 +152,7 @@ class BotInvoker:
     async def _invoke_async(
         self,
         invocation_id: str,
-        bot_name: str,
+        bot_role: str,
         task: str,
         context: Optional[str],
         session_id: str,
@@ -160,16 +160,16 @@ class BotInvoker:
         origin_chat_id: str,
     ) -> str:
         """Asynchronous invocation - fires off task and notifies when complete."""
-        logger.info(f"Invoking {bot_name} (id: {invocation_id}, async): {task[:50]}...")
+        logger.info(f"Invoking {bot_role} (id: {invocation_id}, async): {task[:50]}...")
         
         # Log the bot invocation request
-        self._log_invocation_request(bot_name, task, context)
+        self._log_invocation_request(bot_role, task, context)
         
         # Launch in background, don't wait
         task_handle = asyncio.create_task(
             self._process_invocation(
                 invocation_id=invocation_id,
-                bot_name=bot_name,
+                bot_role=bot_role,
                 task=task,
                 context=context,
                 session_id=session_id,
@@ -180,16 +180,16 @@ class BotInvoker:
         self._active_invocations[invocation_id] = task_handle
         
         # Get bot info for nice message
-        bot_info = self.get_bot_info(bot_name)
-        bot_title = bot_info.get("default_name", bot_name) if bot_info else bot_name
+        bot_info = self.get_bot_info(bot_role)
+        bot_title = bot_info.get("bot_name", bot_role) if bot_info else bot_role
         
         # Return immediately with confirmation
-        return f"@{bot_name} ({bot_title}) is on the task. I'll share the results when ready."
+        return f"@{bot_role} ({bot_title}) is on the task. I'll share the results when ready."
     
     async def _process_invocation(
         self,
         invocation_id: str,
-        bot_name: str,
+        bot_role: str,
         task: str,
         context: Optional[str],
         session_id: str,
@@ -202,7 +202,7 @@ class BotInvoker:
         
         try:
             # Build system prompt for this bot
-            system_prompt = await self._build_bot_system_prompt(bot_name, task)
+            system_prompt = await self._build_bot_system_prompt(bot_role, task)
             
             # Build user message
             user_message = task
@@ -210,19 +210,19 @@ class BotInvoker:
                 user_message = f"Context from Leader:\n{context}\n\n---\n\nTask:\n{task}"
             
             # Process through LLM
-            response = await self._call_bot_llm(bot_name, system_prompt, user_message, session_id)
+            response = await self._call_bot_llm(bot_role, system_prompt, user_message, session_id)
             result = response or "Task completed but no response generated."
             
             logger.info(f"Async invocation {invocation_id} completed")
             
             # Log the bot's response
-            self._log_invocation_response(bot_name, task, result)
+            self._log_invocation_response(bot_role, task, result)
             
         except Exception as e:
             logger.error(f"Async invocation {invocation_id} failed: {e}")
             result = f"Error: {str(e)}"
             status = "error"
-            self._log_invocation_error(bot_name, task, str(e))
+            self._log_invocation_error(bot_role, task, str(e))
         finally:
             # Cleanup
             self._active_invocations.pop(invocation_id, None)
@@ -230,7 +230,7 @@ class BotInvoker:
             # Announce result back to main agent via system message
             await self._announce_result(
                 invocation_id=invocation_id,
-                bot_name=bot_name,
+                bot_role=bot_role,
                 task=task,
                 result=result,
                 origin_channel=origin_channel,
@@ -241,7 +241,7 @@ class BotInvoker:
     async def _announce_result(
         self,
         invocation_id: str,
-        bot_name: str,
+        bot_role: str,
         task: str,
         result: str,
         origin_channel: str,
@@ -249,11 +249,11 @@ class BotInvoker:
         status: str,
     ) -> None:
         """Announce the bot result back to the main agent via system message."""
-        bot_info = self.get_bot_info(bot_name)
-        bot_title = bot_info.get("default_name", bot_name) if bot_info else bot_name
+        bot_info = self.get_bot_info(bot_role)
+        bot_title = bot_info.get("bot_name", bot_role) if bot_info else bot_role
         status_text = "completed" if status == "ok" else "failed"
         
-        announce_content = f"""[Bot @{bot_name} ({bot_title}) {status_text}]
+        announce_content = f"""[Bot @{bot_role} ({bot_title}) {status_text}]
 
 Task: {task}
 
@@ -265,7 +265,7 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
         # Inject as system message to trigger main agent
         msg = InboundMessage(
             channel="system",
-            sender_id=f"invoke:{bot_name}",
+            sender_id=f"invoke:{bot_role}",
             chat_id=f"{origin_channel}:{origin_chat_id}",
             content=announce_content,
         )
@@ -273,22 +273,22 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
         await self.bus.publish_inbound(msg)
         logger.debug(f"Invocation {invocation_id} announced result to {origin_channel}:{origin_chat_id}")
     
-    async def _build_bot_system_prompt(self, bot_name: str, task: str) -> str:
+    async def _build_bot_system_prompt(self, bot_role: str, task: str) -> str:
         """Build system prompt for the invoked bot."""
         from nanobot.soul import SoulManager
         
         # Get bot's SOUL.md if exists
         soul_manager = SoulManager(self.workspace)
-        soul_content = soul_manager.get_bot_soul(bot_name)
+        soul_content = soul_manager.get_bot_soul(bot_role)
         
         # Build system prompt
-        bot_info = AVAILABLE_BOTS[bot_name]
+        bot_info = AVAILABLE_BOTS[bot_role]
         
         if soul_content:
             system_prompt = soul_content
         else:
             # Fallback to basic role
-            system_prompt = f"""You are @{bot_name} ({bot_info['default_name']}), a specialist bot.
+            system_prompt = f"""You are @{bot_role} ({bot_info['bot_name']}), a specialist bot.
 
 Domain: {bot_info['domain']}
 Role: {bot_info['description']}
@@ -305,11 +305,11 @@ Focus only on your domain expertise and provide a helpful response.
         
         return system_prompt
     
-    def _create_bot_tool_registry(self, bot_name: str) -> "ToolRegistry":
+    def _create_bot_tool_registry(self, bot_role: str) -> "ToolRegistry":
         """Create a tool registry for a bot based on permissions.
         
         Args:
-            bot_name: Name of the bot
+            bot_role: Name of the bot
             
         Returns:
             ToolRegistry configured for this bot
@@ -318,7 +318,7 @@ Focus only on your domain expertise and provide a helpful response.
         
         return create_bot_registry(
             workspace=self.workspace,
-            bot_name=bot_name,
+            bot_role=bot_role,
             brave_api_key=self.brave_api_key,
             exec_config=self.exec_config,
             restrict_to_workspace=self.restrict_to_workspace,
@@ -326,7 +326,7 @@ Focus only on your domain expertise and provide a helpful response.
     
     async def _call_bot_llm(
         self,
-        bot_name: str,
+        bot_role: str,
         system_prompt: str,
         user_message: str,
         session_id: str,
@@ -343,7 +343,7 @@ Focus only on your domain expertise and provide a helpful response.
         from nanobot.agent.tools import ToolRegistry
         
         # Create tool registry for this bot
-        tool_registry = self._create_bot_tool_registry(bot_name)
+        tool_registry = self._create_bot_tool_registry(bot_role)
         tool_definitions = tool_registry.get_definitions()
         
         # Build initial messages
@@ -387,7 +387,7 @@ Focus only on your domain expertise and provide a helpful response.
                         tool_args = {}
                 
                 # Execute tool
-                logger.debug(f"[{bot_name}] Executing tool: {tool_name}")
+                logger.debug(f"[{bot_role}] Executing tool: {tool_name}")
                 result = await tool_registry.execute(tool_name, tool_args)
                 
                 # Add tool result to messages
@@ -416,20 +416,20 @@ Focus only on your domain expertise and provide a helpful response.
             })
         
         # Max iterations reached, return last content
-        logger.warning(f"[{bot_name}] Max tool iterations ({max_iterations}) reached")
+        logger.warning(f"[{bot_role}] Max tool iterations ({max_iterations}) reached")
         return content
     
     def list_available_bots(self) -> dict:
         """List all bots that can be invoked."""
         return AVAILABLE_BOTS.copy()
     
-    def get_bot_info(self, bot_name: str) -> Optional[dict]:
+    def get_bot_info(self, bot_role: str) -> Optional[dict]:
         """Get information about a specific bot."""
-        return AVAILABLE_BOTS.get(bot_name)
+        return AVAILABLE_BOTS.get(bot_role)
     
     def _log_invocation_request(
         self,
-        bot_name: str,
+        bot_role: str,
         task: str,
         context: Optional[str] = None,
     ) -> None:
@@ -440,18 +440,18 @@ Focus only on your domain expertise and provide a helpful response.
         try:
             # Log as a bot message with mention
             self.work_log_manager.log_bot_message(
-                bot_name="leader",
-                message=f"Invoking @{bot_name} with task: {task[:200]}...",
-                mentions=[f"@{bot_name}"]
+                bot_role="leader",
+                message=f"Invoking @{bot_role} with task: {task[:200]}...",
+                mentions=[f"@{bot_role}"]
             )
             
             # Log as a handoff (bot-to-bot transfer)
             self.work_log_manager.log(
                 level=LogLevel.HANDOFF,
                 category="bot_invocation",
-                message=f"Delegating task to @{bot_name}",
+                message=f"Delegating task to @{bot_role}",
                 details={
-                    "target_bot": bot_name,
+                    "target_bot": bot_role,
                     "task": task[:500],
                     "context": context[:500] if context else None,
                 },
@@ -462,7 +462,7 @@ Focus only on your domain expertise and provide a helpful response.
     
     def _log_invocation_response(
         self,
-        bot_name: str,
+        bot_role: str,
         task: str,
         response: str,
     ) -> None:
@@ -473,29 +473,29 @@ Focus only on your domain expertise and provide a helpful response.
         try:
             # Log the bot's response
             self.work_log_manager.log_bot_message(
-                bot_name=bot_name,
+                bot_role=bot_role,
                 message=f"Response to task: {task[:100]}...\n\n{response[:1000]}...",
-                mentions=[f"@{bot_name}"]
+                mentions=[f"@{bot_role}"]
             )
             
             # Log completion
             self.work_log_manager.log(
                 level=LogLevel.INFO,
                 category="bot_invocation",
-                message=f"@{bot_name} completed the task",
+                message=f"@{bot_role} completed the task",
                 details={
-                    "target_bot": bot_name,
+                    "target_bot": bot_role,
                     "task": task[:500],
                     "response_length": len(response),
                 },
-                triggered_by=f"@{bot_name}"
+                triggered_by=f"@{bot_role}"
             )
         except Exception as e:
             logger.warning(f"Failed to log invocation response: {e}")
     
     def _log_invocation_error(
         self,
-        bot_name: str,
+        bot_role: str,
         task: str,
         error: str,
     ) -> None:
@@ -507,9 +507,9 @@ Focus only on your domain expertise and provide a helpful response.
             self.work_log_manager.log(
                 level=LogLevel.ERROR,
                 category="bot_invocation",
-                message=f"@{bot_name} invocation failed: {error}",
+                message=f"@{bot_role} invocation failed: {error}",
                 details={
-                    "target_bot": bot_name,
+                    "target_bot": bot_role,
                     "task": task[:500],
                     "error": error,
                 },

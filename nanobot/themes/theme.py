@@ -20,20 +20,20 @@ class ThemeName(Enum):
 class BotTheming:
     """How a bot appears within a theme."""
 
-    title: str  # Role title ("Captain", "Lead Singer", "Commander", etc.)
-    personality: str  # Brief personality description
-    greeting: str  # How bot introduces itself
-    voice_directive: str  # How bot should communicate
+    bot_title: str = ""  # Role title ("Captain", "Lead Singer", "Commander", etc.)
+    personality: str = ""  # Brief personality description
+    greeting: str = ""  # How bot introduces itself
+    voice_directive: str = ""  # How bot should communicate
     emoji: str = ""  # Visual identifier
-    default_name: str = ""  # Default display name (e.g., "Blackbeard", "Slash")
+    bot_name: str = ""  # Character name within theme (e.g., "Blackbeard", "Slash")
 
     def get_default_display_name(self) -> str:
         """Get the default display name for this bot.
         
         Returns:
-            default_name if set, otherwise falls back to title
+            bot_name if set, otherwise falls back to bot_title
         """
-        return self.default_name if self.default_name else self.title
+        return self.bot_name if self.bot_name else self.bot_title
 
 
 @dataclass
@@ -54,11 +54,11 @@ class Theme:
     metadata: Dict[str, Any] = field(default_factory=dict)
     """Additional theme metadata"""
 
-    def get_bot_theming(self, bot_name: str) -> Optional[BotTheming]:
+    def get_bot_theming(self, bot_role: str) -> Optional[BotTheming]:
         """Get theming for a specific bot.
 
         Args:
-            bot_name: Name of bot (leader, researcher, coder, social, creative, auditor)
+            bot_role: Role identifier (leader, researcher, coder, social, creative, auditor)
 
         Returns:
             BotTheming or None if bot not found
@@ -71,13 +71,13 @@ class Theme:
             "creative": self.creative,
             "auditor": self.auditor,
         }
-        return bot_map.get(bot_name)
+        return bot_map.get(bot_role)
 
     def get_all_bots_theming(self) -> Dict[str, BotTheming]:
         """Get theming for all 6 bots.
 
         Returns:
-            Dictionary mapping bot names to their theming
+            Dictionary mapping bot roles to their theming
         """
         return {
             "leader": self.leader,
@@ -99,42 +99,48 @@ class Theme:
             "description": self.description,
             "bots": {
                 "leader": {
-                    "title": self.leader.title,
+                    "bot_title": self.leader.bot_title,
+                    "bot_name": self.leader.bot_name,
                     "personality": self.leader.personality,
                     "greeting": self.leader.greeting,
                     "voice": self.leader.voice_directive,
                     "emoji": self.leader.emoji,
                 },
                 "researcher": {
-                    "title": self.researcher.title,
+                    "bot_title": self.researcher.bot_title,
+                    "bot_name": self.researcher.bot_name,
                     "personality": self.researcher.personality,
                     "greeting": self.researcher.greeting,
                     "voice": self.researcher.voice_directive,
                     "emoji": self.researcher.emoji,
                 },
                 "coder": {
-                    "title": self.coder.title,
+                    "bot_title": self.coder.bot_title,
+                    "bot_name": self.coder.bot_name,
                     "personality": self.coder.personality,
                     "greeting": self.coder.greeting,
                     "voice": self.coder.voice_directive,
                     "emoji": self.coder.emoji,
                 },
                 "social": {
-                    "title": self.social.title,
+                    "bot_title": self.social.bot_title,
+                    "bot_name": self.social.bot_name,
                     "personality": self.social.personality,
                     "greeting": self.social.greeting,
                     "voice": self.social.voice_directive,
                     "emoji": self.social.emoji,
                 },
                 "creative": {
-                    "title": self.creative.title,
+                    "bot_title": self.creative.bot_title,
+                    "bot_name": self.creative.bot_name,
                     "personality": self.creative.personality,
                     "greeting": self.creative.greeting,
                     "voice": self.creative.voice_directive,
                     "emoji": self.creative.emoji,
                 },
                 "auditor": {
-                    "title": self.auditor.title,
+                    "bot_title": self.auditor.bot_title,
+                    "bot_name": self.auditor.bot_name,
                     "personality": self.auditor.personality,
                     "greeting": self.auditor.greeting,
                     "voice": self.auditor.voice_directive,

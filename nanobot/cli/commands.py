@@ -504,14 +504,18 @@ def _create_workspace_templates(workspace: Path):
     templates = {
         "USER.md": """# User
 
-Information about the user goes here.
+        Information about the user goes here.
 
-## Preferences
+        ## Preferences
 
-- Communication style: (casual/formal)
-- Timezone: (your timezone)
-- Language: (your preferred language)
-""",
+        - Communication style: casual
+        - Timezone: UTC
+        - Language: English
+
+        ## About You
+
+        Add your preferences, constraints, and communication style here. This helps the AI understand how to interact with you.
+        """,
         "TOOLS.md": """# Available Tools
 
 This document describes the tools available to nanobot.
@@ -680,6 +684,10 @@ def gateway(
     cron_store_path = get_data_dir() / "cron" / "jobs.json"
     cron = CronService(cron_store_path)
     
+    # Get user's timezone from USER.md (or default to UTC)
+    from nanobot.utils.user_profile import get_user_timezone
+    system_timezone = get_user_timezone(config.workspace_path)
+    
     # Create agent with cron service and smart routing
     agent = AgentLoop(
         bus=bus,
@@ -692,6 +700,7 @@ def gateway(
         brave_api_key=config.tools.web.search.api_key or None,
         exec_config=config.tools.exec,
         cron_service=cron,
+        system_timezone=system_timezone,
         restrict_to_workspace=config.tools.restrict_to_workspace,
         session_manager=session_manager,
         routing_config=config.routing,
@@ -947,23 +956,23 @@ def _render_team_roster(current_participants: list, theme_manager) -> str:
     
     output = "[bold cyan]TEAM[/bold cyan]\n"
     
-    for bot_name, role in all_bots:
-        theming = theme_manager.get_bot_theming(bot_name)
+    for bot_role, role in all_bots:
+        theming = theme_manager.get_bot_theming(bot_role)
         
         if theming and isinstance(theming, dict):
-            char_name = theming.get('default_name') or theming.get('title', bot_name)
+            bot_name = theming.get('bot_name') or theming.get('bot_title', bot_role)
             emoji = theming.get('emoji', '•')
-            title = theming.get('title', role)
+            bot_title = theming.get('bot_title', role)
         else:
-            char_name = bot_name
+            bot_name = bot_role
             emoji = "•"
-            title = role
+            bot_title = role
         
         # Check if in current room
-        if bot_name in current_participants:
-            output += f"→ {emoji} [green]{char_name:12}[/green] ({title})\n"
+        if bot_role in current_participants:
+            output += f"→ {emoji} [green]{bot_name:12}[/green] ({bot_title})\n"
         else:
-            output += f"  {emoji} {char_name:12} ({title})\n"
+            output += f"  {emoji} {bot_name:12} ({bot_title})\n"
     
     return output
 
@@ -1173,23 +1182,23 @@ async def _handle_room_creation_intent(
     console.print("\n[bold]Recommended team:[/bold]")
     
     for bot in intent.get("recommended_bots", []):
-        bot_name = bot.get("name", "")
+        bot_role = bot.get("name", "")
         reason = bot.get("reason", "")
         
         # Get themed info (returns dict, not object)
-        theming = theme_manager.get_bot_theming(bot_name)
+        theming = theme_manager.get_bot_theming(bot_role)
         if theming and isinstance(theming, dict):
-            display_name = theming.get('default_name') or theming.get('title', bot_name)
+            display_name = theming.get('bot_name') or theming.get('bot_title', bot_role)
             emoji = theming.get('emoji', '•')
-            title = theming.get('title', '')
-            console.print(f"  {emoji} @{display_name:12} ({title} - {reason})")
+            bot_title = theming.get('bot_title', '')
+            console.print(f"  {emoji} @{display_name:12} ({bot_title} - {reason})")
         else:
             # Fallback to roster
-            info = roster.get_bot_info(bot_name)
+            info = roster.get_bot_info(bot_role)
             if info:
-                console.print(f"  {info['emoji']} @{bot_name:12} ({reason})")
+                console.print(f"  {info['emoji']} @{bot_role:12} ({reason})")
             else:
-                console.print(f"  • @{bot_name:12} ({reason})")
+                console.print(f"  • @{bot_role:12} ({reason})")
     
     console.print()
     
@@ -1219,23 +1228,23 @@ async def _handle_room_creation_intent(
         # Invite recommended bots with themed names
         invited = []
         for bot in intent.get("recommended_bots", []):
-            bot_name = bot.get("name", "")
-            with console.status(f"[cyan]Inviting @{bot_name}...[/cyan]", spinner="dots"):
-                invite_success = room_manager.invite_bot(new_room.id, bot_name)
+            bot_role = bot.get("name", "")
+            with console.status(f"[cyan]Inviting @{bot_role}...[/cyan]", spinner="dots"):
+                invite_success = room_manager.invite_bot(new_room.id, bot_role)
             
             if invite_success:
                 # Get themed info (returns dict)
-                theming = theme_manager.get_bot_theming(bot_name)
+                theming = theme_manager.get_bot_theming(bot_role)
                 if theming and isinstance(theming, dict):
-                    display_name = theming.get('default_name') or theming.get('title', bot_name)
+                    display_name = theming.get('bot_name') or theming.get('bot_title', bot_role)
                     emoji = theming.get('emoji', '•')
                     console.print(f"  {emoji} Invited @{display_name}")
                     invited.append(display_name)
                 else:
-                    info = roster.get_bot_info(bot_name)
+                    info = roster.get_bot_info(bot_role)
                     emoji = info['emoji'] if info else "•"
-                    console.print(f"  {emoji} Invited @{bot_name}")
-                    invited.append(bot_name)
+                    console.print(f"  {emoji} Invited @{bot_role}")
+                    invited.append(bot_role)
         
         if invited:
             console.print(f"\n[green]Team assembled: {', '.join(['@' + n for n in invited])}[/green]\n")
@@ -1283,6 +1292,10 @@ def agent(
     else:
         logger.disable("nanobot")
     
+    # Get user's timezone from USER.md (or default to UTC)
+    from nanobot.utils.user_profile import get_user_timezone
+    system_timezone = get_user_timezone(config.workspace_path)
+    
     agent_loop = AgentLoop(
         bus=bus,
         provider=provider,
@@ -1293,6 +1306,7 @@ def agent(
         max_tokens=config.agents.defaults.max_tokens,
         brave_api_key=config.tools.web.search.api_key or None,
         exec_config=config.tools.exec,
+        system_timezone=system_timezone,
         restrict_to_workspace=config.tools.restrict_to_workspace,
         routing_config=config.routing,
         evolutionary=config.tools.evolutionary,
@@ -2394,6 +2408,7 @@ def cron_add(
     every: int = typer.Option(None, "--every", "-e", help="Run every N seconds"),
     cron_expr: str = typer.Option(None, "--cron", "-c", help="Cron expression (e.g. '0 9 * * *')"),
     at: str = typer.Option(None, "--at", help="Run once at time (ISO format)"),
+    tz: str = typer.Option(None, "--tz", help="Timezone for cron (e.g. 'America/New_York', 'Asia/Tokyo'). Uses local timezone if not specified."),
     deliver: bool = typer.Option(False, "--deliver", "-d", help="Deliver response to channel"),
     to: str = typer.Option(None, "--to", help="Recipient for delivery"),
     channel: str = typer.Option(None, "--channel", help="Channel for delivery (e.g. 'telegram', 'whatsapp')"),
@@ -2407,7 +2422,7 @@ def cron_add(
     if every:
         schedule = CronSchedule(kind="every", every_ms=every * 1000)
     elif cron_expr:
-        schedule = CronSchedule(kind="cron", expr=cron_expr)
+        schedule = CronSchedule(kind="cron", expr=cron_expr, tz=tz)
     elif at:
         import datetime
         dt = datetime.datetime.fromisoformat(at)

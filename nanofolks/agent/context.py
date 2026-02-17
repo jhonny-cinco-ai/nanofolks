@@ -857,7 +857,10 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
         Returns:
             Updated message list.
         """
-        msg: dict[str, Any] = {"role": "assistant", "content": content or ""}
+        # Omit empty content — some backends reject empty text blocks
+        msg: dict[str, Any] = {"role": "assistant"}
+        if content:
+            msg["content"] = content
         
         if tool_calls:
             msg["tool_calls"] = tool_calls

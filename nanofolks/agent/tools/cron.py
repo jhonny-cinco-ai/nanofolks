@@ -105,6 +105,14 @@ class CronTool(Tool):
             return "Error: message is required for add"
         if not self._channel or not self._chat_id:
             return "Error: no session context (channel/chat_id)"
+        if timezone and not cron_expr:
+            return "Error: tz can only be used with cron_expr"
+        if timezone:
+            from zoneinfo import ZoneInfo
+            try:
+                ZoneInfo(timezone)
+            except (KeyError, Exception):
+                return f"Error: unknown timezone '{timezone}'"
         
         # Use provided timezone or fall back to user's default timezone
         effective_tz = timezone or self._default_timezone

@@ -2411,15 +2411,21 @@ def cron_list(
         if job.schedule.kind == "every":
             sched = f"every {(job.schedule.every_ms or 0) // 1000}s"
         elif job.schedule.kind == "cron":
-            sched = job.schedule.expr or ""
+            sched = f"{job.schedule.expr or ''} ({job.schedule.tz})" if job.schedule.tz else (job.schedule.expr or "")
         else:
             sched = "one-time"
         
         # Format next run
         next_run = ""
         if job.state.next_run_at_ms:
-            next_time = time.strftime("%Y-%m-%d %H:%M", time.localtime(job.state.next_run_at_ms / 1000))
-            next_run = next_time
+            from datetime import datetime as _dt
+            from zoneinfo import ZoneInfo
+            try:
+                ts = job.state.next_run_at_ms / 1000
+                tz = ZoneInfo(job.schedule.tz) if job.schedule.tz else None
+                next_run = _dt.fromtimestamp(ts, tz).strftime("%Y-%m-%d %H:%M")
+            except Exception:
+                next_run = time.strftime("%Y-%m-%d %H:%M", time.localtime(job.state.next_run_at_ms / 1000))
         
         status = "[green]enabled[/green]" if job.enabled else "[dim]disabled[/dim]"
         

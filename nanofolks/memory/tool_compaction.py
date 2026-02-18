@@ -223,7 +223,7 @@ class ToolOutputCompactor:
         self,
         tool_name: str,
         result: str,
-        session_key: str = ""
+        session_key: str = "",
         max_context_chars: int | None = None
     ) -> dict[str, Any]:
         """

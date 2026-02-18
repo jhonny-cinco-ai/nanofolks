@@ -439,29 +439,29 @@ Then restart nanofolks for secure access.
             self._select_theme()
     
     def _show_team_for_theme(self, theme_name: str) -> None:
-         """Show the full team composition for a theme."""
-         team = get_team(theme_name)
-         if not team:
-             return
-         
-         console.print(f"\n[bold]Crew: {team.name.value}[/bold]\n")
-         console.print(f"[dim]{team.description}[/dim]\n")
-         
-         # Create a table showing each team member
-         team_table = Table(title="Your Crew Members", box=box.ROUNDED)
-         team_table.add_column("Role", style="cyan", width=15)
-         team_table.add_column("Bot", style="green", width=12)
-         team_table.add_column("Description", style="white")
-         
-         # Add each bot
-         bots = [
-             ("Leader", team.leader, "leader"),
-             ("Researcher", team.researcher, "researcher"),
-             ("Coder", team.coder, "coder"),
-             ("Social", team.social, "social"),
-             ("Creative", team.creative, "creative"),
-             ("Auditor", team.auditor, "auditor"),
-         ]
+        """Show the full team composition for a theme."""
+        team = get_team(theme_name)
+        if not team:
+            return
+        
+        console.print(f"\n[bold]Crew: {team.name.value}[/bold]\n")
+        console.print(f"[dim]{team.description}[/dim]\n")
+        
+        # Create a table showing each team member
+        team_table = Table(title="Your Crew Members", box=box.ROUNDED)
+        team_table.add_column("Role", style="cyan", width=15)
+        team_table.add_column("Bot", style="green", width=12)
+        team_table.add_column("Description", style="white")
+        
+        # Add each bot
+        bots = [
+            ("Leader", team.leader, "leader"),
+            ("Researcher", team.researcher, "researcher"),
+            ("Coder", team.coder, "coder"),
+            ("Social", team.social, "social"),
+            ("Creative", team.creative, "creative"),
+            ("Auditor", team.auditor, "auditor"),
+        ]
         
         for role, bot_theming, bot_name in bots:
             if bot_theming:

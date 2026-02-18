@@ -28,6 +28,7 @@ Pick the kind of crew that fits you.
 | ✨ | **Collaboration** over automation |
 | 🎭 | **Characters** over tools |
 | 🤝 | **Companionship** over commands |
+| 🏠 | **Room-centric** organization over fragmented sessions |
 
 > It's not just an assistant. It's a team.
 
@@ -53,6 +54,7 @@ Nanofolks provides a flexible architecture for:
 | 🧩 | role-based personalities |
 | 🔧 | extensibility |
 | 💬 | multi-platform interaction |
+| 🏠 | room-centric session organization |
 
 **Inspired by nanobot's simplicity, Nanofolks expands the concept into a more expressive, team-oriented system.**
 
@@ -1030,6 +1032,54 @@ CreativeBot: [accesses the same research context]
 
 You: @coder build a dashboard with those stats
 CoderBot: [references previous findings]
+```
+
+### Room-Centric Architecture
+
+Nanofolks uses a **room-centric architecture** where everything is organized by room. This provides:
+
+| Benefit | Description |
+|---------|-------------|
+| **Persistent Sessions** | Conversation history is stored per-room, not per-channel |
+| **Cross-Platform Continuity** | Same room ID works across Telegram, Discord, Slack, etc. |
+| **Organized Storage** | All data (sessions, memory, work logs) organized by room |
+| **Easy Retrieval** | Find conversations by room name, not obscure session IDs |
+
+#### How It Works
+
+```
+room:cli_default          → CLI conversations
+room:telegram_123456      → Telegram chat
+room:discord_987654       → Discord channel
+room:project_website      → Project room (multi-platform)
+```
+
+#### Storage Structure
+
+```
+~/.nanofolks/
+├── room_sessions/          # Session history by room
+│   ├── cli_default.jsonl
+│   ├── telegram_123456.jsonl
+│   └── project_website.jsonl
+├── project_states/         # Discovery flow states
+│   ├── project_website.json
+│   └── project_website_quick.json
+└── work_logs.db           # Work logs with room IDs
+```
+
+#### Cross-Platform Rooms
+
+Create rooms that work across platforms:
+
+```bash
+# Create a project room
+nanofolks room create website-redesign
+
+# Join from any platform - same room, same context
+# Telegram: @nanofolks invite me to website-redesign
+# Discord: /invite website-redesign
+# CLI: nanofolks room join website-redesign
 ```
 
 ### CLI Commands for Rooms

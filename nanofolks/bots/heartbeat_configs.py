@@ -6,27 +6,27 @@ defaults by providing a heartbeat.yaml or heartbeat.json file.
 
 Usage:
     from nanofolks.bots.heartbeat_configs import get_bot_heartbeat_config
-    
+
     config = get_bot_heartbeat_config("researcher")
     service = BotHeartbeatService(bot, config)
     await service.start()
 """
 
-from typing import Any, Dict, List, Optional
-from pathlib import Path
-import yaml
 import json
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import yaml
 from loguru import logger
 
-from nanofolks.heartbeat.models import HeartbeatConfig, CheckDefinition, CheckPriority
-
+from nanofolks.heartbeat.models import CheckDefinition, CheckPriority, HeartbeatConfig
 
 # Default interval: 60 minutes for specialists, 30 minutes for coordinator
 DEFAULT_SPECIALIST_INTERVAL_S = 3600  # 60 minutes
 DEFAULT_COORDINATOR_INTERVAL_S = 1800  # 30 minutes
 
 
-def _create_check(name: str, description: str, priority: str = "normal", 
+def _create_check(name: str, description: str, priority: str = "normal",
                   max_duration_s: float = 60.0, config: Optional[Dict] = None) -> CheckDefinition:
     """Helper to create a CheckDefinition."""
     priority_map = {
@@ -35,7 +35,7 @@ def _create_check(name: str, description: str, priority: str = "normal",
         "normal": CheckPriority.NORMAL,
         "low": CheckPriority.LOW
     }
-    
+
     return CheckDefinition(
         name=name,
         description=description,
@@ -447,16 +447,16 @@ DEFAULT_CONFIGS: Dict[str, HeartbeatConfig] = {
 
 def load_config_from_file(config_path: Path) -> Optional[Dict[str, Any]]:
     """Load heartbeat configuration from YAML or JSON file.
-    
+
     Args:
         config_path: Path to configuration file
-        
+
     Returns:
         Configuration dict or None if file doesn't exist
     """
     if not config_path.exists():
         return None
-    
+
     try:
         with open(config_path, 'r') as f:
             if config_path.suffix in ['.yaml', '.yml']:
@@ -477,11 +477,11 @@ def load_config_from_file(config_path: Path) -> Optional[Dict[str, Any]]:
 
 def merge_config(base: HeartbeatConfig, override: Dict[str, Any]) -> HeartbeatConfig:
     """Merge override settings into base configuration.
-    
+
     Args:
         base: Base configuration
         override: Override settings from file
-        
+
     Returns:
         Merged configuration
     """
@@ -501,11 +501,11 @@ def merge_config(base: HeartbeatConfig, override: Dict[str, Any]) -> HeartbeatCo
         log_level=override.get('log_level', base.log_level),
         retain_history_count=override.get('retain_history_count', base.retain_history_count)
     )
-    
+
     # Update check configurations
     if 'checks' in override:
         check_overrides = {c['name']: c for c in override['checks'] if 'name' in c}
-        
+
         updated_checks = []
         for check in merged.checks:
             if check.name in check_overrides:
@@ -522,9 +522,9 @@ def merge_config(base: HeartbeatConfig, override: Dict[str, Any]) -> HeartbeatCo
                 ))
             else:
                 updated_checks.append(check)
-        
+
         merged.checks = updated_checks
-    
+
     return merged
 
 
@@ -534,23 +534,23 @@ def get_bot_heartbeat_config(
     custom_overrides: Optional[Dict[str, Any]] = None
 ) -> HeartbeatConfig:
     """Get heartbeat configuration for a bot.
-    
+
     Loads default configuration and applies any overrides from:
     1. Configuration file (heartbeat.yaml or heartbeat.json)
     2. Custom overrides passed as parameter
-    
+
     Args:
         bot_name: Name of the bot (researcher, coder, social, auditor, creative, coordinator)
         config_dir: Directory containing heartbeat.yaml/json (default: current dir)
         custom_overrides: Additional override settings
-        
+
     Returns:
         Configured HeartbeatConfig for the bot
-        
+
     Example:
         >>> config = get_bot_heartbeat_config("researcher")
         >>> print(f"Interval: {config.interval_s}s")
-        
+
         >>> config = get_bot_heartbeat_config(
         ...     "social",
         ...     custom_overrides={"interval_s": 1800}  # 30 min
@@ -562,11 +562,11 @@ def get_bot_heartbeat_config(
         base_config = HeartbeatConfig(bot_name=bot_name)
     else:
         base_config = DEFAULT_CONFIGS[bot_name]
-    
+
     # Load from file if exists
     if config_dir is None:
         config_dir = Path.cwd()
-    
+
     for filename in ['heartbeat.yaml', 'heartbeat.yml', 'heartbeat.json']:
         config_file = config_dir / filename
         if config_file.exists():
@@ -575,11 +575,11 @@ def get_bot_heartbeat_config(
                 logger.info(f"Loading heartbeat config for {bot_name} from {config_file}")
                 base_config = merge_config(base_config, file_config[bot_name])
             break
-    
+
     # Apply custom overrides
     if custom_overrides:
         base_config = merge_config(base_config, custom_overrides)
-    
+
     return base_config
 
 
@@ -587,10 +587,10 @@ def get_all_heartbeat_configs(
     config_dir: Optional[Path] = None
 ) -> Dict[str, HeartbeatConfig]:
     """Get heartbeat configurations for all bots.
-    
+
     Args:
         config_dir: Directory containing configuration files
-        
+
     Returns:
         Dict mapping bot names to their configurations
     """
@@ -606,12 +606,12 @@ def save_heartbeat_config(
     format: str = "yaml"
 ) -> None:
     """Save heartbeat configuration to file.
-    
+
     Args:
         config: Configuration to save
         config_path: Path to save to
         format: 'yaml' or 'json'
-        
+
     Example:
         >>> config = HeartbeatConfig(bot_name="custom")
         >>> save_heartbeat_config(config, Path("config.yaml"))
@@ -644,26 +644,26 @@ def save_heartbeat_config(
             ]
         }
     }
-    
+
     with open(config_path, 'w') as f:
         if format in ['yaml', 'yml']:
             yaml.dump(config_dict, f, default_flow_style=False, sort_keys=False)
         else:
             json.dump(config_dict, f, indent=2)
-    
+
     logger.info(f"Saved heartbeat config to {config_path}")
 
 
 __all__ = [
     # Default configs
     "RESEARCHER_CONFIG",
-    "CODER_CONFIG", 
+    "CODER_CONFIG",
     "SOCIAL_CONFIG",
     "AUDITOR_CONFIG",
     "CREATIVE_CONFIG",
     "COORDINATOR_CONFIG",
     "DEFAULT_CONFIGS",
-    
+
     # Functions
     "get_bot_heartbeat_config",
     "get_all_heartbeat_configs",

@@ -4,33 +4,33 @@ from typing import Any
 
 from nanofolks.agent.tools.base import Tool
 from nanofolks.cron.service import CronService
-from nanofolks.cron.types import CronPayload, CronSchedule
+from nanofolks.cron.types import CronSchedule
 
 
 class CronTool(Tool):
     """
     Tool to schedule reminders, recurring tasks, and routing calibration.
-    
+
     Supports two job types:
     1. User reminders (delivered back to user via chat/channel)
     2. System calibration (optimizes routing performance in background)
     """
-    
+
     def __init__(self, cron_service: CronService, default_timezone: str = "UTC"):
         self._cron = cron_service
         self._channel = ""
         self._chat_id = ""
         self._default_timezone = default_timezone  # User's configured timezone
-    
+
     def set_context(self, channel: str, chat_id: str) -> None:
         """Set the current session context for delivery."""
         self._channel = channel
         self._chat_id = chat_id
-    
+
     @property
     def name(self) -> str:
         return "cron"
-    
+
     @property
     def description(self) -> str:
         return (
@@ -39,7 +39,7 @@ class CronTool(Tool):
             "Use 'calibrate' to schedule automatic routing performance optimization. "
             "Supports timezones like 'America/New_York', 'Europe/London', 'Asia/Tokyo'."
         )
-    
+
     @property
     def parameters(self) -> dict[str, Any]:
         return {
@@ -77,7 +77,7 @@ class CronTool(Tool):
             },
             "required": ["action"]
         }
-    
+
     async def execute(
         self,
         action: str,
@@ -98,7 +98,7 @@ class CronTool(Tool):
         elif action == "remove":
             return self._remove_job(job_id)
         return f"Unknown action: {action}"
-    
+
     def _add_job(self, message: str, every_seconds: int | None, cron_expr: str | None, at: str | None, timezone: str | None = None) -> str:
         """Add a user reminder or task job."""
         if not message:
@@ -113,10 +113,10 @@ class CronTool(Tool):
                 ZoneInfo(timezone)
             except (KeyError, Exception):
                 return f"Error: unknown timezone '{timezone}'"
-        
+
         # Use provided timezone or fall back to user's default timezone
         effective_tz = timezone or self._default_timezone
-        
+
         # Build schedule
         delete_after = False
         if every_seconds:
@@ -131,7 +131,7 @@ class CronTool(Tool):
             delete_after = True
         else:
             return "Error: either every_seconds, cron_expr, or at is required"
-        
+
         job = self._cron.add_job(
             name=message[:30],
             schedule=schedule,
@@ -142,19 +142,19 @@ class CronTool(Tool):
             delete_after_run=delete_after,
         )
         return f"Created reminder '{job.name}' (id: {job.id}). You'll receive this message as scheduled."
-    
+
     def _add_calibration_job(self, every_seconds: int | None, cron_expr: str | None, timezone: str | None = None) -> str:
         """
         Add a routing calibration job to optimize classification performance.
-        
+
         Calibration analyzes classification history and improves routing accuracy
         over time by learning from successful LLM classifications.
-        
+
         This is a system job that runs in background - no user delivery.
         """
         # Use provided timezone or fall back to user's default timezone
         effective_tz = timezone or self._default_timezone
-        
+
         # Default to daily calibration if no schedule specified
         if not every_seconds and not cron_expr:
             # Default: daily at 2:00 AM
@@ -177,7 +177,7 @@ class CronTool(Tool):
             schedule_desc = f"on schedule '{cron_expr}'"
         else:
             return "Error: either every_seconds or cron_expr is required"
-        
+
         # Create calibration job - system job, no delivery to user
         job = self._cron.add_job(
             name="Routing Calibration",
@@ -187,38 +187,38 @@ class CronTool(Tool):
             channel="internal",
             to="calibration",
         )
-        
+
         return (
             f"✓ Scheduled routing calibration {schedule_desc} (job id: {job.id}).\n\n"
             f"This will automatically optimize message routing based on classification history, "
             f"improving accuracy and reducing costs over time. "
             f"Calibration runs in the background - you'll see improvements gradually."
         )
-    
+
     def _list_jobs(self) -> str:
         """List all jobs - separate user reminders from system calibration."""
         jobs = self._cron.list_jobs()
         if not jobs:
             return "No scheduled jobs."
-        
+
         # Separate user jobs from calibration jobs
         user_jobs = []
         calibration_jobs = []
-        
+
         for job in jobs:
             if job.payload.message == "CALIBRATE_ROUTING":
                 calibration_jobs.append(job)
             else:
                 user_jobs.append(job)
-        
+
         lines = []
-        
+
         # Show user reminders first
         if user_jobs:
             lines.append("📅 Your Reminders:")
             for job in user_jobs:
                 lines.append(f"  • {job.name} (id: {job.id}, {job.schedule.kind})")
-        
+
         # Show calibration jobs
         if calibration_jobs:
             if user_jobs:
@@ -226,9 +226,9 @@ class CronTool(Tool):
             lines.append("🔧 System Calibration:")
             for job in calibration_jobs:
                 lines.append(f"  • {job.name} (id: {job.id}, {job.schedule.kind})")
-        
+
         return "\n".join(lines)
-    
+
     def _remove_job(self, job_id: str | None) -> str:
         if not job_id:
             return "Error: job_id is required for remove"

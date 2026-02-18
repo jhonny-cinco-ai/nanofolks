@@ -2,12 +2,11 @@
 
 import asyncio
 import re
-from typing import Any
 
 from loguru import logger
-from slack_sdk.socket_mode.websockets import SocketModeClient
 from slack_sdk.socket_mode.request import SocketModeRequest
 from slack_sdk.socket_mode.response import SocketModeResponse
+from slack_sdk.socket_mode.websockets import SocketModeClient
 from slack_sdk.web.async_client import AsyncWebClient
 
 from nanofolks.bus.events import OutboundMessage
@@ -221,11 +220,11 @@ class SlackChannel(BaseChannel):
         """Convert standard Markdown to Slack mrkdwn format."""
         if not text:
             return text
-        
+
         # Apply formatting substitutions
         for pattern, replacement in self._MD_TO_SLACK:
             text = re.sub(pattern, replacement, text)
-        
+
         # Convert tables
         return self._TABLE_RE.sub(self._convert_table, text)
 
@@ -235,10 +234,10 @@ class SlackChannel(BaseChannel):
         lines = [l.strip() for l in match.group(0).strip().split('\n') if l.strip()]
         if len(lines) < 2:
             return match.group(0)
-        
+
         headers = [h.strip() for h in lines[0].strip('|').split('|')]
         start = 2 if not re.search(r'[^ |:\-]', lines[1]) else 1
-        
+
         result: list[str] = []
         for line in lines[start:]:
             cells = [c.strip() for c in line.strip('|').split('|')]

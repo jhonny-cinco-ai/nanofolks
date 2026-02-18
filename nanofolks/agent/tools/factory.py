@@ -9,10 +9,10 @@ from typing import Any, Optional
 
 from nanofolks.agent.tools import ToolRegistry
 from nanofolks.agent.tools.permissions import (
-    get_permissions_from_soul,
-    get_permissions_from_agents,
-    merge_permissions,
     filter_registry,
+    get_permissions_from_agents,
+    get_permissions_from_soul,
+    merge_permissions,
 )
 from nanofolks.config.schema import ExecToolConfig
 
@@ -27,12 +27,12 @@ def create_bot_registry(
     base_registry: Optional[ToolRegistry] = None,
 ) -> ToolRegistry:
     """Create a tool registry for a specialist bot.
-    
+
     This function:
     1. Loads tool permissions from bot's SOUL.md/AGENTS.md
     2. Creates a base tool registry with standard tools
     3. Filters tools based on permissions
-    
+
     Args:
         workspace: Path to workspace
         bot_name: Name of the bot
@@ -41,7 +41,7 @@ def create_bot_registry(
         exec_config: Execution config for shell tool
         restrict_to_workspace: Whether to restrict file ops to workspace
         base_registry: Optional pre-created registry to filter
-        
+
     Returns:
         Filtered ToolRegistry for the bot
     """
@@ -49,7 +49,7 @@ def create_bot_registry(
     soul_perms = get_permissions_from_soul(bot_name, workspace)
     agents_perms = get_permissions_from_agents(bot_name, workspace)
     permissions = merge_permissions(soul_perms, agents_perms)
-    
+
     # If no special permissions, create default registry
     if not permissions.allowed_tools and not permissions.denied_tools:
         if base_registry:
@@ -61,7 +61,7 @@ def create_bot_registry(
             exec_config=exec_config,
             restrict_to_workspace=restrict_to_workspace,
         )
-    
+
     # Create base registry and filter
     base = base_registry or create_default_registry(
         workspace=workspace,
@@ -70,7 +70,7 @@ def create_bot_registry(
         exec_config=exec_config,
         restrict_to_workspace=restrict_to_workspace,
     )
-    
+
     return filter_registry(base, permissions)
 
 
@@ -85,7 +85,7 @@ def create_default_registry(
     protected_paths: Optional[list[str]] = None,
 ) -> ToolRegistry:
     """Create a default tool registry with all standard tools.
-    
+
     Args:
         workspace: Path to workspace
         provider: LLM provider (for message tool)
@@ -95,36 +95,34 @@ def create_default_registry(
         evolutionary: Whether evolutionary mode is enabled
         allowed_paths: Allowed paths for evolutionary mode
         protected_paths: Protected paths for evolutionary mode
-        
+
     Returns:
         ToolRegistry with default tools
     """
     registry = ToolRegistry()
-    
+
     # Import tools
     from nanofolks.agent.tools.filesystem import (
-        ReadFileTool,
-        WriteFileTool,
         EditFileTool,
         ListDirTool,
+        ReadFileTool,
+        WriteFileTool,
     )
     from nanofolks.agent.tools.shell import ExecTool
-    from nanofolks.agent.tools.web import WebSearchTool, WebFetchTool
-    from nanofolks.agent.tools.invoke import InvokeTool
-    from nanofolks.agent.tools.message import MessageTool
-    
+    from nanofolks.agent.tools.web import WebFetchTool, WebSearchTool
+
     # File tools
     allowed_dir = workspace if restrict_to_workspace else None
-    
+
     if evolutionary and allowed_paths:
         allowed_dirs = [Path(p).expanduser().resolve() for p in allowed_paths]
         protected_dirs = [Path(p).expanduser().resolve() for p in (protected_paths or [])]
-        
+
         registry.register(ReadFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
         registry.register(WriteFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
         registry.register(EditFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
         registry.register(ListDirTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
-        
+
         registry.register(ExecTool(
             working_dir=str(workspace),
             timeout=exec_config.timeout if exec_config else 60,
@@ -135,26 +133,26 @@ def create_default_registry(
         registry.register(WriteFileTool(allowed_dir=allowed_dir))
         registry.register(EditFileTool(allowed_dir=allowed_dir))
         registry.register(ListDirTool(allowed_dir=allowed_dir))
-        
+
         registry.register(ExecTool(
             working_dir=str(workspace),
             timeout=exec_config.timeout if exec_config else 60,
             restrict_to_workspace=restrict_to_workspace,
         ))
-    
+
     # Web tools
     if brave_api_key:
         registry.register(WebSearchTool(api_key=brave_api_key))
     registry.register(WebFetchTool())
-    
+
     # Message tool (if provider/bus available)
     if provider:
         # We'll handle this differently - message tool needs bus
         pass
-    
+
     # Invoke tool (for invoking other bots)
     # Note: invoker will be set later
-    
+
     return registry
 
 
@@ -164,22 +162,22 @@ def get_tool_definitions_for_bot(
     base_definitions: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
     """Get filtered tool definitions for a bot based on permissions.
-    
+
     Args:
         workspace: Path to workspace
         bot_name: Name of the bot
         base_definitions: Full list of tool definitions
-        
+
     Returns:
         Filtered list of tool definitions
     """
     soul_perms = get_permissions_from_soul(bot_name, workspace)
     agents_perms = get_permissions_from_agents(bot_name, workspace)
     permissions = merge_permissions(soul_perms, agents_perms)
-    
+
     if not permissions.allowed_tools and not permissions.denied_tools:
         return base_definitions
-    
+
     filtered = []
     for tool_def in base_definitions:
         tool_name = tool_def.get("function", {}).get("name", "")
@@ -195,5 +193,5 @@ def get_tool_definitions_for_bot(
                     }
                 }
             filtered.append(tool_def)
-    
+
     return filtered

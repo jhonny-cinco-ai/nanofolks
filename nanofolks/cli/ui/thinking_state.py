@@ -9,9 +9,9 @@ Supports:
 - Configurable defaults
 """
 
-from typing import Dict, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
+from typing import Dict, Optional
 
 
 class ThinkingDisplayMode(Enum):
@@ -28,7 +28,7 @@ class ThinkingDisplayState:
     message_index: int
     expanded: bool = False
     visited: int = 0  # How many times user has toggled
-    
+
     def increment_visits(self) -> None:
         """Record that user visited this thinking display."""
         self.visited += 1
@@ -36,20 +36,20 @@ class ThinkingDisplayState:
 
 class ThinkingStateTracker:
     """Manages thinking display state across messages.
-    
+
     Tracks:
     - Whether each message's thinking display is expanded/collapsed
     - User preference history
     - Session-wide defaults
     """
-    
+
     def __init__(
         self,
         mode: ThinkingDisplayMode = ThinkingDisplayMode.REMEMBER_STATE,
         default_expanded: bool = False,
     ):
         """Initialize state tracker.
-        
+
         Args:
             mode: How to handle state persistence
             default_expanded: Default state for new messages
@@ -58,13 +58,13 @@ class ThinkingStateTracker:
         self.default_expanded = default_expanded
         self.states: Dict[int, ThinkingDisplayState] = {}
         self.global_preference: Optional[bool] = None
-    
+
     def should_be_expanded(self, message_index: int) -> bool:
         """Determine if thinking display should be expanded for this message.
-        
+
         Args:
             message_index: Index of the message
-            
+
         Returns:
             True if should be expanded, False if collapsed
         """
@@ -82,76 +82,76 @@ class ThinkingStateTracker:
             if self.global_preference is not None:
                 return self.global_preference
             return self.default_expanded
-    
+
     def record_state(self, message_index: int, expanded: bool) -> None:
         """Record the state of a thinking display after user interaction.
-        
+
         Args:
             message_index: Index of the message
             expanded: Whether display was expanded
         """
         if message_index not in self.states:
             self.states[message_index] = ThinkingDisplayState(message_index)
-        
+
         state = self.states[message_index]
         state.expanded = expanded
         state.increment_visits()
-        
+
         # Update global preference based on mode
         if self.mode == ThinkingDisplayMode.USER_CHOICE:
             self.global_preference = expanded
-    
+
     def get_state(self, message_index: int) -> Optional[ThinkingDisplayState]:
         """Get stored state for a message.
-        
+
         Args:
             message_index: Index of the message
-            
+
         Returns:
             State object if exists, None otherwise
         """
         return self.states.get(message_index)
-    
+
     def get_all_states(self) -> Dict[int, ThinkingDisplayState]:
         """Get all stored states.
-        
+
         Returns:
             Dictionary of all states
         """
         return self.states.copy()
-    
+
     def reset_message_state(self, message_index: int) -> None:
         """Reset state for a specific message.
-        
+
         Args:
             message_index: Index of the message
         """
         if message_index in self.states:
             del self.states[message_index]
-    
+
     def reset_all(self) -> None:
         """Reset all state tracking."""
         self.states.clear()
         self.global_preference = None
-    
+
     def set_mode(self, mode: ThinkingDisplayMode) -> None:
         """Change the state tracking mode.
-        
+
         Args:
             mode: New mode to use
         """
         self.mode = mode
-    
+
     def get_stats(self) -> Dict[str, any]:
         """Get statistics about state tracking.
-        
+
         Returns:
             Dictionary with stats
         """
         total_messages = len(self.states)
         expanded_count = sum(1 for s in self.states.values() if s.expanded)
         total_visits = sum(s.visited for s in self.states.values())
-        
+
         return {
             "total_messages": total_messages,
             "expanded_count": expanded_count,
@@ -165,10 +165,10 @@ class ThinkingStateTracker:
 
 class SessionThinkingPreferences:
     """Manages session-wide thinking display preferences.
-    
+
     Stores user preferences that persist across messages in a session.
     """
-    
+
     def __init__(self):
         """Initialize preferences."""
         self.show_thinking = True  # Show thinking display at all
@@ -176,10 +176,10 @@ class SessionThinkingPreferences:
         self.show_stats = True  # Show statistics in expanded view
         self.auto_expand_on_errors = True  # Auto-expand if there were errors
         self.max_summary_length = 80  # Max length before truncation
-    
+
     def to_dict(self) -> Dict[str, any]:
         """Convert to dictionary.
-        
+
         Returns:
             Dictionary of preferences
         """
@@ -190,10 +190,10 @@ class SessionThinkingPreferences:
             "auto_expand_on_errors": self.auto_expand_on_errors,
             "max_summary_length": self.max_summary_length,
         }
-    
+
     def from_dict(self, data: Dict[str, any]) -> None:
         """Load from dictionary.
-        
+
         Args:
             data: Dictionary of preferences
         """

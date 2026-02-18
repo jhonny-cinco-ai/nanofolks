@@ -3,49 +3,49 @@
 Provides inter-bot communication, task delegation, and team coordination.
 """
 
-from nanofolks.coordinator.models import (
-    BotMessage,
-    MessageType,
-    Task,
-    TaskStatus,
-    TaskPriority,
-    TaskDependency,
-    ConversationContext,
-    CoordinationEvent,
+from nanofolks.coordinator.audit import (
+    AuditEvent,
+    AuditEventSeverity,
+    AuditEventType,
+    AuditTrail,
+    DecisionAuditRecord,
 )
-from nanofolks.coordinator.bus import InterBotBus
-from nanofolks.coordinator.coordinator_bot import CoordinatorBot
-from nanofolks.coordinator.store import CoordinatorStore
 from nanofolks.coordinator.autonomous import AutonomousBotTeam, BotCollaborator
+from nanofolks.coordinator.bus import InterBotBus
+from nanofolks.coordinator.circuit_breaker import (
+    CallMetrics,
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    CircuitBreakerOpen,
+    CircuitState,
+    LoadBalancer,
+    RetryStrategy,
+)
+from nanofolks.coordinator.coordinator_bot import CoordinatorBot
 from nanofolks.coordinator.decisions import (
     BotPosition,
     Decision,
-    Disagreement,
     DecisionMaker,
+    Disagreement,
+    DisagreementType,
     DisputeResolver,
     VotingStrategy,
-    DisagreementType,
-)
-from nanofolks.coordinator.audit import (
-    AuditTrail,
-    AuditEvent,
-    AuditEventType,
-    AuditEventSeverity,
-    DecisionAuditRecord,
 )
 from nanofolks.coordinator.explanation import (
-    ExplanationEngine,
     Explanation,
+    ExplanationEngine,
 )
-from nanofolks.coordinator.circuit_breaker import (
-    CircuitBreaker,
-    CircuitBreakerConfig,
-    CircuitState,
-    CallMetrics,
-    CircuitBreakerOpen,
-    RetryStrategy,
-    LoadBalancer,
+from nanofolks.coordinator.models import (
+    BotMessage,
+    ConversationContext,
+    CoordinationEvent,
+    MessageType,
+    Task,
+    TaskDependency,
+    TaskPriority,
+    TaskStatus,
 )
+from nanofolks.coordinator.store import CoordinatorStore
 
 __all__ = [
     "BotMessage",

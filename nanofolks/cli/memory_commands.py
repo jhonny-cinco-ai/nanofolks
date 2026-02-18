@@ -1,17 +1,12 @@
 """Memory CLI commands for nanofolks."""
 
 import asyncio
-import json
-import os
-from pathlib import Path
 from typing import Any, Optional
 
 import typer
+from loguru import logger
 from rich.console import Console
 from rich.table import Table
-
-from loguru import logger
-
 
 console = Console()
 
@@ -19,18 +14,18 @@ console = Console()
 def _get_memory_store() -> Optional[Any]:
     """Get memory store with error handling."""
     try:
-        from nanofolks.memory.store import TurboMemoryStore
         from nanofolks.config.loader import load_config
-        
+        from nanofolks.memory.store import TurboMemoryStore
+
         config = load_config()
         if not config.memory.enabled:
             console.print("[yellow]Memory system is disabled[/yellow]")
             return None
-        
+
         workspace = config.workspace_path
         memory_dir = workspace / "memory"
         memory_dir.mkdir(exist_ok=True)
-        
+
         return TurboMemoryStore(config.memory, workspace)
     except ImportError:
         console.print("[red]Error importing memory store[/red]")
@@ -77,30 +72,30 @@ def memory_status():
     memory_store = _get_memory_store()
     if not memory_store:
         return
-    
+
     try:
         stats = memory_store.get_stats()
-        
-        console.print(f"\n[bold]Memory Status[/bold]")
+
+        console.print("\n[bold]Memory Status[/bold]")
         console.print(f"Events: {stats.get('events', 0):,}")
         console.print(f"Entities: {stats.get('entities', 0):,}")
         console.print(f"Edges: {stats.get('edges', 0):,}")
         console.print(f"Facts: {stats.get('facts', 0):,}")
-        
+
         # Entity types
         entity_summary = stats.get("entity_summary", {})
         if entity_summary:
             console.print("\n[bold yellow]Entity Types:[/bold yellow]")
             for entity_type, count in entity_summary.items():
                 console.print(f"  {entity_type}: {count}")
-        
+
         # Learning stats
         try:
             learnings = memory_store.get_all_learnings(active_only=False)
             console.print(f"\n[bold magenta]Learnings:[/bold magenta] {len(learnings)}")
         except Exception:
             pass
-        
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
@@ -111,13 +106,13 @@ def memory_search(query: str, limit: int = typer.Option(10, "--limit", "-l")):
     memory_store = _get_memory_store()
     if not memory_store:
         return
-    
+
     try:
         from nanofolks.memory.retrieval import create_retrieval
-        
+
         retrieval = create_retrieval(memory_store)
         results = retrieval.search(query, limit=limit)
-        
+
         if results:
             console.print(f"\n[bold]Search: {query}[/bold]")
             for i, result in enumerate(results, 1):
@@ -126,7 +121,7 @@ def memory_search(query: str, limit: int = typer.Option(10, "--limit", "-l")):
                 console.print(f"{i}. {content} [dim]({similarity:.2f})[/dim]")
         else:
             console.print(f"[yellow]No results for: {query}[/yellow]")
-            
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
@@ -137,17 +132,17 @@ def memory_entities(limit: int = typer.Option(20, "--limit", "-l")):
     memory_store = _get_memory_store()
     if not memory_store:
         return
-    
+
     try:
         entities = memory_store.get_all_entities(limit=limit)
-        
+
         if entities:
             table = Table(title=f"Entities (Top {len(entities)})")
             table.add_column("Name", style="green")
             table.add_column("Type", style="yellow")
             table.add_column("Events", style="magenta")
             table.add_column("Last Seen", style="dim")
-            
+
             for entity in entities:
                 last_seen_str = "unknown"
                 if entity.last_seen and hasattr(entity.last_seen, 'strftime'):
@@ -160,12 +155,12 @@ def memory_entities(limit: int = typer.Option(20, "--limit", "-l")):
                     str(entity.event_count),
                     last_seen_str
                 )
-            
-            console.print(f"\n[bold]Entities[/bold]")
+
+            console.print("\n[bold]Entities[/bold]")
             console.print(table)
         else:
             console.print("[yellow]No entities found[/yellow]")
-            
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
@@ -176,10 +171,10 @@ def memory_entity(name: str):
     memory_store = _get_memory_store()
     if not memory_store:
         return
-    
+
     try:
         entity = memory_store.find_entity_by_name(name)
-        
+
         if entity:
             console.print(f"\n[bold]Entity: {name}[/bold]")
             console.print(f"Type: {entity.entity_type}")
@@ -187,7 +182,7 @@ def memory_entity(name: str):
             console.print(f"Description: {entity.description or 'No description'}")
         else:
             console.print(f"[yellow]Entity '{name}' not found[/yellow]")
-            
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
@@ -198,12 +193,12 @@ def memory_forget(name: str, confirm: bool = typer.Option(False, "--confirm", "-
     memory_store = _get_memory_store()
     if not memory_store:
         return
-    
+
     if not confirm:
         if not typer.confirm(f"Remove '{name}' from memory?"):
             console.print("[yellow]Cancelled[/yellow]")
             return
-    
+
     try:
         entity = memory_store.find_entity_by_name(name)
         if not entity:
@@ -224,23 +219,23 @@ def memory_doctor():
     memory_store = _get_memory_store()
     if not memory_store:
         return
-    
+
     try:
         stats = memory_store.get_stats()
         issues = []
-        
+
         if stats.get("events", 0) == 0:
             issues.append("No events in database")
         if stats.get("entities", 0) == 0:
             issues.append("No entities in database")
-        
+
         if not issues:
             console.print("[green]Memory system is healthy[/green]")
         else:
             console.print("\n[bold]Issues Found:[/bold]")
             for issue in issues:
                 console.print(f"[yellow]Warning: {issue}[/yellow]")
-                
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
@@ -252,31 +247,31 @@ session_app = typer.Typer(name="session", help="Session management commands")
 @session_app.command("compact")
 def session_compact():
     """Trigger session compaction."""
-    from nanofolks.session.manager import SessionManager
     from nanofolks.config.loader import load_config
-    from nanofolks.memory.session_compactor import SessionCompactor, SessionCompactionConfig
+    from nanofolks.memory.session_compactor import SessionCompactionConfig, SessionCompactor
     from nanofolks.memory.token_counter import count_messages
-    
+    from nanofolks.session.manager import SessionManager
+
     config = load_config()
     if not config.memory.enabled:
         console.print("[yellow]Memory system disabled[/yellow]")
         return
-    
+
     workspace = config.workspace_path
     session_manager = SessionManager(workspace)
-    
+
     sessions = session_manager.list_sessions()
     if not sessions:
         console.print("[yellow]No sessions found[/yellow]")
         return
-    
+
     session_key = sessions[0]["key"]
     session = session_manager.get_or_create(session_key)
-    
+
     console.print(f"Session: {session_key}")
     console.print(f"Messages: {len(session.messages)}")
     console.print(f"Tokens: {count_messages(session.messages)}")
-    
+
     try:
         compaction_config = config.memory.session_compaction
         settings = SessionCompactionConfig(
@@ -293,11 +288,11 @@ def session_compact():
         )
         compactor = SessionCompactor(settings)
         should_compact = compactor.should_compact(session.messages, 8000)
-        
+
         if should_compact:
             console.print("[yellow]Compacting...[/yellow]")
             result = asyncio.run(compactor.compact_session(session, 8000))
-            
+
             if result:
                 console.print(f"[green]Complete! Messages: {result.original_count} -> {result.compacted_count}[/green]")
                 console.print(f"Tokens: {result.tokens_before} -> {result.tokens_after}")
@@ -305,7 +300,7 @@ def session_compact():
                 session_manager.save(session)
         else:
             console.print("[green]No compaction needed[/green]")
-            
+
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
 
@@ -313,39 +308,39 @@ def session_compact():
 @session_app.command("status")
 def session_status():
     """Show session status."""
-    from nanofolks.session.manager import SessionManager
     from nanofolks.config.loader import load_config
     from nanofolks.memory.token_counter import count_messages
-    
+    from nanofolks.session.manager import SessionManager
+
     config = load_config()
     if not config.memory.enabled:
         console.print("[yellow]Memory system disabled[/yellow]")
         return
-    
+
     workspace = config.workspace_path
     session_manager = SessionManager(workspace)
-    
+
     sessions = session_manager.list_sessions()
     if sessions:
         table = Table(title="Sessions")
         table.add_column("Session", style="cyan")
         table.add_column("Messages", style="green")
         table.add_column("Tokens", style="yellow")
-        
+
         max_tokens = config.memory.enhanced_context.max_context_tokens
-        
+
         for session_data in sessions[:10]:
             try:
                 session = session_manager.get_or_create(session_data["key"])
                 tokens = count_messages(session.messages)
                 percentage = (tokens / max_tokens * 100) if max_tokens > 0 else 0
-                
+
                 status_color = "green"
                 if percentage > 70:
                     status_color = "yellow"
                 if percentage > 80:
                     status_color = "red"
-                
+
                 table.add_row(
                     session_data["key"][:30],
                     str(len(session.messages)),
@@ -353,12 +348,12 @@ def session_status():
                 )
             except Exception:
                 table.add_row(session_data["key"][:30], "error", "0")
-        
-        console.print(f"\n[bold]Sessions[/bold]")
+
+        console.print("\n[bold]Sessions[/bold]")
         console.print(table)
-        
+
         if config.memory.enhanced_context.show_context_percentage:
-            console.print(f"\n[dim]Warning: 70% | Compact: 80%[/dim]")
+            console.print("\n[dim]Warning: 70% | Compact: 80%[/dim]")
     else:
         console.print("[yellow]No sessions found[/yellow]")
 
@@ -366,17 +361,17 @@ def session_status():
 @session_app.command("reset")
 def session_reset():
     """Reset all sessions."""
-    from nanofolks.session.manager import SessionManager
     from nanofolks.config.loader import load_config
-    
+    from nanofolks.session.manager import SessionManager
+
     if not typer.confirm("Delete ALL conversation history?"):
         console.print("[yellow]Cancelled[/yellow]")
         return
-    
+
     config = load_config()
     workspace = config.workspace_path
     session_manager = SessionManager(workspace)
-    
+
     try:
         sessions = session_manager.list_sessions()
         deleted = sum(1 for s in sessions if session_manager.delete(s["key"]))

@@ -10,14 +10,12 @@ that happens when the user first talks to the agent.
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
-from loguru import logger
-from rich.table import Table
 from rich.console import Console
+from rich.table import Table
 
-from nanofolks.teams import TeamManager
 from nanofolks.models.role_card import BUILTIN_BOTS, RoleCardDomain
+from nanofolks.teams import TeamManager
 
 console = Console()
 
@@ -60,13 +58,13 @@ class UserProfileAnswers:
 @dataclass
 class ChatOnboarding:
     """Handles conversational user onboarding."""
-    
+
     workspace_path: Path
     theme_manager: TeamManager
     state: OnboardingState = OnboardingState.NOT_STARTED
     answers: UserProfileAnswers = field(default_factory=UserProfileAnswers)
     current_question: int = 0
-    
+
     # Questions flow (maps to USER.md fields)
     QUESTIONS = [
         {
@@ -76,14 +74,14 @@ class ChatOnboarding:
             "follow_up": "Got it! And what's your {field}?",
         },
         {
-            "field": "timezone", 
+            "field": "timezone",
             "key": "timezone",
             "question": "What timezone are you in? (e.g., UTC-5, America/New_York)",
             "skip_if": lambda a: not a.name,
         },
         {
             "field": "language",
-            "key": "language", 
+            "key": "language",
             "question": "What language do you prefer? (e.g., English, Spanish)",
             "skip_if": lambda a: not a.name,
         },
@@ -118,63 +116,63 @@ class ChatOnboarding:
             "skip_if": lambda a: not a.name,
         },
     ]
-    
+
     def is_needed(self) -> bool:
         """Check if onboarding is needed."""
         return self.state in [OnboardingState.NOT_STARTED, OnboardingState.IN_PROGRESS]
-    
+
     def check_if_needed(self) -> bool:
         """Check if USER.md needs onboarding (is empty or has defaults)."""
         user_file = self.workspace_path / "USER.md"
-        
+
         if not user_file.exists():
             return True
-        
+
         content = user_file.read_text()
-        
+
         # Check if user has filled in real info (not placeholders)
         placeholders = ["(your name)", "(your timezone)", "(your role)"]
         has_real_data = not any(p in content for p in placeholders)
-        
+
         return not has_real_data
-    
+
     def get_next_question(self) -> dict | None:
         """Get the next question in the flow."""
         while self.current_question < len(self.QUESTIONS):
             q = self.QUESTIONS[self.current_question]
-            
+
             # Check skip condition
             skip_fn = q.get("skip_if")
             if skip_fn and skip_fn(self.answers):
                 self.current_question += 1
                 continue
-            
+
             return q
-        
+
         return None
-    
+
     def process_answer(self, user_message: str) -> str:
         """Process user's answer and return leader's response."""
         question = self.get_next_question()
-        
+
         if not question:
             # No more questions, move to team intro
             self.state = OnboardingState.TEAM_INTRO
             return self._get_team_intro_message()
-        
+
         # Store the answer
         field_name = question["key"]
         setattr(self.answers, field_name, user_message)
-        
+
         # Save to USER.md
         self._save_to_user_md()
-        
+
         # Move to next question
         self.current_question += 1
-        
+
         # Get next question for response
         next_q = self.get_next_question()
-        
+
         if next_q:
             # Build natural response
             response = self._build_natural_response(question, next_q)
@@ -182,42 +180,42 @@ class ChatOnboarding:
             # All questions done, move to team intro
             self.state = OnboardingState.TEAM_INTRO
             response = self._get_team_intro_message()
-        
+
         return response
-    
+
     def _build_natural_response(self, answered_q: dict, next_q: dict) -> str:
         """Build a natural leader response after user's answer."""
         # Simple responses based on question type
         responses = []
-        
+
         if answered_q["key"] == "name":
             responses.append(f"Gotcha, {self.answers.name}!")
             responses.append(f"Alright {self.answers.name}, nice to meet you!")
-        
+
         elif answered_q["key"] == "role":
             responses.append(f"Interesting! So you're a {self.answers.role}.")
-        
+
         elif answered_q["key"] == "projects":
-            responses.append(f"Awesome! Sounds like interesting work.")
-        
+            responses.append("Awesome! Sounds like interesting work.")
+
         elif answered_q["key"] == "tools":
-            responses.append(f"Cool tools! I know some of those.")
-        
+            responses.append("Cool tools! I know some of those.")
+
         elif answered_q["key"] == "team_name":
             if self.answers.team_name:
                 responses.append(f"Love it! '{self.answers.team_name}' it is!")
             else:
                 responses.append("Got it, we'll keep the original name!")
-        
+
         # Add next question
         responses.append(f"\n{next_q['question']}")
-        
+
         return " ".join(responses)
-    
+
     def _save_to_user_md(self) -> None:
         """Save collected answers to USER.md."""
         user_file = self.workspace_path / "USER.md"
-        
+
         content = f"""# User Profile
 
 Information about the user to help personalize interactions.
@@ -267,30 +265,30 @@ Information about the user to help personalize interactions.
 
 *Auto-filled during onboarding.*
 """
-        
+
         user_file.write_text(content)
-    
+
     def _format_topics(self) -> str:
         """Format topics as bullet points."""
         if self.answers.topics:
             lines = self.answers.topics.split(",")
             return "\n".join(f"- {line.strip()}" for line in lines if line.strip())
         return "-\n-\n-"
-    
+
     def _format_special_instructions(self) -> str:
         """Format special instructions."""
         # Could add more context later
         return "(Any specific instructions for how the assistant should behave)"
-    
+
     def _get_team_intro_message(self) -> str:
         """Get the team introduction message."""
         table = self._build_team_table()
-        
+
         # Get the team's name (custom or default from theme)
         team = self.theme_manager.get_current_team()
         default_team_name = team.name.value.replace("_", " ").title() if team else "Crew"
         team_name = self.answers.team_name or default_team_name
-        
+
         return f"""Great to know you better, {self.answers.name or "friend"}! 🎉
 
 Now, let me introduce you to {team_name}!
@@ -300,31 +298,30 @@ Now, let me introduce you to {team_name}!
 That's your team! We're all here to help you with your {self.answers.projects or "work"}.
 
 Need more details on any particular crew member? Just ask!"""
-    
+
     def _build_team_table(self) -> Table:
         """Build a themed table of all bots."""
         table = Table(show_header=True, header_style="bold magenta")
-        
+
         # Add columns: Name, Title, Role
         table.add_column("Name", style="cyan", width=20)
         table.add_column("Title", style="yellow", width=15)
         table.add_column("Role", style="green", width=50)
-        
+
         # Get theme emoji for header
-        team = self.theme_manager.get_current_team()
-        header_emoji = team.leader.emoji if team else "⚓"
-        
+        self.theme_manager.get_current_team()
+
         # Get all bots in order
         bot_order = ["leader", "researcher", "coder", "creative", "social", "auditor"]
-        
+
         for bot_role in bot_order:
             # Get theme info
             theming = self.theme_manager.get_bot_theming(bot_role)
-            
+
             bot_name = theming.get("bot_name", theming.get("bot_title", bot_role))
             bot_title = theming.get("bot_title", bot_role)
             emoji = theming.get("emoji", "")
-            
+
             # Get role description from domain
             role_card = BUILTIN_BOTS.get(bot_role)
             if role_card:
@@ -332,36 +329,36 @@ Need more details on any particular crew member? Just ask!"""
                 role_desc = DOMAIN_DESCRIPTIONS.get(domain, domain.value)
             else:
                 role_desc = "Helping the team"
-            
+
             # Add emoji to name
             display_name = f"{emoji} {bot_name}" if emoji else bot_name
-            
+
             table.add_row(display_name, bot_title, role_desc)
-        
+
         return table
-    
+
     def get_team_intro_only(self) -> str:
         """Get just the team introduction (for later requests)."""
         self.state = OnboardingState.TEAM_INTRO
         return self._get_team_intro_message()
-    
+
     def introduce_bot(self, bot_role: str) -> str:
         """Introduce a specific bot in detail."""
         # Get theme info
         theming = self.theme_manager.get_bot_theming(bot_role)
-        
+
         bot_name = theming.get("bot_name", theming.get("bot_title", bot_role))
         bot_title = theming.get("bot_title", bot_role)
         emoji = theming.get("emoji", "")
         personality = theming.get("personality", "")
         greeting = theming.get("greeting", "")
-        
+
         # Get role description
         role_card = BUILTIN_BOTS.get(bot_role)
         if role_card:
             domain = role_card.domain
             role_desc = DOMAIN_DESCRIPTIONS.get(domain, domain.value)
-            
+
             # Get capabilities
             caps = []
             if role_card.capabilities.can_access_web:
@@ -372,12 +369,12 @@ Need more details on any particular crew member? Just ask!"""
                 caps.append("send messages")
             if role_card.capabilities.can_do_heartbeat:
                 caps.append("scheduled tasks")
-            
+
             capabilities = ", ".join(caps) if caps else "various tools"
         else:
             role_desc = "Helping the team"
             capabilities = "various tools"
-        
+
         intro = f"""
 **{emoji} {bot_name} - {bot_title}**
 
@@ -390,11 +387,11 @@ They can: {capabilities}
 {greeting}
 """
         return intro.strip()
-    
+
     def complete(self) -> None:
         """Mark onboarding as complete."""
         self.state = OnboardingState.COMPLETED
-    
+
     def to_dict(self) -> dict:
         """Serialize state for saving."""
         return {
@@ -411,15 +408,15 @@ They can: {capabilities}
             },
             "current_question": self.current_question,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict, workspace_path: Path, theme_manager: TeamManager) -> "ChatOnboarding":
         """Deserialize from saved state."""
         onboarding = cls(workspace_path, theme_manager)
         onboarding.state = OnboardingState(data.get("state", "not_started"))
         onboarding.current_question = data.get("current_question", 0)
-        
+
         answers = data.get("answers", {})
         onboarding.answers = UserProfileAnswers(**answers)
-        
+
         return onboarding

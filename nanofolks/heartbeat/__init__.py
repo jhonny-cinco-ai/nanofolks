@@ -6,7 +6,7 @@ with domain-specific checks, configurable intervals, and full resilience.
 Example Usage:
     from nanofolks.heartbeat import BotHeartbeatService, HeartbeatConfig
     from nanofolks.heartbeat.check_registry import register_check
-    
+
     # Define a check
     @register_check(
         name="monitor_data",
@@ -16,7 +16,7 @@ Example Usage:
     async def monitor_data(bot, config):
         # Check implementation
         return {"success": True, "data": {}}
-    
+
     # Create and start heartbeat
     service = BotHeartbeatService(
         bot_instance=bot,
@@ -33,28 +33,28 @@ Example Usage:
 # Use BotHeartbeatService and MultiHeartbeatManager instead.
 
 # New multi-heartbeat system
-from nanofolks.heartbeat.models import (
-    CheckPriority,
-    CheckStatus,
-    CheckDefinition,
-    CheckResult,
-    HeartbeatConfig,
-    HeartbeatTick,
-    HeartbeatHistory,
-)
 from nanofolks.heartbeat.bot_heartbeat import BotHeartbeatService
 from nanofolks.heartbeat.check_registry import (
     CheckRegistry,
     check_registry,
     register_check,
 )
-from nanofolks.heartbeat.multi_manager import (
-    MultiHeartbeatManager,
-    CrossBotCheck,
-    TeamHealthReport,
-)
 from nanofolks.heartbeat.dashboard import DashboardService, MetricsBuffer
 from nanofolks.heartbeat.dashboard_server import DashboardHTTPServer
+from nanofolks.heartbeat.models import (
+    CheckDefinition,
+    CheckPriority,
+    CheckResult,
+    CheckStatus,
+    HeartbeatConfig,
+    HeartbeatHistory,
+    HeartbeatTick,
+)
+from nanofolks.heartbeat.multi_manager import (
+    CrossBotCheck,
+    MultiHeartbeatManager,
+    TeamHealthReport,
+)
 
 __version__ = "1.0.0"
 

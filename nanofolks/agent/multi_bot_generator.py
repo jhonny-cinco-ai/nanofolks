@@ -28,7 +28,7 @@ class BotResponse:
 
 class MultiBotResponseGenerator:
     """Generate responses from multiple bots simultaneously."""
-    
+
     # Bot emoji mapping for display
     BOT_EMOJIS = {
         "leader": "👑",
@@ -38,7 +38,7 @@ class MultiBotResponseGenerator:
         "creative": "🎨",
         "auditor": "🔍",
     }
-    
+
     # Bot color mapping for CLI
     BOT_COLORS = {
         "leader": "blue",
@@ -48,7 +48,7 @@ class MultiBotResponseGenerator:
         "creative": "yellow",
         "auditor": "red",
     }
-    
+
     def __init__(
         self,
         provider: LLMProvider,
@@ -59,7 +59,7 @@ class MultiBotResponseGenerator:
         room_theme: str = "default",
     ):
         """Initialize the multi-bot response generator.
-        
+
         Args:
             provider: LLM provider for generating responses
             workspace: Workspace path for loading bot identities
@@ -74,10 +74,10 @@ class MultiBotResponseGenerator:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.room_theme = room_theme
-        
+
         self._affinity_builder = None
         self._cross_ref_injector = None
-    
+
     @property
     def affinity_builder(self):
         """Lazy-load affinity context builder."""
@@ -85,7 +85,7 @@ class MultiBotResponseGenerator:
             from nanofolks.agent.affinity_context import AffinityContextBuilder
             self._affinity_builder = AffinityContextBuilder(self.workspace)
         return self._affinity_builder
-    
+
     @property
     def cross_ref_injector(self):
         """Lazy-load cross-reference injector."""
@@ -93,7 +93,7 @@ class MultiBotResponseGenerator:
             from nanofolks.agent.cross_reference import CrossReferenceInjector
             self._cross_ref_injector = CrossReferenceInjector(self.room_theme)
         return self._cross_ref_injector
-    
+
     async def generate_responses(
         self,
         user_message: str,
@@ -102,18 +102,18 @@ class MultiBotResponseGenerator:
         room_context: Optional[Dict[str, Any]] = None,
     ) -> List[BotResponse]:
         """Generate responses from multiple bots in parallel.
-        
+
         Args:
             user_message: The user's message
             bot_names: List of bot names to generate responses from
             mode: Dispatch mode (MULTI_BOT or CREW_CONTEXT)
             room_context: Optional room context information
-            
+
         Returns:
             List of BotResponse objects
         """
         logger.info(f"Generating multi-bot responses from: {', '.join(bot_names)} (mode: {mode.value})")
-        
+
         # Create tasks for each bot
         tasks = []
         for bot_name in bot_names:
@@ -125,36 +125,36 @@ class MultiBotResponseGenerator:
                 room_context=room_context,
             )
             tasks.append(task)
-        
+
         # Execute all in parallel
         start_time = time.time()
         responses = await asyncio.gather(*tasks, return_exceptions=True)
         total_time = (time.time() - start_time) * 1000
-        
+
         # Process results
         bot_responses = []
         for i, result in enumerate(responses):
             bot_name = bot_names[i]
-            
+
             if isinstance(result, Exception):
                 logger.error(f"[{bot_name}] Failed to generate response: {result}")
                 bot_responses.append(BotResponse(
                     bot_name=bot_name,
-                    content=f"❌ I encountered an error while processing your request.",
+                    content="❌ I encountered an error while processing your request.",
                     confidence=0.0,
                     response_time_ms=0,
                     metadata={"error": str(result)}
                 ))
             else:
                 bot_responses.append(result)
-        
+
         logger.info(f"Generated {len(bot_responses)} responses in {total_time:.0f}ms")
-        
+
         # Inject cross-references between bots
         bot_responses = self.cross_ref_injector.inject_references(bot_responses)
-        
+
         return bot_responses
-    
+
     async def _generate_single_response(
         self,
         bot_name: str,
@@ -164,19 +164,19 @@ class MultiBotResponseGenerator:
         room_context: Optional[Dict[str, Any]] = None,
     ) -> BotResponse:
         """Generate response for a single bot.
-        
+
         Args:
             bot_name: Name of the bot
             user_message: User's message
             other_bots: List of other bots participating
             mode: Dispatch mode
             room_context: Optional room context
-            
+
         Returns:
             BotResponse object
         """
         start_time = time.time()
-        
+
         try:
             # Build context with communal awareness
             context = self._build_communal_context(
@@ -186,7 +186,7 @@ class MultiBotResponseGenerator:
                 mode=mode,
                 room_context=room_context,
             )
-            
+
             # Generate response using LLM
             response = await self.provider.chat(
                 model=self.model,
@@ -197,9 +197,9 @@ class MultiBotResponseGenerator:
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
-            
+
             response_time = int((time.time() - start_time) * 1000)
-            
+
             return BotResponse(
                 bot_name=bot_name,
                 content=response.content or "",
@@ -210,11 +210,11 @@ class MultiBotResponseGenerator:
                     "tokens_used": getattr(response, 'tokens_used', 0),
                 }
             )
-            
+
         except Exception as e:
             logger.error(f"[{bot_name}] Response generation failed: {e}")
             raise
-    
+
     def _build_communal_context(
         self,
         bot_name: str,
@@ -224,20 +224,20 @@ class MultiBotResponseGenerator:
         room_context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Build context that includes communal awareness.
-        
+
         Args:
             bot_name: Name of the bot
             user_message: User's message
             other_bots: List of other participating bots
             mode: Dispatch mode
             room_context: Optional room context
-            
+
         Returns:
             System prompt for the bot
         """
         # Load bot's identity/SOUL
         identity = self._load_bot_identity(bot_name)
-        
+
         # Build context parts
         context_parts = [
             f"# You are @{bot_name}",
@@ -247,12 +247,12 @@ class MultiBotResponseGenerator:
             "",
             "## Current Situation",
         ]
-        
+
         # Add room context if available
         if room_context:
             room_name = room_context.get('name', 'this room')
             context_parts.append(f"Room: {room_name}")
-        
+
         context_parts.extend([
             f"Other bots present: {', '.join(other_bots) if other_bots else 'None'}",
             f"This is a {'group' if mode == DispatchTarget.MULTI_BOT else 'context-aware'} conversation.",
@@ -262,7 +262,7 @@ class MultiBotResponseGenerator:
             "",
             "## How to Respond",
         ])
-        
+
         # Mode-specific instructions
         if mode == DispatchTarget.MULTI_BOT:
             context_parts.extend([
@@ -280,7 +280,7 @@ class MultiBotResponseGenerator:
                 "- Be concise (2-3 sentences max)",
                 "- Provide specific, actionable insights",
             ])
-        
+
         # Add affinity context for multi-bot mode
         if mode == DispatchTarget.MULTI_BOT and other_bots:
             affinity_context = self.affinity_builder.build_affinity_context(
@@ -289,15 +289,15 @@ class MultiBotResponseGenerator:
             )
             if affinity_context:
                 context_parts.extend(["", affinity_context])
-        
+
         return "\n".join(context_parts)
-    
+
     def _load_bot_identity(self, bot_name: str) -> Optional[str]:
         """Load bot's identity from SOUL.md or IDENTITY.md.
-        
+
         Args:
             bot_name: Name of the bot
-            
+
         Returns:
             Identity content or None
         """
@@ -309,7 +309,7 @@ class MultiBotResponseGenerator:
                     return f.read()
             except Exception as e:
                 logger.warning(f"Failed to load SOUL.md for {bot_name}: {e}")
-        
+
         # Fallback to IDENTITY.md
         identity_path = self.workspace / "bots" / bot_name / "IDENTITY.md"
         if identity_path.exists():
@@ -318,54 +318,54 @@ class MultiBotResponseGenerator:
                     return f.read()
             except Exception as e:
                 logger.warning(f"Failed to load IDENTITY.md for {bot_name}: {e}")
-        
+
         return None
-    
+
     def format_multi_bot_response(
         self,
         responses: List[BotResponse],
         include_header: bool = True,
     ) -> str:
         """Format multiple bot responses into a cohesive output.
-        
+
         Args:
             responses: List of BotResponse objects
             include_header: Whether to include a header
-            
+
         Returns:
             Formatted string
         """
         parts = []
-        
+
         if include_header:
             parts.append("🎭 **Multi-Bot Response**")
             parts.append("")
-        
+
         for response in responses:
             emoji = self.BOT_EMOJIS.get(response.bot_name, "🤖")
             parts.append(f"{emoji} **@{response.bot_name}:**")
             parts.append(response.content)
             parts.append("")
-        
+
         return "\n".join(parts)
-    
+
     def get_bot_emoji(self, bot_name: str) -> str:
         """Get emoji for a bot.
-        
+
         Args:
             bot_name: Name of the bot
-            
+
         Returns:
             Emoji string
         """
         return self.BOT_EMOJIS.get(bot_name, "🤖")
-    
+
     def get_bot_color(self, bot_name: str) -> str:
         """Get color for a bot.
-        
+
         Args:
             bot_name: Name of the bot
-            
+
         Returns:
             Color name string
         """

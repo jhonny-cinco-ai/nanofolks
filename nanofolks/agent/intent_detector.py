@@ -1,10 +1,8 @@
 """Intent Detection - Routes user messages to appropriate flow types."""
 
-from enum import Enum
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
-
-from loguru import logger
+from enum import Enum
+from typing import Any, Dict, List
 
 
 class IntentType(Enum):
@@ -36,7 +34,7 @@ class Intent:
 
 class IntentDetector:
     """Detect user intent from message content.
-    
+
     Maps user messages to intents and determines the appropriate
     flow type (simultaneous, quick, or full discovery).
     """
@@ -107,10 +105,10 @@ class IntentDetector:
 
     def detect(self, message: str) -> Intent:
         """Detect intent from user message.
-        
+
         Args:
             message: The user's message content
-            
+
         Returns:
             Intent with detected type, confidence, and suggested flow
         """
@@ -162,7 +160,7 @@ class IntentDetector:
     def _extract_entities(self, message: str, intent_type: IntentType) -> Dict[str, Any]:
         """Extract relevant entities from message."""
         entities = {}
-        
+
         if intent_type in [IntentType.EXPLORE, IntentType.RESEARCH]:
             import re
             combined = re.findall(r'(\w+)\s+(?:and|&)\s+(\w+)', message.lower())
@@ -189,7 +187,7 @@ class IntentDetector:
 
     def get_all_bots_for_intent(self, intent: Intent) -> List[str]:
         """Get all bots that should respond for a given intent.
-        
+
         For CHAT/SIMULTANEOUS, returns all bots for communal experience.
         For other intents, returns suggested bots.
         """

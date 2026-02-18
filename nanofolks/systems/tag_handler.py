@@ -102,7 +102,7 @@ class TagHandler:
             Dictionary mapping mention strings to context
         """
         mentions = {}
-        
+
         # Extract @bot mentions with context
         for match in re.finditer(self.BOT_PATTERN, message):
             bot_name = match.group(1)

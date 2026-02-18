@@ -2,8 +2,8 @@
 
 from typing import Optional
 
-from nanofolks.teams.presets import get_team, list_teams, AVAILABLE_TEAMS
-from nanofolks.teams.team import Team, TeamName
+from nanofolks.teams.presets import AVAILABLE_TEAMS, get_team, list_teams
+from nanofolks.teams.team import Team
 
 
 class TeamManager:

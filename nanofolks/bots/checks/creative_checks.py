@@ -7,8 +7,9 @@ Usage:
     Automatically registered when CreativeBot initializes.
 """
 
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from datetime import datetime
+from typing import Any, Dict
+
 from loguru import logger
 
 from nanofolks.heartbeat.check_registry import register_check
@@ -23,20 +24,20 @@ from nanofolks.heartbeat.check_registry import register_check
 )
 async def check_design_asset_status(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Check design assets for outdated or missing files.
-    
+
     Scans design systems, asset libraries, and project folders for
     outdated assets, missing files, or broken references.
-    
+
     Args:
         bot: The CreativeBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with asset status and issues
     """
     try:
         max_age_days = config.get("max_age_days", 30)
-        
+
         if hasattr(bot, 'scan_design_assets'):
             assets = await bot.scan_design_assets()
         else:
@@ -45,15 +46,15 @@ async def check_design_asset_status(bot, config: Dict[str, Any]) -> Dict[str, An
                 "message": "Asset scanning not available",
                 "assets_checked": 0
             }
-        
+
         outdated = []
         broken = []
         missing = []
-        
+
         for asset in assets:
             asset_id = getattr(asset, 'id', 'unknown')
             asset_name = getattr(asset, 'name', 'Unnamed Asset')
-            
+
             # Check if outdated
             last_modified = getattr(asset, 'last_modified', None)
             if last_modified:
@@ -62,7 +63,7 @@ async def check_design_asset_status(bot, config: Dict[str, Any]) -> Dict[str, An
                         last_modified = datetime.fromisoformat(last_modified.replace('Z', '+00:00'))
                     except:
                         last_modified = datetime.now()
-                
+
                 age_days = (datetime.now() - last_modified).days
                 if age_days > max_age_days:
                     outdated.append({
@@ -71,7 +72,7 @@ async def check_design_asset_status(bot, config: Dict[str, Any]) -> Dict[str, An
                         "age_days": age_days,
                         "max_age": max_age_days
                     })
-            
+
             # Check for broken references
             if getattr(asset, 'is_broken', False):
                 broken.append({
@@ -79,7 +80,7 @@ async def check_design_asset_status(bot, config: Dict[str, Any]) -> Dict[str, An
                     "name": asset_name,
                     "issue": "Broken reference"
                 })
-            
+
             # Check for missing required files
             if getattr(asset, 'is_missing', False):
                 missing.append({
@@ -87,9 +88,9 @@ async def check_design_asset_status(bot, config: Dict[str, Any]) -> Dict[str, An
                     "name": asset_name,
                     "expected_location": getattr(asset, 'expected_path', 'unknown')
                 })
-        
+
         issues = outdated + broken + missing
-        
+
         if issues:
             if hasattr(bot, 'notify_coordinator'):
                 try:
@@ -110,7 +111,7 @@ async def check_design_asset_status(bot, config: Dict[str, Any]) -> Dict[str, An
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len(broken) == 0 and len(missing) == 0,
             "assets_checked": len(assets),
@@ -119,7 +120,7 @@ async def check_design_asset_status(bot, config: Dict[str, Any]) -> Dict[str, An
             "missing": len(missing),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in check_design_asset_status: {e}")
         return {
@@ -138,14 +139,14 @@ async def check_design_asset_status(bot, config: Dict[str, Any]) -> Dict[str, An
 )
 async def monitor_creative_deadlines(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Monitor creative project deadlines and alert on approaching due dates.
-    
+
     Tracks design projects, deliverables, and milestones. Alerts on
     overdue items and deadlines approaching within 24/48/72 hours.
-    
+
     Args:
         bot: The CreativeBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with deadline status and alerts
     """
@@ -158,27 +159,27 @@ async def monitor_creative_deadlines(bot, config: Dict[str, Any]) -> Dict[str, A
                 "message": "Project tracking not available",
                 "projects_checked": 0
             }
-        
+
         now = datetime.now()
-        
+
         overdue = []
         due_24h = []
         due_48h = []
         due_72h = []
-        
+
         for project in projects:
             deadline = getattr(project, 'deadline', None)
             if not deadline:
                 continue
-            
+
             if isinstance(deadline, str):
                 try:
                     deadline = datetime.fromisoformat(deadline.replace('Z', '+00:00'))
                 except:
                     continue
-            
+
             hours_remaining = (deadline - now).total_seconds() / 3600
-            
+
             project_data = {
                 "id": getattr(project, 'id', 'unknown'),
                 "name": getattr(project, 'name', 'Unnamed'),
@@ -186,7 +187,7 @@ async def monitor_creative_deadlines(bot, config: Dict[str, Any]) -> Dict[str, A
                 "hours_remaining": round(hours_remaining, 1),
                 "status": getattr(project, 'status', 'unknown')
             }
-            
+
             if hours_remaining < 0:
                 overdue.append(project_data)
             elif hours_remaining <= 24:
@@ -195,7 +196,7 @@ async def monitor_creative_deadlines(bot, config: Dict[str, Any]) -> Dict[str, A
                 due_48h.append(project_data)
             elif hours_remaining <= 72:
                 due_72h.append(project_data)
-        
+
         # Determine priority
         if overdue:
             priority = "critical"
@@ -212,7 +213,7 @@ async def monitor_creative_deadlines(bot, config: Dict[str, Any]) -> Dict[str, A
         else:
             priority = None
             message = None
-        
+
         if message:
             if hasattr(bot, 'escalate_to_coordinator'):
                 try:
@@ -234,7 +235,7 @@ async def monitor_creative_deadlines(bot, config: Dict[str, Any]) -> Dict[str, A
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len(overdue) == 0,
             "projects_checked": len(projects),
@@ -244,7 +245,7 @@ async def monitor_creative_deadlines(bot, config: Dict[str, Any]) -> Dict[str, A
             "due_72h": len(due_72h),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in monitor_creative_deadlines: {e}")
         return {
@@ -263,14 +264,14 @@ async def monitor_creative_deadlines(bot, config: Dict[str, Any]) -> Dict[str, A
 )
 async def validate_brand_consistency(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Validate brand consistency across creative assets.
-    
+
     Checks for brand guideline violations including colors, fonts,
     logos, tone of voice, and messaging consistency.
-    
+
     Args:
         bot: The CreativeBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with brand consistency validation results
     """
@@ -283,12 +284,12 @@ async def validate_brand_consistency(bot, config: Dict[str, Any]) -> Dict[str, A
                 "message": "Brand validation not available",
                 "assets_checked": 0
             }
-        
+
         # Categorize violations
         critical = [v for v in violations if v.get('severity') == 'critical']
         major = [v for v in violations if v.get('severity') == 'major']
         minor = [v for v in violations if v.get('severity') == 'minor']
-        
+
         if critical or major:
             if hasattr(bot, 'notify_coordinator'):
                 try:
@@ -309,7 +310,7 @@ async def validate_brand_consistency(bot, config: Dict[str, Any]) -> Dict[str, A
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len(critical) == 0,
             "violations_found": len(violations),
@@ -318,7 +319,7 @@ async def validate_brand_consistency(bot, config: Dict[str, Any]) -> Dict[str, A
             "minor": len(minor),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in validate_brand_consistency: {e}")
         return {
@@ -337,20 +338,20 @@ async def validate_brand_consistency(bot, config: Dict[str, Any]) -> Dict[str, A
 )
 async def check_content_approval_queue(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Check content items awaiting approval or review.
-    
+
     Monitors approval queues for blog posts, graphics, videos, and
     other creative content. Alerts on items pending too long.
-    
+
     Args:
         bot: The CreativeBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with approval queue status
     """
     try:
         max_wait_hours = config.get("max_wait_hours", 48)
-        
+
         if hasattr(bot, 'get_pending_approvals'):
             pending = await bot.get_pending_approvals()
         else:
@@ -359,13 +360,13 @@ async def check_content_approval_queue(bot, config: Dict[str, Any]) -> Dict[str,
                 "message": "Approval queue not available",
                 "items_pending": 0
             }
-        
+
         now = datetime.now()
-        
+
         stale = []
         urgent = []
         normal = []
-        
+
         for item in pending:
             submitted = getattr(item, 'submitted_at', now)
             if isinstance(submitted, str):
@@ -373,9 +374,9 @@ async def check_content_approval_queue(bot, config: Dict[str, Any]) -> Dict[str,
                     submitted = datetime.fromisoformat(submitted.replace('Z', '+00:00'))
                 except:
                     submitted = now
-            
+
             hours_waiting = (now - submitted).total_seconds() / 3600
-            
+
             item_data = {
                 "id": getattr(item, 'id', 'unknown'),
                 "title": getattr(item, 'title', 'Untitled'),
@@ -383,14 +384,14 @@ async def check_content_approval_queue(bot, config: Dict[str, Any]) -> Dict[str,
                 "submitted_by": getattr(item, 'submitted_by', 'unknown'),
                 "hours_waiting": round(hours_waiting, 1)
             }
-            
+
             if hours_waiting > max_wait_hours * 2:
                 stale.append(item_data)
             elif hours_waiting > max_wait_hours:
                 urgent.append(item_data)
             else:
                 normal.append(item_data)
-        
+
         if stale or urgent:
             if hasattr(bot, 'notify_coordinator'):
                 try:
@@ -411,7 +412,7 @@ async def check_content_approval_queue(bot, config: Dict[str, Any]) -> Dict[str,
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len(stale) == 0,
             "total_pending": len(pending),
@@ -420,7 +421,7 @@ async def check_content_approval_queue(bot, config: Dict[str, Any]) -> Dict[str,
             "normal": len(normal),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in check_content_approval_queue: {e}")
         return {

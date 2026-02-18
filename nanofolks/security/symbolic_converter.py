@@ -11,9 +11,9 @@ Example:
     >>> # result.credentials = [{'key_ref': 'github_token', 'value': 'ghp_abc123'}]
 """
 
-import uuid
 from dataclasses import dataclass
 from typing import Optional
+
 from loguru import logger
 
 from nanofolks.security.credential_detector import CredentialDetector, CredentialMatch
@@ -30,86 +30,86 @@ class ConversionResult:
 
 class SymbolicConverter:
     """Converts detected credentials to symbolic references.
-    
+
     This is the core of the credential protection system. It:
     1. Detects credentials in text
     2. Stores them securely in KeyVault
     3. Replaces them with symbolic references
-    
+
     The LLM never sees the actual credentials.
     """
-    
+
     def __init__(self):
         """Initialize the converter."""
         self.detector = CredentialDetector()
         self.keyring = KeyringManager()
         self._session_keys: dict[str, str] = {}  # Temporary session-based keys
-    
+
     def convert(self, text: str, session_id: Optional[str] = None) -> ConversionResult:
         """Convert credentials in text to symbolic references.
-        
+
         Args:
             text: The text containing credentials
             session_id: Optional session ID for temporary key scoping
-            
+
         Returns:
             ConversionResult with converted text and stored credentials
         """
         if not text:
             return ConversionResult(text=text, credentials=[], warnings=[])
-        
+
         # Detect credentials
         credentials = self.detector.detect(text)
-        
+
         if not credentials:
             return ConversionResult(text=text, credentials=[], warnings=[])
-        
+
         # Convert credentials to symbolic references
         converted_text = text
         stored_credentials = []
         warnings = []
-        
+
         # Process from end to start to preserve positions
         for cred in reversed(credentials):
             # Generate symbolic reference
             key_ref = self._generate_key_ref(cred, session_id)
-            
+
             # Store in session keys (temporary) or keyring
             self._store_credential(key_ref, cred.value, session_id)
-            
+
             # Replace in text (from end to preserve positions)
             converted_text = (
-                converted_text[:cred.start] + 
-                key_ref + 
+                converted_text[:cred.start] +
+                key_ref +
                 converted_text[cred.end:]
             )
-            
+
             stored_credentials.append({
                 'key_ref': key_ref,
                 'value': cred.value[:10] + '...',  # Only store preview
                 'service': cred.service,
                 'type': cred.credential_type
             })
-            
+
             logger.debug(f"Converted {cred.credential_type} to {key_ref}")
-        
+
         # Log warning about what was detected
         services = set(c.service for c in credentials)
         warnings.append(f"Credentials detected and converted: {', '.join(services)}")
-        
+
         return ConversionResult(
             text=converted_text,
             credentials=stored_credentials,
             warnings=warnings
         )
-    
+
     def _generate_key_ref(self, cred: CredentialMatch, session_id: Optional[str]) -> str:
         """Generate a symbolic reference for a credential.
-        
+
         Args:
             cred: The credential match
             session_id: Optional session ID
-            
+
         Returns:
             Symbolic reference like {{github_token}} or {{session_github_token}}
         """
@@ -118,12 +118,12 @@ class SymbolicConverter:
             # Use short session ID
             session_suffix = session_id[:8]
             return f"{{{{{cred.service}_{cred.credential_type}_{session_suffix}}}}}"
-        
+
         return f"{{{{{cred.service}_{cred.credential_type}}}}}"
-    
+
     def _store_credential(self, key_ref: str, value: str, session_id: Optional[str]) -> None:
         """Store credential in session or keyring.
-        
+
         Args:
             key_ref: The symbolic reference
             value: The actual credential value
@@ -131,7 +131,7 @@ class SymbolicConverter:
         """
         # Extract key name from {{brackets}}
         key_name = key_ref.strip("{}")
-        
+
         if session_id:
             # Store in session-scoped keys (temporary, in-memory)
             self._session_keys[key_name] = value
@@ -139,30 +139,30 @@ class SymbolicConverter:
         else:
             # Ask user if they want to persist (for now, just log)
             logger.info(f"Credential detected: {key_name} (consider storing in keyring)")
-    
+
     def resolve(self, key_ref: str, session_id: Optional[str] = None) -> Optional[str]:
         """Resolve a symbolic reference to its actual value.
-        
+
         Args:
             key_ref: The symbolic reference (e.g., {{github_token}})
             session_id: Optional session ID
-            
+
         Returns:
             The actual credential value, or None if not found
         """
         # Extract key name
         key_name = key_ref.strip("{}")
-        
+
         # First check session keys
         if key_name in self._session_keys:
             return self._session_keys[key_name]
-        
+
         # Then check keyring
         return self.keyring.get_key(key_name)
-    
+
     def clear_session_keys(self, session_id: Optional[str] = None) -> None:
         """Clear session-scoped keys.
-        
+
         Args:
             session_id: Optional specific session to clear, or None for all
         """
@@ -175,13 +175,13 @@ class SymbolicConverter:
         else:
             # Clear all session keys
             self._session_keys.clear()
-    
+
     def is_symbolic_ref(self, value: str) -> bool:
         """Check if a value is a symbolic reference.
-        
+
         Args:
             value: The value to check
-            
+
         Returns:
             True if it's a symbolic reference
         """
@@ -194,7 +194,7 @@ _converter: Optional[SymbolicConverter] = None
 
 def get_symbolic_converter() -> SymbolicConverter:
     """Get the global symbolic converter instance.
-    
+
     Returns:
         The global SymbolicConverter instance
     """
@@ -206,11 +206,11 @@ def get_symbolic_converter() -> SymbolicConverter:
 
 def convert_to_symbolic(text: str, session_id: Optional[str] = None) -> ConversionResult:
     """Convenience function to convert credentials to symbolic references.
-    
+
     Args:
         text: Text containing credentials
         session_id: Optional session ID
-        
+
     Returns:
         ConversionResult with converted text
     """
@@ -219,11 +219,11 @@ def convert_to_symbolic(text: str, session_id: Optional[str] = None) -> Conversi
 
 def resolve_symbolic(key_ref: str, session_id: Optional[str] = None) -> Optional[str]:
     """Convenience function to resolve a symbolic reference.
-    
+
     Args:
         key_ref: The symbolic reference
         session_id: Optional session ID
-        
+
     Returns:
         The actual value
     """

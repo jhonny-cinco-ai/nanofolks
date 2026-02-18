@@ -1,8 +1,8 @@
 """Concrete bot implementations."""
 
 from nanofolks.bots.base import SpecialistBot
-from nanofolks.models.room import Room
 from nanofolks.models import get_role_card
+from nanofolks.models.room import Room
 
 
 class BotLeader(SpecialistBot):
@@ -68,7 +68,7 @@ class ResearcherBot(SpecialistBot):
         super().__init__(get_role_card("researcher"), bus, workspace_id, theme_manager=theme_manager, custom_name=custom_name)
         self.add_expertise("data_analysis")
         self.add_expertise("web_research")
-        
+
         # Auto-initialize heartbeat with researcher-specific config
         if auto_init_heartbeat:
             from nanofolks.bots.heartbeat_configs import RESEARCHER_CONFIG

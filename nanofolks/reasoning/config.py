@@ -5,10 +5,10 @@ routing tier, and tool context to optimize token usage while
 maintaining reasoning quality.
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, Set, Dict
-from enum import Enum
 import logging
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Dict, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -17,19 +17,19 @@ class CoTLevel(Enum):
     """Chain-of-thought reasoning levels."""
     NONE = "none"           # No reflection, fastest
     MINIMAL = "minimal"     # Only after error-prone tools
-    STANDARD = "standard"   # After complex tools  
+    STANDARD = "standard"   # After complex tools
     FULL = "full"           # After every tool call
 
 
 @dataclass
 class ReasoningConfig:
     """Configuration for bot reasoning behavior.
-    
+
     Provides adaptive Chain-of-Thought that considers:
     - Bot's base reasoning level
     - Routing tier (simple/medium/complex)
     - Tool-specific triggers
-    
+
     Example:
         >>> config = ReasoningConfig(
         ...     cot_level=CoTLevel.STANDARD,
@@ -41,58 +41,58 @@ class ReasoningConfig:
         >>> config.should_use_cot("simple", "time")
         False
     """
-    
+
     # Primary setting
     cot_level: CoTLevel = CoTLevel.STANDARD
-    
+
     # Tier overrides (optional)
     simple_tier_level: Optional[CoTLevel] = None
     medium_tier_level: Optional[CoTLevel] = None
     complex_tier_level: Optional[CoTLevel] = None
-    
+
     # Tool-specific triggers
     always_cot_tools: Set[str] = field(default_factory=set)
     never_cot_tools: Set[str] = field(default_factory=set)
-    
+
     # Custom prompt (optional)
     reflection_prompt: Optional[str] = None
-    
+
     # Token budget for reflection
     max_reflection_tokens: int = 150
-    
+
     # LLM settings for heartbeat
     temperature: float = 0.7
     max_tokens: Optional[int] = None
-    
+
     def get_heartbeat_prompt(self) -> str:
         """Get reasoning guidance for heartbeat tasks.
-        
+
         Returns:
             Prompt segment with reasoning instructions for heartbeat
         """
         if self.cot_level == CoTLevel.NONE:
             return ""
-        
+
         level_name = get_cot_level_name(self.cot_level)
-        
+
         base = f"[{level_name} reasoning mode]"
-        
+
         # Add reflection guidance based on level
         if self.cot_level in (CoTLevel.STANDARD, CoTLevel.FULL):
             base += " Think step-by-step through each checklist item."
-        
+
         if self.cot_level == CoTLevel.FULL:
             base += " Consider alternatives and edge cases."
-        
+
         return base
-    
+
     def should_use_cot(self, tier: str, tool_name: str) -> bool:
         """Determine if CoT should be used for this context.
-        
+
         Args:
             tier: Routing tier ("simple", "medium", "complex")
             tool_name: Name of the tool being executed
-            
+
         Returns:
             True if CoT reflection should be added
         """
@@ -100,15 +100,15 @@ class ReasoningConfig:
         if tool_name in self.never_cot_tools:
             logger.debug(f"CoT disabled for tool '{tool_name}' (in never_cot_tools)")
             return False
-        
+
         # Check mandatory triggers
         if tool_name in self.always_cot_tools:
             logger.debug(f"CoT enabled for tool '{tool_name}' (in always_cot_tools)")
             return True
-        
+
         # Determine effective level based on tier
         effective_level = self._get_effective_level(tier)
-        
+
         # Map level to behavior
         if effective_level == CoTLevel.NONE:
             return False
@@ -122,13 +122,13 @@ class ReasoningConfig:
             # After multi-step or complex tools, skip simple ones
             simple_tools = {"time", "date", "ping", "weather"}
             return tool_name not in simple_tools
-    
+
     def _get_effective_level(self, tier: str) -> CoTLevel:
         """Get CoT level considering tier overrides.
-        
+
         Args:
             tier: Routing tier
-            
+
         Returns:
             Effective CoTLevel for this tier
         """
@@ -138,32 +138,32 @@ class ReasoningConfig:
             "medium": self.medium_tier_level,
             "complex": self.complex_tier_level,
         }
-        
+
         override = tier_map.get(tier.lower())
         if override is not None:
             return override
-        
+
         # Apply default tier adjustments
         levels = [CoTLevel.NONE, CoTLevel.MINIMAL, CoTLevel.STANDARD, CoTLevel.FULL]
-        
+
         try:
             idx = levels.index(self.cot_level)
         except ValueError:
             logger.warning(f"Unknown cot_level: {self.cot_level}, defaulting to STANDARD")
             return CoTLevel.STANDARD
-        
+
         if tier.lower() == "simple" and self.cot_level != CoTLevel.NONE:
             # Downgrade simple tier by one level
             return levels[max(0, idx - 1)]
         elif tier.lower() == "complex" and self.cot_level != CoTLevel.FULL:
             # Upgrade complex tier by one level
             return levels[min(len(levels) - 1, idx + 1)]
-        
+
         return self.cot_level
-    
+
     def get_reflection_prompt(self) -> str:
         """Get the reflection prompt.
-        
+
         Returns:
             Custom prompt if set, otherwise default
         """
@@ -275,23 +275,23 @@ BOT_REASONING_CONFIGS: Dict[str, ReasoningConfig] = {
 
 def get_reasoning_config(bot_name: str) -> ReasoningConfig:
     """Get reasoning configuration for a bot.
-    
+
     Args:
         bot_name: Name of the bot (e.g., "CoderBot", "coder")
-        
+
     Returns:
         ReasoningConfig for the bot, or default if not found
     """
     # Try exact match first
     if bot_name in BOT_REASONING_CONFIGS:
         return BOT_REASONING_CONFIGS[bot_name]
-    
+
     # Try case-insensitive match
     bot_name_lower = bot_name.lower()
     for name, config in BOT_REASONING_CONFIGS.items():
         if name.lower() == bot_name_lower:
             return config
-    
+
     # Return default
     logger.debug(f"No reasoning config found for '{bot_name}', using default")
     return DEFAULT_REASONING
@@ -299,10 +299,10 @@ def get_reasoning_config(bot_name: str) -> ReasoningConfig:
 
 def get_cot_level_name(level: CoTLevel) -> str:
     """Get human-readable name for CoT level.
-    
+
     Args:
         level: CoTLevel enum value
-        
+
     Returns:
         Human-readable string
     """

@@ -1,6 +1,6 @@
 """Bot invocation system for delegating tasks to specialist bots.
 
-This module provides both synchronous and asynchronous bot invocation where 
+This module provides both synchronous and asynchronous bot invocation where
 the main agent (nanofolks) can delegate tasks to specialist bots. Supports:
 - Synchronous: waits for response before continuing (legacy mode)
 - Asynchronous: fires off task and notifies when complete (recommended)
@@ -13,19 +13,13 @@ from typing import Any, Optional
 
 from loguru import logger
 
-from nanofolks.agent.work_log import LogLevel
-from nanofolks.bus.events import InboundMessage, OutboundMessage
-from nanofolks.bus.queue import MessageBus
-from nanofolks.providers.base import LLMProvider
-from nanofolks.agent.context import ContextBuilder
 from nanofolks.agent.tools.registry import ToolRegistry
-from nanofolks.agent.tools.filesystem import ReadFileTool, WriteFileTool, EditFileTool, ListDirTool
-from nanofolks.agent.tools.shell import ExecTool
-from nanofolks.agent.tools.web import WebSearchTool, WebFetchTool
-from nanofolks.security.sanitizer import SecretSanitizer
+from nanofolks.agent.work_log import LogLevel
+from nanofolks.bus.events import InboundMessage
+from nanofolks.bus.queue import MessageBus
 from nanofolks.config.schema import ExecToolConfig
-from nanofolks.session.manager import SessionManager
-
+from nanofolks.providers.base import LLMProvider
+from nanofolks.security.sanitizer import SecretSanitizer
 
 # Available specialist bots that can be invoked
 AVAILABLE_BOTS = {
@@ -35,7 +29,7 @@ AVAILABLE_BOTS = {
         "bot_role": "Navigator",
     },
     "coder": {
-        "domain": "development", 
+        "domain": "development",
         "description": "Code implementation, debugging, and technical solutions",
         "bot_role": "Gunner",
     },
@@ -60,12 +54,12 @@ AVAILABLE_BOTS = {
 class BotInvoker:
     """
     Manages synchronous bot invocations.
-    
+
     Allows the main agent (nanofolks) to delegate tasks to specialist bots
     and wait for their responses. Each bot has its own processing context
     with its SOUL.md personality.
     """
-    
+
     def __init__(
         self,
         provider: LLMProvider,
@@ -94,16 +88,16 @@ class BotInvoker:
         self.evolutionary = evolutionary
         self.protected_paths = protected_paths or []
         self.allowed_paths = allowed_paths or []
-        
+
         # Initialize secret sanitizer
         self.sanitizer = SecretSanitizer()
-        
+
         # Work log manager for multi-bot tracking
         self.work_log_manager = work_log_manager
-        
+
         # Active invocations (all async now)
         self._active_invocations: dict[str, asyncio.Task[None]] = {}
-    
+
     async def invoke(
         self,
         bot_role: str,
@@ -115,10 +109,10 @@ class BotInvoker:
     ) -> str:
         """
         Invoke a specialist bot to handle a task.
-        
+
         The bot works in the background and reports results back when complete.
         This is always async - the main agent continues immediately.
-        
+
         Args:
             bot_role: Role identifier (researcher, coder, social, creative, auditor)
             task: Task description for the bot
@@ -126,18 +120,18 @@ class BotInvoker:
             session_id: Session ID for this invocation
             origin_channel: Channel to send notification when complete
             origin_chat_id: Chat ID to send notification when complete
-            
+
         Returns:
             Confirmation message that the bot was invoked
         """
         if bot_role not in AVAILABLE_BOTS:
             return f"Error: Unknown bot '{bot_role}'. Available bots: {', '.join(AVAILABLE_BOTS.keys())}"
-        
+
         if bot_role == "leader":
             return "Error: Cannot invoke leader (Leader) - use @leader directly"
-        
+
         invocation_id = str(uuid.uuid4())[:8]
-        
+
         # Always async - fire and forget
         return await self._invoke_async(
             invocation_id=invocation_id,
@@ -148,7 +142,7 @@ class BotInvoker:
             origin_channel=origin_channel,
             origin_chat_id=origin_chat_id,
         )
-    
+
     async def _invoke_async(
         self,
         invocation_id: str,
@@ -161,10 +155,10 @@ class BotInvoker:
     ) -> str:
         """Asynchronous invocation - fires off task and notifies when complete."""
         logger.info(f"Invoking {bot_role} (id: {invocation_id}, async): {task[:50]}...")
-        
+
         # Log the bot invocation request
         self._log_invocation_request(bot_role, task, context)
-        
+
         # Launch in background, don't wait
         task_handle = asyncio.create_task(
             self._process_invocation(
@@ -178,14 +172,14 @@ class BotInvoker:
             )
         )
         self._active_invocations[invocation_id] = task_handle
-        
+
         # Get bot info for nice message
         bot_info = self.get_bot_info(bot_role)
         bot_title = bot_info.get("bot_name", bot_role) if bot_info else bot_role
-        
+
         # Return immediately with confirmation
         return f"@{bot_role} ({bot_title}) is on the task. I'll share the results when ready."
-    
+
     async def _process_invocation(
         self,
         invocation_id: str,
@@ -199,25 +193,25 @@ class BotInvoker:
         """Process a bot invocation and announce result when complete."""
         result: str = ""
         status = "ok"
-        
+
         try:
             # Build system prompt for this bot
             system_prompt = await self._build_bot_system_prompt(bot_role, task)
-            
+
             # Build user message
             user_message = task
             if context:
                 user_message = f"Context from Leader:\n{context}\n\n---\n\nTask:\n{task}"
-            
+
             # Process through LLM
             response = await self._call_bot_llm(bot_role, system_prompt, user_message, session_id)
             result = response or "Task completed but no response generated."
-            
+
             logger.info(f"Async invocation {invocation_id} completed")
-            
+
             # Log the bot's response
             self._log_invocation_response(bot_role, task, result)
-            
+
         except Exception as e:
             logger.error(f"Async invocation {invocation_id} failed: {e}")
             result = f"Error: {str(e)}"
@@ -226,7 +220,7 @@ class BotInvoker:
         finally:
             # Cleanup
             self._active_invocations.pop(invocation_id, None)
-            
+
             # Announce result back to main agent via system message
             await self._announce_result(
                 invocation_id=invocation_id,
@@ -237,7 +231,7 @@ class BotInvoker:
                 origin_chat_id=origin_chat_id,
                 status=status,
             )
-    
+
     async def _announce_result(
         self,
         invocation_id: str,
@@ -252,7 +246,7 @@ class BotInvoker:
         bot_info = self.get_bot_info(bot_role)
         bot_title = bot_info.get("bot_name", bot_role) if bot_info else bot_role
         status_text = "completed" if status == "ok" else "failed"
-        
+
         announce_content = f"""[Bot @{bot_role} ({bot_title}) {status_text}]
 
 Task: {task}
@@ -261,7 +255,7 @@ Result:
 {result}
 
 Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not mention technical details like 'invocation' or task IDs."""
-        
+
         # Inject as system message to trigger main agent
         msg = InboundMessage(
             channel="system",
@@ -269,21 +263,21 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
             chat_id=f"{origin_channel}:{origin_chat_id}",
             content=announce_content,
         )
-        
+
         await self.bus.publish_inbound(msg)
         logger.debug(f"Invocation {invocation_id} announced result to {origin_channel}:{origin_chat_id}")
-    
+
     async def _build_bot_system_prompt(self, bot_role: str, task: str) -> str:
         """Build system prompt for the invoked bot."""
         from nanofolks.soul import SoulManager
-        
+
         # Get bot's SOUL.md if exists
         soul_manager = SoulManager(self.workspace)
         soul_content = soul_manager.get_bot_soul(bot_role)
-        
+
         # Build system prompt
         bot_info = AVAILABLE_BOTS[bot_role]
-        
+
         if soul_content:
             system_prompt = soul_content
         else:
@@ -293,29 +287,29 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
 Domain: {bot_info['domain']}
 Role: {bot_info['description']}
 
-You are a specialist focused on {bot_info['domain']} tasks. 
+You are a specialist focused on {bot_info['domain']} tasks.
 Provide helpful, expert responses in your domain."""
-        
+
         # Add task context
-        system_prompt += f"""
+        system_prompt += """
 
 You were invoked by the Leader (leader) to help with a task.
 Focus only on your domain expertise and provide a helpful response.
 """
-        
+
         return system_prompt
-    
+
     def _create_bot_tool_registry(self, bot_role: str) -> "ToolRegistry":
         """Create a tool registry for a bot based on permissions.
-        
+
         Args:
             bot_role: Name of the bot
-            
+
         Returns:
             ToolRegistry configured for this bot
         """
         from nanofolks.agent.tools.factory import create_bot_registry
-        
+
         return create_bot_registry(
             workspace=self.workspace,
             bot_role=bot_role,
@@ -323,7 +317,7 @@ Focus only on your domain expertise and provide a helpful response.
             exec_config=self.exec_config,
             restrict_to_workspace=self.restrict_to_workspace,
         )
-    
+
     async def _call_bot_llm(
         self,
         bot_role: str,
@@ -332,7 +326,7 @@ Focus only on your domain expertise and provide a helpful response.
         session_id: str,
     ) -> str:
         """Call LLM with bot's context and execute tools if needed.
-        
+
         If the bot has tool permissions, this will:
         1. Create a filtered tool registry
         2. Call LLM with tool definitions
@@ -340,21 +334,20 @@ Focus only on your domain expertise and provide a helpful response.
         4. Feed results back to LLM
         5. Continue until no more tool calls
         """
-        from nanofolks.agent.tools import ToolRegistry
-        
+
         # Create tool registry for this bot
         tool_registry = self._create_bot_tool_registry(bot_role)
         tool_definitions = tool_registry.get_definitions()
-        
+
         # Build initial messages
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ]
-        
+
         # Maximum tool call iterations to prevent infinite loops
         max_iterations = 10
-        
+
         for iteration in range(max_iterations):
             # Call LLM
             response = await self.provider.chat(
@@ -364,20 +357,20 @@ Focus only on your domain expertise and provide a helpful response.
                 max_tokens=self.max_tokens,
                 tools=tool_definitions if tool_definitions else None,
             )
-            
+
             # Get content and tool calls
             content = response.content or ""
             tool_calls = getattr(response, 'tool_calls', None) or []
-            
+
             # If no tool calls, return the response
             if not tool_calls:
                 return content
-            
+
             # Execute tool calls and add results to messages
             for tool_call in tool_calls:
                 tool_name = tool_call.function.name
                 tool_args = tool_call.function.arguments
-                
+
                 # Parse arguments (could be string or dict)
                 if isinstance(tool_args, str):
                     import json
@@ -385,11 +378,11 @@ Focus only on your domain expertise and provide a helpful response.
                         tool_args = json.loads(tool_args)
                     except json.JSONDecodeError:
                         tool_args = {}
-                
+
                 # Execute tool
                 logger.debug(f"[{bot_role}] Executing tool: {tool_name}")
                 result = await tool_registry.execute(tool_name, tool_args)
-                
+
                 # Add tool result to messages
                 messages.append({
                     "role": "tool",
@@ -397,7 +390,7 @@ Focus only on your domain expertise and provide a helpful response.
                     "name": tool_name,
                     "content": result,
                 })
-            
+
             # Add assistant message with tool calls
             messages.append({
                 "role": "assistant",
@@ -414,19 +407,19 @@ Focus only on your domain expertise and provide a helpful response.
                     for tc in tool_calls
                 ],
             })
-        
+
         # Max iterations reached, return last content
         logger.warning(f"[{bot_role}] Max tool iterations ({max_iterations}) reached")
         return content
-    
+
     def list_available_bots(self) -> dict:
         """List all bots that can be invoked."""
         return AVAILABLE_BOTS.copy()
-    
+
     def get_bot_info(self, bot_role: str) -> Optional[dict]:
         """Get information about a specific bot."""
         return AVAILABLE_BOTS.get(bot_role)
-    
+
     def _log_invocation_request(
         self,
         bot_role: str,
@@ -436,7 +429,7 @@ Focus only on your domain expertise and provide a helpful response.
         """Log a bot invocation request using work_log_manager."""
         if not self.work_log_manager:
             return
-        
+
         try:
             # Log as a bot message with mention
             self.work_log_manager.log_bot_message(
@@ -444,7 +437,7 @@ Focus only on your domain expertise and provide a helpful response.
                 message=f"Invoking @{bot_role} with task: {task[:200]}...",
                 mentions=[f"@{bot_role}"]
             )
-            
+
             # Log as a handoff (bot-to-bot transfer)
             self.work_log_manager.log(
                 level=LogLevel.HANDOFF,
@@ -459,7 +452,7 @@ Focus only on your domain expertise and provide a helpful response.
             )
         except Exception as e:
             logger.warning(f"Failed to log invocation request: {e}")
-    
+
     def _log_invocation_response(
         self,
         bot_role: str,
@@ -469,7 +462,7 @@ Focus only on your domain expertise and provide a helpful response.
         """Log a bot's response to an invocation."""
         if not self.work_log_manager:
             return
-        
+
         try:
             # Log the bot's response
             self.work_log_manager.log_bot_message(
@@ -477,7 +470,7 @@ Focus only on your domain expertise and provide a helpful response.
                 message=f"Response to task: {task[:100]}...\n\n{response[:1000]}...",
                 mentions=[f"@{bot_role}"]
             )
-            
+
             # Log completion
             self.work_log_manager.log(
                 level=LogLevel.INFO,
@@ -492,7 +485,7 @@ Focus only on your domain expertise and provide a helpful response.
             )
         except Exception as e:
             logger.warning(f"Failed to log invocation response: {e}")
-    
+
     def _log_invocation_error(
         self,
         bot_role: str,
@@ -502,7 +495,7 @@ Focus only on your domain expertise and provide a helpful response.
         """Log an error during bot invocation."""
         if not self.work_log_manager:
             return
-        
+
         try:
             self.work_log_manager.log(
                 level=LogLevel.ERROR,

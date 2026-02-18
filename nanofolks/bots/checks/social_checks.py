@@ -8,7 +8,8 @@ Usage:
 """
 
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict
+
 from loguru import logger
 
 from nanofolks.heartbeat.check_registry import register_check
@@ -23,14 +24,14 @@ from nanofolks.heartbeat.check_registry import register_check
 )
 async def publish_scheduled_posts(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Check for and publish scheduled social media posts.
-    
+
     Automatically publishes posts that are scheduled for the current
     time or past due. Tracks successes and failures.
-    
+
     Args:
         bot: The SocialBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with publishing results
     """
@@ -41,7 +42,7 @@ async def publish_scheduled_posts(bot, config: Dict[str, Any]) -> Dict[str, Any]
             scheduled_posts = await bot.get_scheduled_posts(before=now)
         else:
             scheduled_posts = []
-        
+
         if not scheduled_posts:
             return {
                 "success": True,
@@ -50,16 +51,16 @@ async def publish_scheduled_posts(bot, config: Dict[str, Any]) -> Dict[str, Any]
                 "published": 0,
                 "failed": 0
             }
-        
+
         published = []
         failed = []
-        
+
         for post in scheduled_posts:
             try:
                 success = False
                 if hasattr(bot, 'publish_post'):
                     success = await bot.publish_post(post)
-                
+
                 if success:
                     published.append({
                         "post_id": getattr(post, 'id', 'unknown'),
@@ -72,14 +73,14 @@ async def publish_scheduled_posts(bot, config: Dict[str, Any]) -> Dict[str, Any]
                         "platform": getattr(post, 'platform', 'unknown'),
                         "error": "Publishing failed"
                     })
-            
+
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] Error publishing post: {e}")
                 failed.append({
                     "post_id": getattr(post, 'id', 'unknown'),
                     "error": str(e)
                 })
-        
+
         # Escalate failures
         if failed:
             if hasattr(bot, 'escalate_to_coordinator'):
@@ -97,7 +98,7 @@ async def publish_scheduled_posts(bot, config: Dict[str, Any]) -> Dict[str, Any]
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len(failed) == 0,
             "posts_scheduled": len(scheduled_posts),
@@ -105,7 +106,7 @@ async def publish_scheduled_posts(bot, config: Dict[str, Any]) -> Dict[str, Any]
             "failed": len(failed),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in publish_scheduled_posts: {e}")
         return {
@@ -125,57 +126,57 @@ async def publish_scheduled_posts(bot, config: Dict[str, Any]) -> Dict[str, Any]
 )
 async def monitor_community_mentions(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Monitor social platforms for mentions requiring response.
-    
+
     Checks configured platforms for mentions, especially those with
     negative sentiment or requiring urgent response.
-    
+
     Args:
         bot: The SocialBot instance
         config: Configuration with platforms list
-        
+
     Returns:
         Dict with mention counts and urgent items
     """
     platforms = config.get("platforms", ["twitter", "linkedin"])
-    
+
     total_mentions = 0
     urgent_mentions = []
-    
+
     for platform in platforms:
         try:
             # Get last check time
             last_check_key = f"last_mention_check_{platform}"
             since = bot.private_memory.get(last_check_key)
-            
+
             # Check mentions
             if hasattr(bot, 'check_mentions'):
                 mentions = await bot.check_mentions(platform, since=since)
             else:
                 mentions = []
-            
+
             total_mentions += len(mentions)
-            
+
             # Identify urgent mentions
             urgent = [
                 m for m in mentions
                 if getattr(m, 'requires_response', False) or
                 getattr(m, 'sentiment', '') in ["negative", "urgent", "angry"]
             ]
-            
+
             if urgent:
                 # Draft responses
                 for mention in urgent:
                     if hasattr(bot, 'draft_response'):
                         mention.response = await bot.draft_response(mention)
-                
+
                 urgent_mentions.extend(urgent)
-            
+
             # Update memory
             bot.private_memory[last_check_key] = datetime.now().isoformat()
-            
+
         except Exception as e:
             logger.error(f"[{bot.role_card.bot_name}] Error checking {platform}: {e}")
-    
+
     # Notify if urgent mentions
     if urgent_mentions:
         if hasattr(bot, 'notify_coordinator'):
@@ -204,7 +205,7 @@ async def monitor_community_mentions(bot, config: Dict[str, Any]) -> Dict[str, A
             action = "detected"
     else:
         action = None
-    
+
     return {
         "success": True,
         "platforms_checked": len(platforms),
@@ -223,14 +224,14 @@ async def monitor_community_mentions(bot, config: Dict[str, Any]) -> Dict[str, A
 )
 async def check_engagement_metrics(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Analyze engagement metrics and detect significant changes.
-    
+
     Tracks likes, shares, comments, reach, and other engagement metrics.
     Detects sudden drops or spikes that may indicate issues or opportunities.
-    
+
     Args:
         bot: The SocialBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with metric analysis and anomalies
     """
@@ -239,17 +240,17 @@ async def check_engagement_metrics(bot, config: Dict[str, Any]) -> Dict[str, Any
             metrics = await bot.analyze_engagement_metrics()
         else:
             metrics = {}
-        
+
         # Detect anomalies
         anomalies = []
-        
+
         for metric_name, values in metrics.items():
             if len(values) < 2:
                 continue
-                
+
             current = values[-1]
             avg = sum(values[:-1]) / len(values[:-1])
-            
+
             # 30% drop or 50% spike
             if current < avg * 0.7:
                 anomalies.append({
@@ -267,7 +268,7 @@ async def check_engagement_metrics(bot, config: Dict[str, Any]) -> Dict[str, Any
                     "current": current,
                     "average": round(avg, 1)
                 })
-        
+
         if anomalies:
             if hasattr(bot, 'notify_coordinator'):
                 try:
@@ -283,7 +284,7 @@ async def check_engagement_metrics(bot, config: Dict[str, Any]) -> Dict[str, Any
                 action = "detected"
         else:
             action = None
-        
+
         return {
             "success": True,
             "metrics_analyzed": len(metrics),
@@ -291,7 +292,7 @@ async def check_engagement_metrics(bot, config: Dict[str, Any]) -> Dict[str, Any
             "action_taken": action,
             "anomalies": anomalies if anomalies else None
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error checking engagement: {e}")
         return {
@@ -311,19 +312,19 @@ async def check_engagement_metrics(bot, config: Dict[str, Any]) -> Dict[str, Any
 )
 async def track_trending_topics(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Track trending topics and suggest content opportunities.
-    
+
     Monitors configured topics for trending activity. High-opportunity
     trends are reported for potential content creation.
-    
+
     Args:
         bot: The SocialBot instance
         config: Configuration with topics list
-        
+
     Returns:
         Dict with trending topics and opportunities
     """
     tracked_topics = config.get("topics", [])
-    
+
     if not tracked_topics:
         return {
             "success": True,
@@ -331,20 +332,20 @@ async def track_trending_topics(bot, config: Dict[str, Any]) -> Dict[str, Any]:
             "topics_checked": 0,
             "trending": 0
         }
-    
+
     trending = []
-    
+
     for topic in tracked_topics:
         try:
             if hasattr(bot, 'check_trending'):
                 trend_data = await bot.check_trending(topic)
             else:
                 trend_data = None
-            
-            if (trend_data and 
+
+            if (trend_data and
                 getattr(trend_data, 'is_trending', False) and
                 getattr(trend_data, 'volume', 0) > 1000):
-                
+
                 trending.append({
                     "topic": topic,
                     "volume": getattr(trend_data, 'volume', 0),
@@ -352,13 +353,13 @@ async def track_trending_topics(bot, config: Dict[str, Any]) -> Dict[str, Any]:
                     "opportunity_score": getattr(trend_data, 'opportunity_score', 0.5),
                     "trending_since": getattr(trend_data, 'trending_since', None)
                 })
-        
+
         except Exception as e:
             logger.error(f"[{bot.role_card.bot_name}] Error checking topic {topic}: {e}")
-    
+
     # Sort by opportunity score
     trending.sort(key=lambda x: x["opportunity_score"], reverse=True)
-    
+
     if trending:
         if hasattr(bot, 'notify_coordinator'):
             try:
@@ -377,7 +378,7 @@ async def track_trending_topics(bot, config: Dict[str, Any]) -> Dict[str, Any]:
             action = "detected"
     else:
         action = None
-    
+
     return {
         "success": True,
         "topics_checked": len(tracked_topics),

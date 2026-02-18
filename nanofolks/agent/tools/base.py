@@ -9,11 +9,11 @@ from nanofolks.security.symbolic_converter import get_symbolic_converter
 class Tool(ABC):
     """
     Abstract base class for agent tools.
-    
+
     Tools are capabilities that the agent can use to interact with
     the environment, such as reading files, executing commands, etc.
     """
-    
+
     _TYPE_MAP = {
         "string": str,
         "integer": int,
@@ -22,33 +22,33 @@ class Tool(ABC):
         "array": list,
         "object": dict,
     }
-    
+
     @property
     @abstractmethod
     def name(self) -> str:
         """Tool name used in function calls."""
         pass
-    
+
     @property
     @abstractmethod
     def description(self) -> str:
         """Description of what the tool does."""
         pass
-    
+
     @property
     @abstractmethod
     def parameters(self) -> dict[str, Any]:
         """JSON Schema for tool parameters."""
         pass
-    
+
     @abstractmethod
     async def execute(self, **kwargs: Any) -> str:
         """
         Execute the tool with given parameters.
-        
+
         Args:
             **kwargs: Tool-specific parameters.
-        
+
         Returns:
             String result of the tool execution.
         """
@@ -60,22 +60,22 @@ class Tool(ABC):
         if schema.get("type", "object") != "object":
             raise ValueError(f"Schema must be object type, got {schema.get('type')!r}")
         return self._validate(params, {**schema, "type": "object"}, "")
-    
+
     def resolve_symbolic_params(self, params: dict[str, Any]) -> dict[str, Any]:
         """Resolve symbolic references in parameters to actual values.
-        
+
         This is called before tool execution to resolve any {{symbolic_refs}}
         to their actual values from the KeyVault.
-        
+
         Args:
             params: The parameters passed to the tool
-            
+
         Returns:
             Parameters with symbolic references resolved
         """
         converter = get_symbolic_converter()
         resolved = {}
-        
+
         for key, value in params.items():
             if isinstance(value, str) and converter.is_symbolic_ref(value):
                 # Resolve symbolic reference
@@ -87,14 +87,14 @@ class Tool(ABC):
                     resolved[key] = value
             else:
                 resolved[key] = value
-        
+
         return resolved
 
     def _validate(self, val: Any, schema: dict[str, Any], path: str) -> list[str]:
         t, label = schema.get("type"), path or "parameter"
         if t in self._TYPE_MAP and not isinstance(val, self._TYPE_MAP[t]):
             return [f"{label} should be {t}"]
-        
+
         errors = []
         if "enum" in schema and val not in schema["enum"]:
             errors.append(f"{label} must be one of {schema['enum']}")
@@ -120,7 +120,7 @@ class Tool(ABC):
             for i, item in enumerate(val):
                 errors.extend(self._validate(item, schema["items"], f"{path}[{i}]" if path else f"[{i}]"))
         return errors
-    
+
     def to_schema(self) -> dict[str, Any]:
         """Convert tool to OpenAI function schema format."""
         return {

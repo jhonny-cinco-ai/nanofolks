@@ -1,9 +1,9 @@
 """Room data model for multi-agent orchestration."""
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from datetime import datetime
 
 
 class RoomType(Enum):
@@ -62,13 +62,13 @@ class Room:
     name: str = ""  # Display name (e.g., "General", "Project Website")
     type: RoomType = RoomType.OPEN  # OPEN, PROJECT, DIRECT, COORDINATION
     room_type: str = "open"  # String form for compatibility
-    
+
     # Participants (bots)
     participants: List[str] = field(default_factory=list)  # ["leader", "researcher"]
-    
+
     # Members (users and channels)
     members: List[RoomMember] = field(default_factory=list)
-    
+
     # Metadata
     owner: str = "user"  # "user" or bot name if coordination mode
     description: str = ""
@@ -89,17 +89,17 @@ class Room:
     # Metadata
     deadline: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def __post_init__(self):
         """Set defaults after initialization."""
         if not self.name:
             self.name = self.id
         if not self.room_type and self.type:
             self.room_type = self.type.value
-    
+
     def add_member(self, member: RoomMember) -> None:
         """Add a member to the room.
-        
+
         Args:
             member: RoomMember to add
         """
@@ -107,13 +107,13 @@ class Room:
         if not existing:
             self.members.append(member)
             self.updated_at = datetime.now()
-    
+
     def remove_member(self, member_id: str) -> bool:
         """Remove a member from the room.
-        
+
         Args:
             member_id: Member ID to remove
-            
+
         Returns:
             True if removed, False if not found
         """
@@ -123,13 +123,13 @@ class Room:
                 self.updated_at = datetime.now()
                 return True
         return False
-    
+
     def get_member(self, member_id: str) -> Optional[RoomMember]:
         """Get a member by ID.
-        
+
         Args:
             member_id: Member ID to find
-            
+
         Returns:
             RoomMember or None if not found
         """
@@ -140,11 +140,11 @@ class Room:
 
     def add_message(self, sender: str, content: str) -> Message:
         """Add a message to room history.
-        
+
         Args:
             sender: Bot name or "user"
             content: Message content
-            
+
         Returns:
             Created Message object
         """
@@ -159,7 +159,7 @@ class Room:
 
     def add_participant(self, bot_name: str) -> None:
         """Add bot to room.
-        
+
         Args:
             bot_name: Name of bot to add
         """
@@ -168,7 +168,7 @@ class Room:
 
     def remove_participant(self, bot_name: str) -> None:
         """Remove bot from room.
-        
+
         Args:
             bot_name: Name of bot to remove
         """
@@ -177,10 +177,10 @@ class Room:
 
     def has_participant(self, bot_name: str) -> bool:
         """Check if bot is in room.
-        
+
         Args:
             bot_name: Name of bot to check
-            
+
         Returns:
             True if bot is participant
         """
@@ -188,20 +188,20 @@ class Room:
 
     def is_active(self) -> bool:
         """Check if room should be archived.
-        
+
         Returns:
             True if room is still active
         """
         if not self.history:
             return False
-        
+
         last_activity = self.history[-1].timestamp
         days_inactive = (datetime.now() - last_activity).days
         return days_inactive < self.archive_after_days
 
     def get_last_message(self) -> Optional[Message]:
         """Get the most recent message in room.
-        
+
         Returns:
             Last message or None if no messages
         """
@@ -209,10 +209,10 @@ class Room:
 
     def get_participant_messages(self, bot_name: str) -> List[Message]:
         """Get all messages from specific participant.
-        
+
         Args:
             bot_name: Name of bot
-            
+
         Returns:
             List of messages from that bot
         """
@@ -222,7 +222,7 @@ class Room:
         self, subject: str, predicate: str, obj: str, confidence: float = 1.0
     ) -> None:
         """Add fact to shared memory.
-        
+
         Args:
             subject: Subject of fact
             predicate: Relationship
@@ -240,7 +240,7 @@ class Room:
 
     def add_entity(self, entity_id: str, entity_data: Dict[str, Any]) -> None:
         """Add entity to knowledge graph.
-        
+
         Args:
             entity_id: Unique entity identifier
             entity_data: Entity information
@@ -249,7 +249,7 @@ class Room:
 
     def add_event(self, content: str, source: str, **kwargs: Any) -> None:
         """Add event to shared history.
-        
+
         Args:
             content: What happened
             source: Where event came from
@@ -262,7 +262,7 @@ class Room:
             **kwargs,
         }
         self.shared_context.events.append(event)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Serialize room to dictionary."""
         return {
@@ -294,7 +294,7 @@ class Room:
             "deadline": self.deadline,
             "metadata": self.metadata,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Room":
         """Deserialize room from dictionary."""
@@ -308,7 +308,7 @@ class Room:
                 joined_at=datetime.fromisoformat(m_data["joined_at"]) if m_data.get("joined_at") else datetime.now(),
                 metadata=m_data.get("metadata", {}),
             ))
-        
+
         return cls(
             id=data["id"],
             name=data.get("name", data["id"]),

@@ -1,11 +1,11 @@
 """Project State Manager - Manages state for full discovery flow."""
 
-from enum import Enum
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from enum import Enum
 from pathlib import Path
-import json
+from typing import Any, Dict, List, Optional
 
 from loguru import logger
 
@@ -49,21 +49,21 @@ class QuickFlowState:
 
 class ProjectStateManager:
     """Manages project state across sessions for full discovery flow.
-    
+
     This implements the state machine for:
     DISCOVERY → SYNTHESIS → APPROVAL → EXECUTION → REVIEW → IDLE
-    
+
     Also supports quick flow state for ADVICE/RESEARCH intents.
     """
-    
+
     TIMEOUT_MINUTES = 30
     QUICK_FLOW_TIMEOUT_MINUTES = 10
     MIN_QUESTIONS = 3
     MIN_BOTS_WITH_QUESTIONS = 2
-    
+
     def __init__(self, workspace: Path, room_id: str):
         """Initialize project state manager.
-        
+
         Args:
             workspace: Workspace directory
             room_id: Room identifier
@@ -74,14 +74,14 @@ class ProjectStateManager:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.state_file = self.state_dir / f"{room_id}.json"
         self._state: Optional[ProjectState] = None
-    
+
     @property
     def state(self) -> ProjectState:
         """Get current state (lazy load)."""
         if self._state is None:
             self._state = self._load_state()
         return self._state
-    
+
     def _load_state(self) -> ProjectState:
         """Load state from disk."""
         if self.state_file.exists():
@@ -95,7 +95,7 @@ class ProjectStateManager:
             except Exception as e:
                 logger.warning(f"Failed to load project state: {e}")
         return ProjectState()
-    
+
     def _save_state(self):
         """Persist state to disk."""
         data = {
@@ -113,10 +113,10 @@ class ProjectStateManager:
         }
         with open(self.state_file, 'w') as f:
             json.dump(data, f, indent=2)
-    
+
     def start_discovery(self, user_goal: str, intent_type: str, suggested_bots: Optional[List[str]] = None):
         """Begin discovery phase.
-        
+
         Args:
             user_goal: The user's original goal/request
             intent_type: Type of intent (build, explore, task, etc.)
@@ -131,17 +131,17 @@ class ProjectStateManager:
         self.state.suggested_bots = suggested_bots if suggested_bots else ["leader", "researcher", "creative"]
         self.state.iteration += 1
         self._save_state()
-        
+
         logger.info(f"Started discovery for: {user_goal[:50]}...")
-    
+
     def log_discovery_entry(
-        self, 
-        bot_name: str, 
-        content: str, 
+        self,
+        bot_name: str,
+        content: str,
         is_question: bool = True
     ):
         """Log discovery question or answer.
-        
+
         Args:
             bot_name: Name of the bot (or "user")
             content: The question or answer content
@@ -154,29 +154,29 @@ class ProjectStateManager:
             'timestamp': datetime.now().isoformat()
         })
         self._save_state()
-    
+
     def complete_discovery(self):
         """Transition from discovery to synthesis."""
         self.state.phase = ProjectPhase.SYNTHESIS
         self._save_state()
-        
+
         logger.info("Discovery complete, moving to synthesis")
-    
+
     def set_synthesis(self, synthesis: Dict[str, Any]):
         """Set synthesis and move to approval.
-        
+
         Args:
             synthesis: The synthesized project brief
         """
         self.state.synthesis = synthesis
         self.state.phase = ProjectPhase.APPROVAL
         self._save_state()
-        
+
         logger.info("Synthesis complete, awaiting approval")
-    
+
     def handle_approval(self, approved: bool, feedback: Optional[str] = None):
         """Handle user approval decision.
-        
+
         Args:
             approved: Whether the user approved
             feedback: User's feedback if rejected
@@ -186,51 +186,51 @@ class ProjectStateManager:
             'feedback': feedback,
             'timestamp': datetime.now().isoformat()
         }
-        
+
         if approved:
             self.state.phase = ProjectPhase.EXECUTION
             logger.info("Approved! Moving to execution")
         else:
             self.state.phase = ProjectPhase.DISCOVERY
             logger.info("Rejected! Returning to discovery")
-        
+
         self._save_state()
-    
+
     def start_execution(self, plan: Dict[str, Any]):
         """Begin execution phase.
-        
+
         Args:
             plan: Execution plan with tasks for each bot
         """
         self.state.execution_plan = plan
         self.state.phase = ProjectPhase.EXECUTION
         self._save_state()
-        
+
         logger.info("Starting execution phase")
-    
+
     def complete_review(self):
         """Reset to idle after successful review."""
         self.state.phase = ProjectPhase.IDLE
         self._save_state()
-        
+
         logger.info("Project complete, reset to idle")
-    
+
     def reset(self):
         """Force reset to idle state."""
         self.state.phase = ProjectPhase.IDLE
         self._save_state()
-        
+
         logger.info("Project state reset to idle")
-    
+
     def check_timeout(self) -> bool:
         """Check if project timed out due to inactivity.
-        
+
         Returns:
             True if timed out and reset to idle
         """
         if self.state.phase == ProjectPhase.IDLE:
             return False
-        
+
         elapsed = (datetime.now() - self.state.updated_at).total_seconds() / 60
         if elapsed > self.TIMEOUT_MINUTES:
             self.state.phase = ProjectPhase.IDLE
@@ -238,49 +238,49 @@ class ProjectStateManager:
             logger.info(f"Project timed out after {elapsed:.0f} minutes")
             return True
         return False
-    
+
     def _is_discovery_complete(self) -> bool:
         """Check if discovery phase is complete.
-        
+
         Discovery is complete when:
         - At least MIN_QUESTIONS questions have been asked
         - At least MIN_BOTS_WITH_QUESTIONS different bots have asked questions
         """
         log = self.state.discovery_log
-        
+
         questions = [e for e in log if e.get('is_question', True)]
         bots_with_questions = len(set(e['bot'] for e in questions))
-        
+
         complete = len(questions) >= self.MIN_QUESTIONS and bots_with_questions >= self.MIN_BOTS_WITH_QUESTIONS
-        
+
         if complete:
             logger.info(f"Discovery complete: {len(questions)} questions from {bots_with_questions} bots")
-        
+
         return complete
-    
+
     def _get_next_bot(self) -> str:
         """Get next bot to ask a question (round-robin).
-        
+
         Returns:
             Name of the next bot to ask a question
         """
         log = self.state.discovery_log
         bots = self.state.suggested_bots or ["leader", "researcher", "creative"]
-        
+
         asked = set(e['bot'] for e in log if e.get('is_question', True))
-        
+
         for bot in bots:
             if bot not in asked:
                 return bot
-        
+
         return bots[0]
-    
+
     def get_context(self, bot_name: str) -> str:
         """Get formatted context for a bot.
-        
+
         Args:
             bot_name: Name of the bot to get context for
-            
+
         Returns:
             Formatted context string
         """
@@ -289,10 +289,10 @@ class ProjectStateManager:
             "",
             f"## Phase: {self.state.phase.value.upper()}",
         ]
-        
+
         if self.state.user_goal:
-            sections.extend(["", f"## Goal", self.state.user_goal])
-        
+            sections.extend(["", "## Goal", self.state.user_goal])
+
         if self.state.phase == ProjectPhase.DISCOVERY:
             sections.extend([
                 "",
@@ -304,38 +304,38 @@ class ProjectStateManager:
             for entry in self.state.discovery_log:
                 if entry.get('is_question', True):
                     sections.append(f"- @{entry['bot']}: {entry['content']}")
-        
+
         elif self.state.phase == ProjectPhase.EXECUTION:
             next_steps = self.state.synthesis.get('next_steps', {}) if self.state.synthesis else {}
             if bot_name in next_steps:
-                sections.extend(["", f"## Your Task", next_steps[bot_name]])
-        
+                sections.extend(["", "## Your Task", next_steps[bot_name]])
+
         return "\n".join(sections)
-    
+
     def format_status(self) -> str:
         """Get human-readable status string."""
         lines = [
             f"Phase: {self.state.phase.value.upper()}",
             f"Iteration: {self.state.iteration}",
         ]
-        
+
         if self.state.user_goal:
             lines.append(f"Goal: {self.state.user_goal[:50]}...")
-        
+
         if self.state.discovery_log:
             questions = [e for e in self.state.discovery_log if e.get('is_question', True)]
             lines.append(f"Questions: {len(questions)}")
-        
+
         if self.state.phase != ProjectPhase.IDLE:
             elapsed = (datetime.now() - self.state.updated_at).total_seconds() / 60
             lines.append(f"Last activity: {elapsed:.0f}m ago")
-        
+
         return "\n".join(lines)
 
 
     def start_quick_flow(self, intent_type: str, user_goal: str):
         """Start a quick flow session.
-        
+
         Args:
             intent_type: Type of intent (advice, research)
             user_goal: The user's original question/request
@@ -345,33 +345,33 @@ class ProjectStateManager:
         quick_state.user_goal = user_goal
         quick_state.questions_asked = 0
         quick_state.user_answers = []
-        
+
         self._save_quick_flow_state(quick_state)
         logger.info(f"Started quick flow for: {user_goal[:50]}...")
-    
+
     def get_quick_flow_state(self) -> Optional[QuickFlowState]:
         """Get quick flow state if it exists and hasn't timed out.
-        
+
         Returns:
             QuickFlowState if valid, None otherwise
         """
         quick_file = self.state_dir / f"{self.room_id}_quick.json"
         if not quick_file.exists():
             return None
-        
+
         try:
             with open(quick_file, 'r') as f:
                 data = json.load(f)
-            
+
             created_at = datetime.fromisoformat(data['created_at'])
             updated_at = datetime.fromisoformat(data['updated_at'])
-            
+
             elapsed = (datetime.now() - updated_at).total_seconds() / 60
             if elapsed > self.QUICK_FLOW_TIMEOUT_MINUTES:
                 logger.info(f"Quick flow timed out after {elapsed:.0f} minutes")
                 self.clear_quick_flow_state()
                 return None
-            
+
             quick_state = QuickFlowState()
             quick_state.intent_type = data.get('intent_type', '')
             quick_state.questions_asked = data.get('questions_asked', 0)
@@ -379,15 +379,15 @@ class ProjectStateManager:
             quick_state.user_answers = data.get('user_answers', [])
             quick_state.created_at = created_at
             quick_state.updated_at = updated_at
-            
+
             return quick_state
         except Exception as e:
             logger.warning(f"Failed to load quick flow state: {e}")
             return None
-    
+
     def update_quick_flow_state(self, questions_asked: int, user_answers: List[str]):
         """Update quick flow state.
-        
+
         Args:
             questions_asked: Number of questions asked so far
             user_answers: List of user's answers
@@ -397,17 +397,17 @@ class ProjectStateManager:
             quick_state.questions_asked = questions_asked
             quick_state.user_answers = user_answers
             self._save_quick_flow_state(quick_state)
-    
+
     def clear_quick_flow_state(self):
         """Clear quick flow state."""
         quick_file = self.state_dir / f"{self.room_id}_quick.json"
         if quick_file.exists():
             quick_file.unlink()
             logger.info("Cleared quick flow state")
-    
+
     def _save_quick_flow_state(self, quick_state: QuickFlowState):
         """Persist quick flow state to disk.
-        
+
         Args:
             quick_state: The quick flow state to save
         """
@@ -426,11 +426,11 @@ class ProjectStateManager:
 
 def get_project_state_manager(workspace: Path, room_id: str) -> ProjectStateManager:
     """Get ProjectStateManager instance.
-    
+
     Args:
         workspace: Workspace directory
         room_id: Room identifier
-        
+
     Returns:
         ProjectStateManager instance
     """

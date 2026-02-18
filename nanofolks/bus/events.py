@@ -8,7 +8,7 @@ from typing import Any
 @dataclass
 class InboundMessage:
     """Message received from a chat channel."""
-    
+
     channel: str  # telegram, discord, slack, whatsapp
     sender_id: str  # User identifier
     chat_id: str  # Chat/channel identifier
@@ -17,7 +17,7 @@ class InboundMessage:
     media: list[str] = field(default_factory=list)  # Media URLs
     metadata: dict[str, Any] = field(default_factory=dict)  # Channel-specific data
     room_id: str | None = None  # Room ID if part of room-centric routing
-    
+
     @property
     def session_key(self) -> str:
         """Unique key for session identification (room-centric format)."""
@@ -26,7 +26,7 @@ class InboundMessage:
             return f"room:{self.room_id}"
         # Fallback to channel-based (legacy/compatibility)
         return f"room:{self.channel}_{self.chat_id}"
-    
+
     def set_room(self, room_id: str) -> None:
         """Set the room for this message (room-centric routing)."""
         self.room_id = room_id
@@ -35,7 +35,7 @@ class InboundMessage:
 @dataclass
 class OutboundMessage:
     """Message to send to a chat channel."""
-    
+
     channel: str
     chat_id: str
     content: str

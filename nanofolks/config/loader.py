@@ -4,11 +4,10 @@ import json
 import os
 import stat
 from pathlib import Path
-from typing import Any
+
 from loguru import logger
 
 from nanofolks.config.schema import Config
-
 
 # Marker for keys stored in OS keyring
 KEYRING_MARKER = "__KEYRING__"
@@ -43,7 +42,7 @@ def _ensure_room_initialized(config: Config) -> None:
 
          # This will create the default #general room if it doesn't exist
          # RoomManager uses get_data_dir() internally, which respects config
-         manager = RoomManager()
+         RoomManager()
          logger.info("Initialized default #general room with Leader")
      except Exception as e:
          # Don't fail if room creation fails - it will be retried on agent start
@@ -53,19 +52,19 @@ def _ensure_room_initialized(config: Config) -> None:
 def load_config(config_path: Path | None = None) -> Config:
     """
     Load configuration from file or create default.
-    
+
     If keyring is available, keys marked with __KEYRING__ will be
     resolved from the OS keyring.
-    
+
     Args:
         config_path: Optional path to config file. Uses default if not provided.
-    
+
     Returns:
         Loaded configuration object with keys resolved from keyring if available.
     """
     path = config_path or get_config_path()
     is_first_run = not path.exists()
-    
+
     if path.exists():
         # Check and fix permissions if needed
         try:
@@ -78,49 +77,49 @@ def load_config(config_path: Path | None = None) -> Config:
                 os.chmod(path, 0o600)
         except Exception as e:
             logger.warning(f"Could not verify config permissions: {e}")
-        
+
         try:
             with open(path) as f:
                 data = json.load(f)
             data = _migrate_config(data)
             config = Config.model_validate(data)
-            
+
             # Resolve keys from keyring if available
             config = _resolve_keyring_keys(config)
-            
+
             return config
         except (json.JSONDecodeError, ValueError) as e:
             print(f"Warning: Failed to load config from {path}: {e}")
             print("Using default configuration.")
-    
+
     config = Config()
-    
+
     # On first run, ensure room is created
     if is_first_run:
         _ensure_room_initialized(config)
-    
+
     return config
 
 
 def save_config(config: Config, config_path: Path | None = None) -> None:
     """
     Save configuration to file with secure permissions.
-    
+
     Args:
         config: Configuration to save.
         config_path: Optional path to save to. Uses default if not provided.
     """
     path = config_path or get_config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Ensure parent directory has secure permissions (0700 = owner only)
     os.chmod(path.parent, 0o700)
-    
+
     data = config.model_dump(by_alias=True)
-    
+
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
-    
+
     # Enforce secure file permissions (0600 = owner read/write only)
     os.chmod(path, 0o600)
     logger.debug(f"Config saved with secure permissions: {path}")
@@ -138,22 +137,22 @@ def _migrate_config(data: dict) -> dict:
 
 def _resolve_keyring_keys(config: Config) -> Config:
     """Resolve __KEYRING__ markers to actual keys from OS keyring.
-    
+
     Args:
         config: Configuration object to resolve
-        
+
     Returns:
         Configuration with keyring markers resolved to actual keys
     """
     try:
         from nanofolks.security.keyring_manager import get_keyring_manager
-        
+
         keyring = get_keyring_manager()
-        
+
         if not keyring.is_available():
             logger.debug("Keyring not available, using config file keys")
             return config
-        
+
         # Resolve provider API keys
         providers = config.providers
         for provider_name in PROVIDERS_WITH_KEYS:
@@ -165,7 +164,7 @@ def _resolve_keyring_keys(config: Config) -> Config:
                     logger.debug(f"Resolved {provider_name} key from keyring")
                 else:
                     logger.warning(f"Keyring marker found for {provider_name} but no key in keyring")
-        
+
         # Resolve brave search API key
         if config.tools and config.tools.web and config.tools.web.search:
             if config.tools.web.search.api_key == KEYRING_MARKER:
@@ -173,38 +172,38 @@ def _resolve_keyring_keys(config: Config) -> Config:
                 if actual_key:
                     config.tools.web.search.api_key = actual_key
                     logger.debug("Resolved brave search key from keyring")
-        
+
         # Resolve other tool API keys as needed
-        
+
     except ImportError:
         logger.debug("Keyring manager not available, using config file keys")
     except Exception as e:
         logger.warning(f"Error resolving keyring keys: {e}")
-    
+
     return config
 
 
 def _migrate_to_keyring(config: Config, dry_run: bool = False) -> Config:
     """Migrate plain-text API keys to OS keyring.
-    
+
     Args:
         config: Configuration with plain-text keys
         dry_run: If True, don't actually migrate, just return config
-        
+
     Returns:
         Configuration with keys replaced by __KEYRING__ markers
     """
     try:
         from nanofolks.security.keyring_manager import get_keyring_manager
-        
+
         keyring = get_keyring_manager()
-        
+
         if not keyring.is_available():
             logger.warning("Keyring not available, cannot migrate keys")
             return config
-        
+
         migrated = []
-        
+
         # Migrate provider API keys
         providers = config.providers
         for provider_name in PROVIDERS_WITH_KEYS:
@@ -214,7 +213,7 @@ def _migrate_to_keyring(config: Config, dry_run: bool = False) -> Config:
                     keyring.store_key(provider_name, provider.api_key)
                 provider.api_key = KEYRING_MARKER
                 migrated.append(provider_name)
-        
+
         # Migrate brave search key
         if config.tools and config.tools.web and config.tools.web.search:
             if config.tools.web.search.api_key and config.tools.web.search.api_key != KEYRING_MARKER:
@@ -222,15 +221,15 @@ def _migrate_to_keyring(config: Config, dry_run: bool = False) -> Config:
                     keyring.store_key("brave", config.tools.web.search.api_key)
                 config.tools.web.search.api_key = KEYRING_MARKER
                 migrated.append("brave")
-        
+
         if migrated:
             logger.info(f"Migrated {len(migrated)} keys to keyring: {', '.join(migrated)}")
-        
+
     except ImportError:
         logger.error("Keyring manager not available")
     except Exception as e:
         logger.error(f"Error migrating keys to keyring: {e}")
-    
+
     return config
 
 

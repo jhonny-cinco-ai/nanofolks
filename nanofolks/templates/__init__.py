@@ -14,10 +14,10 @@ THEME_NAMES = ["pirate_crew", "rock_band", "swat_team", "feral_clowder", "execut
 
 def get_agents_template(bot_name: str) -> str | None:
     """Get AGENTS.md template for a bot.
-    
+
     Args:
         bot_name: Name of the bot
-        
+
     Returns:
         Template content or None if not found
     """
@@ -29,7 +29,7 @@ def get_agents_template(bot_name: str) -> str | None:
 
 def get_all_agents_templates() -> dict[str, str]:
     """Get all AGENTS.md templates.
-    
+
     Returns:
         Dict mapping bot_name to template content
     """
@@ -43,14 +43,14 @@ def get_all_agents_templates() -> dict[str, str]:
 
 def get_soul_template_for_bot(bot_name: str, theme: Optional[str] = None) -> Optional[str]:
     """Get SOUL.md template for a bot.
-    
+
     Tries to find SOUL template from themes. If no theme specified,
     tries all available themes and returns first match.
-    
+
     Args:
         bot_name: Name of the bot
         theme: Optional theme name. If not specified, tries all themes.
-        
+
     Returns:
         SOUL.md template content or None if not found
     """
@@ -60,26 +60,26 @@ def get_soul_template_for_bot(bot_name: str, theme: Optional[str] = None) -> Opt
         if template_file.exists():
             return template_file.read_text(encoding="utf-8")
         return None
-    
+
     # Try all available themes, return first match
     for theme_name in THEME_NAMES:
         template_file = SOUL_TEMPLATES_DIR / theme_name / f"{bot_name}_SOUL.md"
         if template_file.exists():
             return template_file.read_text(encoding="utf-8")
-    
+
     return None
 
 
 def get_identity_template_for_bot(bot_name: str, theme: Optional[str] = None) -> Optional[str]:
     """Get IDENTITY.md template for a bot.
-    
+
     Tries to find IDENTITY template from themes. If no theme specified,
     tries all available themes and returns first match.
-    
+
     Args:
         bot_name: Name of the bot
         theme: Optional theme name. If not specified, tries all themes.
-        
+
     Returns:
         IDENTITY.md template content or None if not found
     """
@@ -89,24 +89,24 @@ def get_identity_template_for_bot(bot_name: str, theme: Optional[str] = None) ->
         if template_file.exists():
             return template_file.read_text(encoding="utf-8")
         return None
-    
+
     # Try all available themes, return first match
     for theme_name in THEME_NAMES:
         template_file = IDENTITY_TEMPLATES_DIR / theme_name / f"{bot_name}_IDENTITY.md"
         if template_file.exists():
             return template_file.read_text(encoding="utf-8")
-    
+
     return None
 
 
 def get_role_template_for_bot(bot_name: str) -> Optional[str]:
     """Get ROLE.md template for a bot.
-    
+
     Loads the default ROLE.md template for the specified bot.
-    
+
     Args:
         bot_name: Name of the bot
-        
+
     Returns:
         ROLE.md template content or None if not found
     """
@@ -118,7 +118,7 @@ def get_role_template_for_bot(bot_name: str) -> Optional[str]:
 
 def get_all_role_templates() -> dict[str, str]:
     """Get all ROLE.md templates.
-    
+
     Returns:
         Dict mapping bot_name to template content
     """

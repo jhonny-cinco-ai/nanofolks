@@ -1,20 +1,21 @@
 """Configuration schema using Pydantic."""
 
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 from pydantic_settings import BaseSettings
 
 
 class Base(BaseModel):
     """Base model that accepts both camelCase and snake_case keys."""
-    
+
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
 
 
 class WhatsAppConfig(Base):
     """WhatsApp channel configuration.
-    
+
     For secure defaults (Tailscale IP + random port), leave bridge_url empty
     and it will be auto-configured on first run.
     """
@@ -23,35 +24,35 @@ class WhatsAppConfig(Base):
     bridge_token: str = ""  # Shared token for bridge auth (optional, recommended)
     allow_from: list[str] = Field(default_factory=list)  # Allowed phone numbers
     _auto_configured: bool = False  # Track if URL was auto-configured
-    
+
     def get_bridge_url(self) -> str:
         """Get effective bridge URL, auto-configuring if needed."""
         if self.bridge_url:
             return self.bridge_url
-        
+
         # Auto-configure secure defaults
         try:
             from nanofolks.utils.network import get_secure_bind_address
-            
+
             bind_addr = get_secure_bind_address("bridge")
             url = f"ws://{bind_addr.host}:{bind_addr.port}"
-            
+
             # Save to config for future runs
             self._save_auto_configured_url(url)
-            
+
             return url
         except Exception:
             # Fallback to legacy default
             return "ws://localhost:3001"
-    
+
     def _save_auto_configured_url(self, url: str) -> None:
         """Save auto-configured URL to config file."""
         if self._auto_configured:
             return  # Already saved
-        
+
         try:
             from nanofolks.config.loader import load_config, save_config
-            
+
             config = load_config()
             config.channels.whatsapp.bridge_url = url
             save_config(config)
@@ -350,15 +351,15 @@ ROUTING_TIER_MAPPINGS: dict[str, dict[str, dict[str, str]]] = {
 
 def get_routing_tiers_for_provider(provider: str) -> RoutingTiersConfig:
     """Get routing tier configuration for a specific provider.
-    
+
     Args:
         provider: Provider name (e.g., "openrouter", "anthropic", "openai")
-        
+
     Returns:
         RoutingTiersConfig with provider-specific models
     """
     mapping = ROUTING_TIER_MAPPINGS.get(provider, ROUTING_TIER_MAPPINGS["openrouter"])
-    
+
     return RoutingTiersConfig(
         simple=RoutingTierConfig(
             model=mapping["simple"]["model"],
@@ -480,10 +481,10 @@ class ContextConfig(Base):
 class SessionCompactionConfig(Base):
     """
     Session compaction configuration for long conversations.
-    
+
     Inspired by OpenClaw's production-hardened compaction system.
     Prevents context overflow while preserving conversation coherence.
-    
+
     Modes:
     - summary: Smart summarization of older messages (default)
     - token-limit: Hard truncation at safe boundaries (emergency)
@@ -504,7 +505,7 @@ class SessionCompactionConfig(Base):
 class EnhancedContextConfig(Base):
     """
     Enhanced context assembly with real-time monitoring.
-    
+
     Provides accurate token counting, budget allocation, and
     context percentage visibility (context=X%).
     """
@@ -514,13 +515,13 @@ class EnhancedContextConfig(Base):
     memory_budget_percent: float = 0.35   # 35% for memory context
     history_budget_percent: float = 0.35  # 35% for session history
     system_budget_percent: float = 0.20   # 20% for system prompt
-    
+
     # Real-time monitoring
     enable_real_time_tracking: bool = True
     show_context_percentage: bool = True  # Show context=65% in status
     warning_threshold: float = 0.70       # Warn at 70%
     compaction_threshold: float = 0.80    # Compact at 80%
-    
+
     # Priority truncation
     enable_priority_truncation: bool = True
     min_history_messages: int = 10
@@ -559,7 +560,7 @@ class MemoryConfig(Base):
     """Memory system configuration."""
     enabled: bool = True
     db_path: str = "memory/memory.db"   # Relative to workspace
-    
+
     background: BackgroundConfig = Field(default_factory=BackgroundConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
     extraction: ExtractionConfig = Field(default_factory=ExtractionConfig)
@@ -567,7 +568,7 @@ class MemoryConfig(Base):
     learning: LearningConfig = Field(default_factory=LearningConfig)
     context: ContextConfig = Field(default_factory=ContextConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
-    
+
     # Session compaction (Phase 8) - Long conversation support
     session_compaction: SessionCompactionConfig = Field(default_factory=SessionCompactionConfig)
     enhanced_context: EnhancedContextConfig = Field(default_factory=EnhancedContextConfig)
@@ -583,7 +584,7 @@ class WorkLogsConfig(Base):
     log_tool_calls: bool = True
     log_routing_decisions: bool = True
     min_confidence_to_log: float = 0.0  # Log all decisions (0.0 = all)
-    
+
     # Feature flags for gradual rollout
     beta: bool = False  # Beta flag for gradual rollout
 
@@ -604,7 +605,7 @@ class Config(BaseSettings):
     def workspace_path(self) -> Path:
         """Get expanded workspace path."""
         return Path(self.agents.defaults.workspace).expanduser()
-    
+
     def _match_provider(self, model: str | None = None) -> tuple["ProviderConfig | None", str | None]:
         """Match provider config and its registry name. Returns (config, spec_name)."""
         from nanofolks.providers.registry import PROVIDERS
@@ -637,7 +638,7 @@ class Config(BaseSettings):
         """Get API key for the given model. Falls back to first available key."""
         p = self.get_provider(model)
         return p.api_key if p else None
-    
+
     def get_api_base(self, model: str | None = None) -> str | None:
         """Get API base URL for the given model. Applies default URLs for known gateways."""
         from nanofolks.providers.registry import find_by_name
@@ -652,7 +653,7 @@ class Config(BaseSettings):
             if spec and spec.is_gateway and spec.default_api_base:
                 return spec.default_api_base
         return None
-    
+
     model_config = ConfigDict(
         env_prefix="NANOFOLKS_",
         env_nested_delimiter="__"

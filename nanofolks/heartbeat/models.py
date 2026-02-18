@@ -7,13 +7,13 @@ including configurations, check results, and execution tracking.
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Coroutine, Dict, List, Optional
 
 
 class CheckPriority(Enum):
     """Priority levels for heartbeat checks."""
     CRITICAL = "critical"    # Run immediately, alert on failure
-    HIGH = "high"           # Run promptly, log failures  
+    HIGH = "high"           # Run promptly, log failures
     NORMAL = "normal"       # Run during normal heartbeat
     LOW = "low"             # Run when resources available
 
@@ -31,7 +31,7 @@ class CheckStatus(Enum):
 @dataclass
 class CheckDefinition:
     """Definition of a single heartbeat check.
-    
+
     Attributes:
         name: Unique identifier for the check
         description: Human-readable description
@@ -52,10 +52,10 @@ class CheckDefinition:
     config: Dict[str, Any] = field(default_factory=dict)
 
 
-@dataclass  
+@dataclass
 class CheckResult:
     """Result of executing a heartbeat check.
-    
+
     Attributes:
         check_name: Name of the check that was executed
         status: Execution status (pending/running/success/failed/etc.)
@@ -76,21 +76,21 @@ class CheckResult:
     started_at: datetime
     completed_at: Optional[datetime] = None
     duration_ms: float = 0.0
-    
+
     # Outcome
     success: bool = False
     message: str = ""
     data: Dict[str, Any] = field(default_factory=dict)
-    
+
     # Error info
     error: Optional[str] = None
     error_type: Optional[str] = None
     stack_trace: Optional[str] = None
-    
+
     # Action taken
     action_taken: Optional[str] = None
     notifications_sent: List[str] = field(default_factory=list)
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -109,7 +109,7 @@ class CheckResult:
 @dataclass
 class HeartbeatConfig:
     """Configuration for a bot's heartbeat.
-    
+
     Attributes:
         bot_name: Name of the bot this config belongs to
         interval_s: Seconds between heartbeat ticks (default: 3600 = 60 min)
@@ -135,38 +135,38 @@ class HeartbeatConfig:
     interval_s: int = 3600              # 60 minutes default (1 hour)
     max_execution_time_s: int = 300     # 5 minutes max per tick
     enabled: bool = True
-    
+
     # Check definitions
     checks: List[CheckDefinition] = field(default_factory=list)
-    
+
     # Execution strategy
     parallel_checks: bool = True
     max_concurrent_checks: int = 3
     stop_on_first_failure: bool = False
-    
+
     # Retry configuration
     retry_attempts: int = 2
     retry_delay_s: float = 5.0
     retry_backoff: float = 2.0
-    
+
     # Circuit breaker
     circuit_breaker_enabled: bool = True
     circuit_breaker_threshold: int = 3
     circuit_breaker_timeout_s: int = 300
-    
+
     # Notification settings
     notify_on_failure: bool = True
     notify_on_success: bool = False
     notification_channels: List[str] = field(default_factory=lambda: ["coordinator"])
-    
+
     # Logging
     log_level: str = "INFO"
     retain_history_count: int = 100
-    
+
     def get_interval_minutes(self) -> int:
         """Get interval in minutes for display."""
         return self.interval_s // 60
-    
+
     def set_interval_minutes(self, minutes: int) -> None:
         """Set interval from minutes."""
         self.interval_s = minutes * 60
@@ -175,7 +175,7 @@ class HeartbeatConfig:
 @dataclass
 class HeartbeatTick:
     """A single heartbeat execution.
-    
+
     Attributes:
         tick_id: Unique identifier for this tick
         bot_name: Name of the bot that executed this tick
@@ -190,18 +190,18 @@ class HeartbeatTick:
     bot_name: str
     started_at: datetime
     config: HeartbeatConfig
-    
+
     # Execution tracking
     results: List[CheckResult] = field(default_factory=list)
     status: str = "running"  # running, completed, failed, timeout, completed_with_failures
-    
+
     # Metadata
     trigger_type: str = "scheduled"
     triggered_by: Optional[str] = None
-    
+
     def get_success_rate(self) -> float:
         """Calculate success rate of checks.
-        
+
         Returns:
             Float between 0.0 and 1.0 representing success rate
         """
@@ -209,11 +209,11 @@ class HeartbeatTick:
             return 0.0
         successful = sum(1 for r in self.results if r.success)
         return successful / len(self.results)
-    
+
     def get_failed_checks(self) -> List[CheckResult]:
         """Get list of failed checks."""
         return [r for r in self.results if not r.success]
-    
+
     def duration_ms(self) -> float:
         """Get total duration in milliseconds."""
         if not self.results:
@@ -224,7 +224,7 @@ class HeartbeatTick:
             end = max(end_times)
             return (end - start).total_seconds() * 1000
         return 0.0
-    
+
     def get_summary(self) -> Dict[str, Any]:
         """Get summary of this tick."""
         return {
@@ -242,7 +242,7 @@ class HeartbeatTick:
 @dataclass
 class HeartbeatHistory:
     """History of heartbeat executions for a bot.
-    
+
     Attributes:
         bot_name: Name of the bot
         ticks: List of historical ticks
@@ -255,40 +255,40 @@ class HeartbeatHistory:
     """
     bot_name: str
     ticks: List[HeartbeatTick] = field(default_factory=list)
-    
+
     # Statistics
     total_ticks: int = 0
     successful_ticks: int = 0
     failed_ticks: int = 0
-    
+
     last_tick_at: Optional[datetime] = None
     last_success_at: Optional[datetime] = None
     last_failure_at: Optional[datetime] = None
-    
+
     def add_tick(self, tick: HeartbeatTick) -> None:
         """Add a tick to history."""
         self.ticks.append(tick)
         self.total_ticks += 1
         self.last_tick_at = tick.started_at
-        
+
         if tick.status == "completed":
             self.successful_ticks += 1
             self.last_success_at = tick.started_at
         else:
             self.failed_ticks += 1
             self.last_failure_at = tick.started_at
-        
+
         # Trim history to retain limit
         retain_limit = tick.config.retain_history_count if tick.config else 100
         if len(self.ticks) > retain_limit:
             self.ticks = self.ticks[-retain_limit:]
-    
+
     def get_average_success_rate(self, last_n: int = 10) -> float:
         """Get average success rate over last N ticks.
-        
+
         Args:
             last_n: Number of recent ticks to consider
-            
+
         Returns:
             Average success rate as float
         """
@@ -296,28 +296,28 @@ class HeartbeatHistory:
             return 0.0
         recent = self.ticks[-last_n:]
         return sum(t.get_success_rate() for t in recent) / len(recent)
-    
+
     def get_uptime_percentage(self, window_hours: int = 24) -> float:
         """Calculate uptime percentage over time window.
-        
+
         Args:
             window_hours: Time window in hours
-            
+
         Returns:
             Uptime percentage (0-100)
         """
         if not self.ticks:
             return 0.0
-        
+
         cutoff = datetime.now() - timedelta(hours=window_hours)
         recent_ticks = [t for t in self.ticks if t.started_at > cutoff]
-        
+
         if not recent_ticks:
             return 0.0
-        
+
         successful = sum(1 for t in recent_ticks if t.status == "completed")
         return (successful / len(recent_ticks)) * 100
-    
+
     def get_health_summary(self) -> Dict[str, Any]:
         """Get comprehensive health summary."""
         return {
@@ -339,7 +339,7 @@ AsyncCheckHandler = Callable[[Any, Dict[str, Any]], Coroutine[Any, Any, Any]]
 
 __all__ = [
     "CheckPriority",
-    "CheckStatus", 
+    "CheckStatus",
     "CheckDefinition",
     "CheckResult",
     "HeartbeatConfig",

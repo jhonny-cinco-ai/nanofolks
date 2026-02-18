@@ -11,12 +11,14 @@ Example:
 
 # Import all check modules to ensure registration
 # The act of importing registers the checks via @register_check decorator
-from . import researcher_checks
-from . import coder_checks
-from . import social_checks
-from . import auditor_checks
-from . import creative_checks
-from . import coordinator_checks
+from . import (
+    auditor_checks,
+    coder_checks,
+    coordinator_checks,
+    creative_checks,
+    researcher_checks,
+    social_checks,
+)
 
 __all__ = [
     "researcher_checks",

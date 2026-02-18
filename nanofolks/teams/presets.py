@@ -1,7 +1,6 @@
 """Pre-built personality teams for crew customization."""
 
-from nanofolks.teams.team import Team, TeamName, BotTeamProfile
-
+from nanofolks.teams.team import BotTeamProfile, Team, TeamName
 
 # ============================================================================
 # 🏴‍☠️ PIRATE CREW
@@ -385,7 +384,7 @@ def get_team(name: str) -> Team | None:
 
 def list_teams() -> list[dict]:
     """List all available teams.
-    
+
     Returns:
         List of team dictionaries with name, description, emoji
     """

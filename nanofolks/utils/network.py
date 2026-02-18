@@ -8,7 +8,6 @@ from typing import Optional
 
 from loguru import logger
 
-
 TAILSCALE_IP_PREFIX = "100."
 COMMON_PORT_RANGE = (8000, 9000)
 DEFAULT_PORTS = {
@@ -47,7 +46,7 @@ def get_all_ips() -> list[str]:
     except Exception:
         # Fallback: try socket method
         pass
-    
+
     # Also try socket method
     try:
         hostname = socket.gethostname()
@@ -58,13 +57,13 @@ def get_all_ips() -> list[str]:
                 ips.append(ip)
     except Exception:
         pass
-    
+
     return ips
 
 
 def get_tailscale_ip() -> Optional[str]:
     """Get Tailscale IP if available.
-    
+
     Returns:
         Tailscale IP (100.x.x.x) if found, None otherwise.
     """
@@ -83,54 +82,54 @@ def get_tailscale_ip() -> Optional[str]:
                 return ip
     except (FileNotFoundError, subprocess.TimeoutExpired):
         pass
-    
+
     # Fallback: scan local IPs for Tailscale prefix
     for ip in get_all_ips():
         if ip.startswith(TAILSCALE_IP_PREFIX):
             logger.info(f"Found Tailscale IP (scanned): {ip}")
             return ip
-    
+
     return None
 
 
 def get_best_ip() -> str:
     """Get the best IP address to bind to.
-    
+
     Priority:
     1. Tailscale IP (100.x.x.x) - encrypted, private network
     2. Private LAN IP (192.168.x.x, 10.x.x.x) - local network
     3. localhost (127.0.0.1) - single user, no network access
-    
+
     Returns:
         Best IP address to use for binding.
     """
     ips = get_all_ips()
-    
+
     # Priority 1: Tailscale
     tailscale_ip = get_tailscale_ip()
     if tailscale_ip:
         return tailscale_ip
-    
+
     # Priority 2: Private LAN (192.168.x.x or 10.x.x.x)
     for ip in ips:
         if ip.startswith("192.168.") or ip.startswith("10."):
             return ip
-    
+
     # Priority 3: Any other non-loopback
     if ips:
         return ips[0]
-    
+
     # Fallback: localhost
     return "127.0.0.1"
 
 
 def is_port_available(port: int, host: str = "0.0.0.0") -> bool:
     """Check if a port is available.
-    
+
     Args:
         port: Port number to check.
         host: Host to check on.
-    
+
     Returns:
         True if port is available, False otherwise.
     """
@@ -150,12 +149,12 @@ def find_free_port(
     host: str = "0.0.0.0"
 ) -> int:
     """Find a free port in the given range.
-    
+
     Args:
         start: Start of port range (inclusive).
         end: End of port range (exclusive).
         host: Host to check on.
-    
+
     Returns:
         Available port number.
     """
@@ -165,14 +164,14 @@ def find_free_port(
         port = random.randint(start, end - 1)
         if is_port_available(port, host):
             return port
-    
+
     # Fallback: scan sequentially
     for port in range(start, end):
         if is_port_available(port, host):
             return port
-    
+
     # Last resort: return default
-    logger.warning(f"Could not find free port in range, using default")
+    logger.warning("Could not find free port in range, using default")
     return start
 
 
@@ -181,14 +180,14 @@ def get_secure_bind_address(
     prefer_tailscale: bool = True
 ) -> BindAddress:
     """Get a secure bind address for a service.
-    
+
     This function determines the best IP and port combination
     for binding a service securely.
-    
+
     Args:
         service: Service name for default port fallback.
         prefer_tailscale: If True, prefer Tailscale IP.
-    
+
     Returns:
         BindAddress with host, port, and metadata.
     """
@@ -196,7 +195,7 @@ def get_secure_bind_address(
     host = "127.0.0.1"
     is_tailscale = False
     is_localhost = True
-    
+
     if prefer_tailscale:
         tailscale_ip = get_tailscale_ip()
         if tailscale_ip:
@@ -211,13 +210,13 @@ def get_secure_bind_address(
                 host = best_ip
                 is_localhost = False
                 logger.info(f"Using private IP: {host}")
-    
+
     # Determine port
     default_port = DEFAULT_PORTS.get(service, 8080)
-    
+
     # Try to find a free random port first
     port = find_free_port()
-    
+
     # If random port is far from default, good - but also try default
     # to ensure we get something usable
     if not is_port_available(port, host):
@@ -225,7 +224,7 @@ def get_secure_bind_address(
         # If default also taken, find any free port
         if not is_port_available(port, host):
             port = find_free_port()
-    
+
     return BindAddress(
         host=host,
         port=port,
@@ -236,11 +235,11 @@ def get_secure_bind_address(
 
 def format_bind_url(addr: BindAddress, use_https: bool = False) -> str:
     """Format a bind address as a URL.
-    
+
     Args:
         addr: BindAddress to format.
         use_https: Whether to use HTTPS.
-    
+
     Returns:
         Formatted URL string.
     """

@@ -5,11 +5,11 @@ that users can peek into. These are separate from the main room conversations
 and are used for bot coordination and delegation tracking.
 """
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Dict, Any
-import uuid
+from typing import Any, Dict, List, Optional
 
 
 class BotMessageType(Enum):
@@ -24,7 +24,7 @@ class BotMessageType(Enum):
 @dataclass
 class BotDMMessage:
     """A message in a bot-to-bot DM room.
-    
+
     These messages are logged for transparency and audit purposes,
     allowing users to peek into how bots collaborate.
     """
@@ -36,7 +36,7 @@ class BotDMMessage:
     content: str              # Message content
     context: Dict[str, Any] = field(default_factory=dict)  # Additional context
     reply_to: Optional[str] = None  # ID of message being replied to
-    
+
     @classmethod
     def create(
         cls,
@@ -58,7 +58,7 @@ class BotDMMessage:
             context=context or {},
             reply_to=reply_to
         )
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         return {
@@ -71,7 +71,7 @@ class BotDMMessage:
             "context": self.context,
             "reply_to": self.reply_to
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "BotDMMessage":
         """Create from dictionary."""
@@ -85,11 +85,11 @@ class BotDMMessage:
             context=data.get("context", {}),
             reply_to=data.get("reply_to")
         )
-    
+
     def format_display(self) -> str:
         """Format message for display in CLI."""
         timestamp_str = self.timestamp.strftime("%H:%M")
-        
+
         # Format based on type
         if self.message_type == BotMessageType.QUERY:
             prefix = "❓"
@@ -101,20 +101,20 @@ class BotDMMessage:
             prefix = "📋"
         else:
             prefix = "📝"
-        
+
         return f"{prefix} [{timestamp_str}] @{self.sender_bot}: {self.content}"
 
 
 @dataclass
 class BotDMRoom:
     """A DM room between two or more bots.
-    
+
     These rooms are used for:
     - Bot-to-bot queries and responses
     - Task delegation tracking
     - Coordination conversations
     - User visibility into bot collaboration
-    
+
     The room_id format is: dm-{bot_a}-{bot_b} (sorted alphabetically)
     For group DMs: dm-{bot_a}-{bot_b}-{bot_c} (sorted alphabetically)
     """
@@ -123,12 +123,12 @@ class BotDMRoom:
     created_at: datetime
     messages: List[BotDMMessage] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     @property
     def is_group(self) -> bool:
         """Whether this is a group DM (more than 2 bots)."""
         return len(self.bots) > 2
-    
+
     @property
     def display_name(self) -> str:
         """Human-readable name for the room."""
@@ -138,21 +138,21 @@ class BotDMRoom:
             return f"DM: @{self.bots[0]} ↔ @{self.bots[1]}"
         else:
             return f"DM: {', '.join(['@' + b for b in self.bots])}"
-    
+
     def get_other_bot(self, bot_name: str) -> Optional[str]:
         """Get the other bot in a 1-on-1 DM."""
         if len(self.bots) != 2:
             return None
         return self.bots[1] if self.bots[0] == bot_name else self.bots[0]
-    
+
     def add_message(self, message: BotDMMessage):
         """Add a message to the room."""
         self.messages.append(message)
-    
+
     def get_conversation(self, limit: int = 50) -> List[BotDMMessage]:
         """Get recent conversation, most recent last."""
         return self.messages[-limit:] if self.messages else []
-    
+
     def get_conversation_between(
         self,
         bot_a: str,
@@ -166,11 +166,11 @@ class BotDMRoom:
                (m.sender_bot == bot_b and m.recipient_bot == bot_a)
         ]
         return relevant[-limit:]
-    
+
     def to_summary(self) -> Dict[str, Any]:
         """Get summary for listing."""
         last_message = self.messages[-1] if self.messages else None
-        
+
         return {
             "room_id": self.room_id,
             "bots": self.bots,
@@ -184,14 +184,14 @@ class BotDMRoom:
 
 def generate_dm_room_id(bot_a: str, bot_b: str) -> str:
     """Generate a consistent room ID for two bots.
-    
+
     Bots are sorted alphabetically to ensure consistent ID
     regardless of message direction.
-    
+
     Args:
         bot_a: First bot name
         bot_b: Second bot name
-        
+
     Returns:
         Room ID string (e.g., "dm-leader-researcher")
     """
@@ -201,10 +201,10 @@ def generate_dm_room_id(bot_a: str, bot_b: str) -> str:
 
 def generate_group_dm_room_id(bots: List[str]) -> str:
     """Generate a room ID for a group DM.
-    
+
     Args:
         bots: List of bot names (will be sorted alphabetically)
-        
+
     Returns:
         Room ID string (e.g., "dm-auditor-coder-leader")
     """

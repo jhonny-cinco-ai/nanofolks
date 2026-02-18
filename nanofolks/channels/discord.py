@@ -14,7 +14,6 @@ from nanofolks.bus.queue import MessageBus
 from nanofolks.channels.base import BaseChannel
 from nanofolks.config.schema import DiscordConfig
 
-
 DISCORD_API_BASE = "https://discord.com/api/v10"
 MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024  # 20MB
 

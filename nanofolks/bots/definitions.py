@@ -9,25 +9,25 @@ All bot personality data comes from template files:
 Use BotRegistry to access bot configurations.
 """
 
-from nanofolks.models.role_card import (
-    RoleCard,
-    RoleCardDomain,
-    BotCapabilities,
-    BUILTIN_BOTS,
-    get_role_card,
-    list_bots,
-    is_valid_bot,
-)
 from nanofolks.models.bot_registry import (
     BotRegistry,
     get_bot_registry,
     list_available_bots,
 )
+from nanofolks.models.role_card import (
+    BUILTIN_BOTS,
+    BotCapabilities,
+    RoleCard,
+    RoleCardDomain,
+    get_role_card,
+    is_valid_bot,
+    list_bots,
+)
 
 # Re-export for backward compatibility
 __all__ = [
     "RoleCard",
-    "RoleCardDomain", 
+    "RoleCardDomain",
     "BotCapabilities",
     "BUILTIN_BOTS",
     "get_role_card",

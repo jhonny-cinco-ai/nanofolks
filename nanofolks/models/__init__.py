@@ -1,8 +1,15 @@
 """Data models for multi-agent orchestration."""
 
-from .room import Room, RoomType, Message, SharedContext
-from .role_card import RoleCard, RoleCardDomain, BotCapabilities, get_role_card, list_bots, is_valid_bot
 from .bot_registry import BotRegistry, get_bot_registry, list_available_bots
+from .role_card import (
+    BotCapabilities,
+    RoleCard,
+    RoleCardDomain,
+    get_role_card,
+    is_valid_bot,
+    list_bots,
+)
+from .room import Message, Room, RoomType, SharedContext
 
 # Legacy aliases for backwards compatibility
 Workspace = Room

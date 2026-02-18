@@ -6,11 +6,11 @@ decisions, tool executions, errors, and other key events.
 Supports both single-bot and multi-agent workspace modes.
 """
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Any, List
 from enum import Enum
-import json
+from typing import Any, List, Optional
 
 
 class LogLevel(Enum):
@@ -43,10 +43,10 @@ WorkspaceType = RoomType
 @dataclass
 class WorkLogEntry:
     """A single entry in a work log.
-    
+
     Represents one step in the agent's decision-making process,
     such as a thought, decision, tool execution, or error.
-    
+
     Supports both single-bot and multi-agent modes. In single-bot mode,
     multi-agent fields use sensible defaults.
     """
@@ -55,60 +55,60 @@ class WorkLogEntry:
     step: int                    # Sequential step number
     category: str                # "memory", "tool", "routing", etc.
     message: str                 # Human-readable description
-    
+
     # Core fields (always used)
     details: dict = field(default_factory=dict)  # Structured data
     confidence: Optional[float] = None  # 0.0-1.0 for uncertainty
     duration_ms: Optional[int] = None   # How long this step took
-    
+
     # Tool execution fields
     tool_name: Optional[str] = None
     tool_input: Optional[dict] = None
     tool_output: Optional[Any] = None
     tool_status: Optional[str] = None   # "success", "error", "timeout"
     tool_error: Optional[str] = None
-    
+
     # ===============================
     # Multi-Agent Extension Fields
     # ===============================
-    
+
     # Workspace context (room-centric: uses "general" as default)
     room_id: str = "general"  # "#general", "#project-refactor", or "general"
     room_type: WorkspaceType = RoomType.OPEN
     participants: List[str] = field(default_factory=lambda: ["leader"])
-    
+
     # Bot identity (single-bot: always "leader")
     bot_name: str = "leader"      # Which bot created this entry
     bot_role: str = "primary"      # "coordinator", "specialist", "user-proxy", "primary"
     triggered_by: str = "user"     # "user", "leader", "@researcher", etc.
-    
+
     # Coordinator mode (single-bot: always False)
     coordinator_mode: bool = False      # Was leader coordinating?
     escalation: bool = False            # Did this trigger escalation?
-    
+
     # Cross-bot communication (single-bot: empty)
     mentions: List[str] = field(default_factory=list)  # ["@researcher", "@coder"]
     response_to: Optional[int] = None   # Step number this responds to
-    
+
     # Learning Exchange (single-bot: False)
     shareable_insight: bool = False     # Can this be shared with other bots?
     insight_category: Optional[str] = None  # "user_preference", "tool_pattern", etc.
-    
+
     def is_tool_entry(self) -> bool:
         """Check if this entry represents a tool execution."""
         return self.tool_name is not None
-    
+
     def is_bot_conversation(self) -> bool:
         """Check if this is bot-to-bot communication.
-        
+
         Returns True if the entry was triggered by another bot
         or if coordinator mode was active.
         """
         return self.triggered_by.startswith("@") or self.coordinator_mode
-    
+
     def is_multi_agent_entry(self) -> bool:
         """Check if this entry uses multi-agent features.
-        
+
         Returns True if any multi-agent fields are set to non-default values.
         """
         return (
@@ -124,7 +124,7 @@ class WorkLogEntry:
             self.response_to is not None or
             self.shareable_insight
         )
-    
+
     def to_dict(self) -> dict:
         """Convert entry to dictionary for serialization."""
         return {
@@ -161,7 +161,7 @@ class WorkLogEntry:
 @dataclass
 class WorkLog:
     """A complete work log for a single session.
-    
+
     Tracks all the steps an agent took to process a user query,
     from start to finish. Supports both single-bot and multi-agent modes.
     """
@@ -171,19 +171,19 @@ class WorkLog:
     end_time: Optional[datetime] = None
     entries: List[WorkLogEntry] = field(default_factory=list)
     final_output: Optional[str] = None
-    
+
     # Multi-agent context (room-centric: uses "general" as default)
     room_id: str = "general"  # "#general", "#project-alpha", etc.
     room_type: WorkspaceType = RoomType.OPEN
     participants: List[str] = field(default_factory=lambda: ["leader"])
     coordinator: Optional[str] = None  # "leader" if in coordinator mode
-    
+
     def add_entry(self, level: LogLevel, category: str, message: str,
                   details: Optional[dict] = None, confidence: Optional[float] = None,
                   duration_ms: Optional[int] = None, bot_name: str = "leader",
                   triggered_by: str = "user") -> WorkLogEntry:
         """Add a work log entry.
-        
+
         Args:
             level: Severity/importance of the entry
             category: Type of activity (memory, tool, routing, etc.)
@@ -193,7 +193,7 @@ class WorkLog:
             duration_ms: How long this step took in milliseconds
             bot_name: Which bot created this entry (multi-agent)
             triggered_by: Who triggered this action (multi-agent)
-            
+
         Returns:
             The created WorkLogEntry
         """
@@ -216,13 +216,13 @@ class WorkLog:
         )
         self.entries.append(entry)
         return entry
-    
+
     def add_tool_entry(self, tool_name: str, tool_input: dict,
                        tool_output: Any, tool_status: str,
                        duration_ms: int, message: Optional[str] = None,
                        bot_name: str = "leader") -> WorkLogEntry:
         """Add a tool execution entry.
-        
+
         Args:
             tool_name: Name of the tool that was executed
             tool_input: Input parameters to the tool
@@ -231,7 +231,7 @@ class WorkLog:
             duration_ms: How long the tool took to execute
             message: Optional custom message (defaults to tool name)
             bot_name: Which bot executed this tool (multi-agent)
-            
+
         Returns:
             The created WorkLogEntry
         """
@@ -255,18 +255,18 @@ class WorkLog:
         )
         self.entries.append(entry)
         return entry
-    
+
     def add_bot_message(self, bot_name: str, message: str,
                        response_to: Optional[int] = None,
                        mentions: Optional[List[str]] = None) -> WorkLogEntry:
         """Add a bot-to-bot conversation entry (multi-agent).
-        
+
         Args:
             bot_name: Name of the bot sending the message
             message: The message content
             response_to: Step number this responds to (for threading)
             mentions: List of bot mentions ["@researcher", "@coder"]
-            
+
         Returns:
             The created WorkLogEntry
         """
@@ -288,14 +288,14 @@ class WorkLog:
         )
         self.entries.append(entry)
         return entry
-    
+
     def add_escalation(self, reason: str, bot_name: str = "leader") -> WorkLogEntry:
         """Log an escalation that needs user attention (multi-agent).
-        
+
         Args:
             reason: Why this needs user attention
             bot_name: Which bot triggered the escalation
-            
+
         Returns:
             The created WorkLogEntry
         """
@@ -316,85 +316,85 @@ class WorkLog:
         )
         self.entries.append(entry)
         return entry
-    
+
     def get_entries_by_level(self, level: LogLevel) -> List[WorkLogEntry]:
         """Get all entries of a specific level.
-        
+
         Args:
             level: The log level to filter by
-            
+
         Returns:
             List of matching entries
         """
         return [e for e in self.entries if e.level == level]
-    
+
     def get_entries_by_category(self, category: str) -> List[WorkLogEntry]:
         """Get all entries of a specific category.
-        
+
         Args:
             category: The category to filter by
-            
+
         Returns:
             List of matching entries
         """
         return [e for e in self.entries if e.category == category]
-    
+
     def get_entries_by_bot(self, bot_name: str) -> List[WorkLogEntry]:
         """Get all entries from a specific bot (multi-agent).
-        
+
         Args:
             bot_name: The bot name to filter by
-            
+
         Returns:
             List of matching entries
         """
         return [e for e in self.entries if e.bot_name == bot_name]
-    
+
     def get_errors(self) -> List[WorkLogEntry]:
         """Get all error entries.
-        
+
         Returns:
             List of error entries
         """
         return self.get_entries_by_level(LogLevel.ERROR)
-    
+
     def get_decisions(self) -> List[WorkLogEntry]:
         """Get all decision entries.
-        
+
         Returns:
             List of decision entries
         """
         return self.get_entries_by_level(LogLevel.DECISION)
-    
+
     def get_tool_calls(self) -> List[WorkLogEntry]:
         """Get all tool execution entries.
-        
+
         Returns:
             List of tool execution entries
         """
         return [e for e in self.entries if e.is_tool_entry()]
-    
+
     def get_bot_conversations(self) -> List[WorkLogEntry]:
         """Get all bot-to-bot conversation entries (multi-agent).
-        
+
         Returns:
             List of bot conversation entries
         """
         return [e for e in self.entries if e.is_bot_conversation()]
-    
+
     def get_duration_ms(self) -> Optional[int]:
         """Get total duration of the session in milliseconds.
-        
+
         Returns:
             Duration in milliseconds, or None if session hasn't ended
         """
         if not self.end_time:
             return None
         return int((self.end_time - self.start_time).total_seconds() * 1000)
-    
+
     def to_dict(self) -> dict:
         """Convert work log to dictionary for serialization.
-        
+
         Returns:
             Dictionary representation of the work log
         """
@@ -414,13 +414,13 @@ class WorkLog:
             "coordinator": self.coordinator,
             "entries": [e.to_dict() for e in self.entries]
         }
-    
+
     def to_json(self, indent: int = 2) -> str:
         """Convert work log to JSON string.
-        
+
         Args:
             indent: JSON indentation level
-            
+
         Returns:
             JSON string representation
         """

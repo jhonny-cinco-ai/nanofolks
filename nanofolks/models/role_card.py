@@ -2,7 +2,7 @@
 
 Based on the multi-agent architecture pattern, each role card defines:
 1. Domain - What the bot owns
-2. Inputs/Outputs - What it receives and delivers  
+2. Inputs/Outputs - What it receives and delivers
 3. Definition of Done - When "done" is actually done
 4. Hard Bans - What it must never do
 5. Escalation - When to stop and ask for help
@@ -19,10 +19,11 @@ Storage:
 - Bots can propose role card updates through the learning system
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import yaml
 from loguru import logger
 
@@ -51,61 +52,61 @@ class BotCapabilities:
 @dataclass
 class RoleCard:
     """Complete bot role card with 6-layer structure.
-    
+
     This is the discipline manual + job description + escalation protocol.
     It defines what the bot CAN and CANNOT do, its responsibilities,
     and when to escalate.
-    
+
     Complementary files:
     - SOUL.md: How the bot speaks (voice, tone, style)
     - IDENTITY.md: Who the bot is (personality, relationships, quirks)
     - AGENTS.md: Specific task instructions
-    
+
     The role card SHRINKS the behavior space by defining constraints.
     """
-    
+
     # Core identification
     bot_name: str  # System identifier (e.g., "researcher", "coder")
     domain: RoleCardDomain  # What the bot specializes in
-    
+
     # Layer 1: Domain ownership
     domain_description: str = ""  # Detailed description of domain ownership
-    
+
     # Layer 2: Inputs/Outputs
     inputs: List[str] = field(default_factory=list)  # What the bot receives
     outputs: List[str] = field(default_factory=list)  # What the bot delivers
-    
+
     # Layer 3: Definition of Done
     definition_of_done: List[str] = field(default_factory=list)  # Completion criteria
-    
+
     # Layer 4: Hard Bans (what must never be done)
     hard_bans: List[str] = field(default_factory=list)  # Absolute prohibitions
-    
+
     # Layer 5: Escalation triggers
     escalation_triggers: List[str] = field(default_factory=list)  # When to escalate
-    
+
     # Layer 6: Metrics/KPIs
     metrics: List[str] = field(default_factory=list)  # Performance indicators
-    
+
     # Functional capabilities
     capabilities: BotCapabilities = field(default_factory=BotCapabilities)
-    
+
     # Display/identity attributes (typically set by theming, not user-editable in role card)
     # These are kept here for backward compatibility and theming integration
     title: str = ""  # Display title (e.g., "Research Director")
     _display_name: str = ""  # Custom display name (private, use getter/setter)
     greeting: str = ""  # Default greeting message
     voice: str = ""  # Voice description (should match SOUL.md)
-    
+
     # Metadata
     version: str = "1.0"
     metadata: Dict[str, Any] = field(default_factory=dict)
     editable_by_user: bool = True  # Can users edit this role card?
     editable_by_bots: bool = True  # Can bots propose updates?
-    
+
     def get_display_name(self) -> str:
         """Get the display name for this bot.
-        
+
         Returns:
             Display name (falls back to title if not set, then bot_name)
         """
@@ -114,42 +115,42 @@ class RoleCard:
         if self.title:
             return self.title
         return self.bot_name
-    
+
     def set_display_name(self, name: str) -> None:
         """Set a custom display name.
-        
+
         Args:
             name: Custom display name (empty string resets to default)
         """
         self._display_name = name
-    
+
     def has_capability(self, cap: str) -> bool:
         """Check if bot has a capability."""
         return getattr(self.capabilities, cap, False)
-    
+
     def check_hard_bans(self, action: str, context: Optional[Dict] = None) -> Tuple[bool, Optional[str]]:
         """Check if an action violates any hard bans.
-        
+
         Args:
             action: Description of the action being attempted
             context: Additional context (tool name, parameters, etc.)
-            
+
         Returns:
             Tuple of (is_allowed, violation_message)
             If allowed: (True, None)
             If banned: (False, "Violates ban: {ban_description}")
         """
         action_lower = action.lower()
-        
+
         # Check each hard ban
         for ban in self.hard_bans:
             ban_lower = ban.lower()
             # Simple keyword matching (can be enhanced with more sophisticated logic)
             if any(keyword in action_lower for keyword in self._extract_keywords(ban_lower)):
                 return False, f"Action violates hard ban: '{ban}'"
-        
+
         return True, None
-    
+
     def _extract_keywords(self, ban_text: str) -> List[str]:
         """Extract key action keywords from ban text for matching."""
         # Common action keywords to match against
@@ -160,38 +161,38 @@ class RoleCard:
             "without approval", "without verification", "internal format",
             "tool trace", "path", "credential", "secret"
         ]
-        
+
         for pattern in action_patterns:
             if pattern in ban_text:
                 keywords.append(pattern)
-        
+
         return keywords if keywords else [ban_text]  # Fallback to full ban text
-    
+
     def should_escalate(self, situation: str, confidence: float = 1.0) -> Tuple[bool, str]:
         """Determine if a situation requires escalation.
-        
+
         Args:
             situation: Description of the current situation
             confidence: Confidence level (0.0-1.0)
-            
+
         Returns:
             Tuple of (should_escalate, reason)
         """
         situation_lower = situation.lower()
-        
+
         # Check escalation triggers
         for trigger in self.escalation_triggers:
             trigger_lower = trigger.lower()
             # Check if situation matches trigger
             if any(keyword in situation_lower for keyword in self._extract_keywords(trigger_lower)):
                 return True, f"Escalation trigger matched: '{trigger}'"
-        
+
         # Low confidence escalation
         if confidence < 0.5:
             return True, f"Low confidence ({confidence:.0%}) - requires human review"
-        
+
         return False, ""
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert role card to dictionary."""
         return {
@@ -221,7 +222,7 @@ class RoleCard:
             "editable_by_user": self.editable_by_user,
             "editable_by_bots": self.editable_by_bots,
         }
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "RoleCard":
         """Create role card from dictionary."""
@@ -234,7 +235,7 @@ class RoleCard:
             can_send_messages=capabilities_data.get("can_send_messages", True),
             max_concurrent_tasks=capabilities_data.get("max_concurrent_tasks", 1),
         )
-        
+
         # Create instance with core data
         instance = cls(
             bot_name=data["bot_name"],
@@ -252,69 +253,69 @@ class RoleCard:
             editable_by_user=data.get("editable_by_user", True),
             editable_by_bots=data.get("editable_by_bots", True),
         )
-        
+
         # Set display attributes if present
         instance.title = data.get("title", "")
         instance._display_name = data.get("display_name", "")
         instance.greeting = data.get("greeting", "")
         instance.voice = data.get("voice", "")
-        
+
         return instance
-    
+
     def format_for_prompt(self) -> str:
         """Format role card as a prompt-friendly string."""
         lines = [
             f"## Role Card: @{self.bot_name}",
-            f"",
+            "",
             f"**Domain:** {self.domain.value}",
             f"{self.domain_description}",
-            f"",
+            "",
         ]
-        
+
         if self.inputs:
             lines.append("**Inputs (what you receive):**")
             for inp in self.inputs:
                 lines.append(f"  - {inp}")
             lines.append("")
-        
+
         if self.outputs:
             lines.append("**Outputs (what you deliver):**")
             for out in self.outputs:
                 lines.append(f"  - {out}")
             lines.append("")
-        
+
         if self.definition_of_done:
             lines.append("**Definition of Done (completion criteria):**")
             for criteria in self.definition_of_done:
                 lines.append(f"  - {criteria}")
             lines.append("")
-        
+
         if self.hard_bans:
             lines.append("**HARD BANS (what you must NEVER do):**")
             for ban in self.hard_bans:
                 lines.append(f"  - {ban}")
             lines.append("")
-        
+
         if self.escalation_triggers:
             lines.append("**Escalation triggers (when to ask for help):**")
             for trigger in self.escalation_triggers:
                 lines.append(f"  - {trigger}")
             lines.append("")
-        
+
         if self.metrics:
             lines.append("**Your KPIs:**")
             for metric in self.metrics:
                 lines.append(f"  - {metric}")
             lines.append("")
-        
-        lines.append(f"**Capabilities:**")
+
+        lines.append("**Capabilities:**")
         lines.append(f"  - Can invoke other bots: {self.capabilities.can_invoke_bots}")
         lines.append(f"  - Can do heartbeat: {self.capabilities.can_do_heartbeat}")
         lines.append(f"  - Can access web: {self.capabilities.can_access_web}")
         lines.append(f"  - Can execute commands: {self.capabilities.can_exec_commands}")
         lines.append(f"  - Can send messages: {self.capabilities.can_send_messages}")
         lines.append(f"  - Max concurrent tasks: {self.capabilities.max_concurrent_tasks}")
-        
+
         return "\n".join(lines)
 
 
@@ -703,36 +704,36 @@ BUILTIN_ROLES: Dict[str, RoleCard] = {
 
 class RoleCardStorage:
     """Storage manager for user-editable role cards.
-    
+
     Role cards can be stored at:
     - {workspace}/.nanofolks/role_cards/{bot_name}.yaml (user overrides)
     - ~/.config/nanofolks/role_cards/{bot_name}.yaml (global overrides)
-    
+
     Bots can propose updates which are saved as drafts for user approval.
     """
-    
+
     def __init__(self, workspace_path: Optional[Path] = None):
         self.workspace = workspace_path or Path.cwd()
         self.role_cards_dir = self.workspace / ".nanofolks" / "role_cards"
         self.global_dir = Path.home() / ".config" / "nanofolks" / "role_cards"
-        
+
         # Ensure directories exist
         self.role_cards_dir.mkdir(parents=True, exist_ok=True)
         self.global_dir.mkdir(parents=True, exist_ok=True)
-    
+
     def get_role_card(self, bot_name: str, use_cache: bool = True) -> Optional[RoleCard]:
         """Get role card for a bot.
-        
+
         Priority:
         1. ROLE.md in workspace (user-editable markdown)
         2. YAML workspace override (legacy)
         3. YAML global override (legacy)
         4. Built-in default
-        
+
         Args:
             bot_name: Name of the bot
             use_cache: Whether to use cached version
-            
+
         Returns:
             RoleCard or None if not found
         """
@@ -742,20 +743,20 @@ class RoleCardStorage:
         role_from_md = role_parser.parse_role_file(bot_name)
         if role_from_md:
             return role_from_md
-        
+
         # 2. Check YAML workspace override (legacy)
         workspace_path = self.role_cards_dir / f"{bot_name}.yaml"
         if workspace_path.exists():
             return self._load_from_file(workspace_path)
-        
+
         # 3. Check YAML global override (legacy)
         global_path = self.global_dir / f"{bot_name}.yaml"
         if global_path.exists():
             return self._load_from_file(global_path)
-        
+
         # 4. Return built-in default
         return BUILTIN_ROLES.get(bot_name)
-    
+
     def _load_from_file(self, path: Path) -> Optional[RoleCard]:
         """Load role card from YAML file."""
         try:
@@ -765,14 +766,14 @@ class RoleCardStorage:
         except Exception as e:
             logger.error(f"Failed to load role card from {path}: {e}")
             return None
-    
+
     def save_role_card(self, role_card: RoleCard, scope: str = "workspace") -> bool:
         """Save a role card override.
-        
+
         Args:
             role_card: The role card to save
             scope: "workspace" or "global"
-            
+
         Returns:
             True if saved successfully
         """
@@ -780,7 +781,7 @@ class RoleCardStorage:
             path = self.role_cards_dir / f"{role_card.bot_name}.yaml"
         else:
             path = self.global_dir / f"{role_card.bot_name}.yaml"
-        
+
         try:
             with open(path, 'w') as f:
                 yaml.dump(role_card.to_dict(), f, default_flow_style=False, sort_keys=False)
@@ -789,22 +790,22 @@ class RoleCardStorage:
         except Exception as e:
             logger.error(f"Failed to save role card: {e}")
             return False
-    
+
     def save_bot_proposal(self, bot_name: str, proposed_changes: Dict[str, Any], reason: str) -> bool:
         """Save a bot-proposed role card update as a draft.
-        
+
         These proposals require user approval before becoming active.
-        
+
         Args:
             bot_name: Name of the bot proposing changes
             proposed_changes: Dictionary of proposed changes
             reason: Explanation for the changes
-            
+
         Returns:
             True if proposal was saved
         """
         proposal_path = self.role_cards_dir / f"{bot_name}_proposal.yaml"
-        
+
         proposal = {
             "status": "pending",
             "proposed_by": bot_name,
@@ -812,7 +813,7 @@ class RoleCardStorage:
             "timestamp": str(datetime.now()),
             "changes": proposed_changes,
         }
-        
+
         try:
             with open(proposal_path, 'w') as f:
                 yaml.dump(proposal, f, default_flow_style=False, sort_keys=False)
@@ -821,39 +822,39 @@ class RoleCardStorage:
         except Exception as e:
             logger.error(f"Failed to save proposal: {e}")
             return False
-    
+
     def list_available_roles(self) -> List[str]:
         """List all available role names."""
         builtin = set(BUILTIN_ROLES.keys())
-        
+
         # Check for workspace overrides
         workspace_roles = set()
         if self.role_cards_dir.exists():
             for f in self.role_cards_dir.glob("*.yaml"):
                 if not f.name.endswith("_proposal.yaml"):
                     workspace_roles.add(f.stem)
-        
+
         # Check for global overrides
         global_roles = set()
         if self.global_dir.exists():
             for f in self.global_dir.glob("*.yaml"):
                 if not f.name.endswith("_proposal.yaml"):
                     global_roles.add(f.stem)
-        
+
         return sorted(builtin | workspace_roles | global_roles)
-    
+
     def reset_to_default(self, bot_name: str) -> bool:
         """Remove user overrides and reset to built-in default.
-        
+
         Args:
             bot_name: Name of the bot
-            
+
         Returns:
             True if reset (or was already at default)
         """
         workspace_path = self.role_cards_dir / f"{bot_name}.yaml"
         global_path = self.global_dir / f"{bot_name}.yaml"
-        
+
         removed = False
         if workspace_path.exists():
             workspace_path.unlink()
@@ -861,10 +862,10 @@ class RoleCardStorage:
         if global_path.exists():
             global_path.unlink()
             removed = True
-        
+
         if removed:
             logger.info(f"Reset role card for {bot_name} to default")
-        
+
         return True
 
 
@@ -885,11 +886,11 @@ def get_role_card_storage(workspace_path: Optional[Path] = None) -> RoleCardStor
 
 def get_role_card(bot_name: str, workspace_path: Optional[Path] = None) -> Optional[RoleCard]:
     """Get role card for a bot.
-    
+
     Args:
         bot_name: Name of the bot
         workspace_path: Optional workspace path for user overrides
-        
+
     Returns:
         RoleCard or None if not found
     """
@@ -921,7 +922,6 @@ is_valid_bot = is_valid_role
 
 # Import datetime at end to avoid circular import issues
 from datetime import datetime
-
 
 __all__ = [
     "RoleCard",

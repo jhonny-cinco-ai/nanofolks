@@ -8,18 +8,16 @@ This module implements Phase 6 of the memory proposal:
 - Auto-queuing to Learning Exchange for insights with confidence >= 0.85
 """
 
-import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 from uuid import uuid4
 
 from loguru import logger
 
-from nanofolks.memory.models import Learning, Event
-from nanofolks.memory.store import TurboMemoryStore
 from nanofolks.memory.embeddings import EmbeddingProvider
-
+from nanofolks.memory.models import Learning
+from nanofolks.memory.store import TurboMemoryStore
 
 # Feedback detection patterns (regex-based, FREE)
 FEEDBACK_PATTERNS = {
@@ -72,37 +70,37 @@ FEEDBACK_TO_INSIGHT_CATEGORY = {
 class FeedbackDetector:
     """
     Detects feedback in user messages using regex patterns.
-    
+
     This is a lightweight, zero-cost approach that catches
     70-75% of feedback without API calls.
     """
-    
+
     def __init__(self):
         self.patterns = FEEDBACK_PATTERNS
         logger.info("FeedbackDetector initialized with regex patterns")
-    
+
     def detect(self, text: str) -> Optional[dict]:
         """
         Detect if text contains feedback.
-        
+
         Args:
             text: User message text
-            
+
         Returns:
             Dict with feedback info or None
         """
         if not text or len(text.strip()) < 3:
             return None
-        
-        text_lower = text.lower().strip()
-        
+
+        text.lower().strip()
+
         # Check each pattern type
         for feedback_type, patterns in self.patterns.items():
             for pattern in patterns:
                 if re.search(pattern, text):
                     # Extract the relevant part (simplified)
                     content = self._extract_content(text, feedback_type)
-                    
+
                     return {
                         "is_feedback": True,
                         "type": feedback_type,
@@ -110,9 +108,9 @@ class FeedbackDetector:
                         "content": content,
                         "raw_text": text,
                     }
-        
+
         return None
-    
+
     def _extract_content(self, text: str, feedback_type: str) -> str:
         """Extract the meaningful content from feedback."""
         # Simple extraction - can be enhanced
@@ -121,13 +119,13 @@ class FeedbackDetector:
             match = re.search(r"(?i)(?:should be|actually[,.]?\s+|I meant\s+)(.+)", text)
             if match:
                 return match.group(1).strip()
-        
+
         elif feedback_type == "preference":
             # Look for "I prefer X" or "always use X"
             match = re.search(r"(?i)(?:I (?:prefer|like|want)|always use|never use)\s+(.+)", text)
             if match:
                 return match.group(1).strip()
-        
+
         # Default: return full text (truncated)
         return text[:200] if len(text) > 200 else text
 
@@ -140,7 +138,7 @@ class LearningManager:
     - Apply decay
     - Detect contradictions
     """
-    
+
     def __init__(
         self,
         store: TurboMemoryStore,
@@ -152,7 +150,7 @@ class LearningManager:
     ):
         """
         Initialize learning manager.
-        
+
         Args:
             store: TurboMemoryStore for persistence
             embedding_provider: Optional for semantic similarity
@@ -168,61 +166,61 @@ class LearningManager:
         self.feedback_detector = FeedbackDetector()
         self.exchange = exchange
         self.bot_name = bot_name
-        
+
         logger.info(f"LearningManager initialized (decay: {decay_days} days, bot: {bot_name})")
-    
+
     async def process_message(self, message: str, context: Optional[str] = None) -> Optional[Learning]:
         """
         Process a user message and create learning if feedback detected.
-        
+
         High-confidence learnings (confidence >= 0.85) are automatically queued
         to the Learning Exchange for distribution to other bots.
-        
+
         Args:
             message: User message
             context: Optional context (e.g., bot's previous response)
-            
+
         Returns:
             Created Learning or None
         """
         # Step 1: Detect feedback (regex, FREE)
         detection = self.feedback_detector.detect(message)
-        
+
         if not detection:
             return None
-        
+
         # Step 2: Create learning
         learning = self._create_learning_from_detection(detection, context)
-        
+
         # Step 3: Check for contradictions
         await self._check_contradictions(learning)
-        
+
         # Step 4: Store in Turbo Memory
         self.store.create_learning(learning)
-        
+
         logger.info(f"Created learning from feedback: {learning.id} (type: {learning.source})")
-        
+
         # Step 5: Auto-queue to Learning Exchange if confidence >= 0.85 and exchange is available
         if learning.confidence >= 0.85 and self.exchange:
             await self._queue_to_exchange(learning, detection)
-        
+
         return learning
-    
+
     async def _queue_to_exchange(self, learning: Learning, detection: dict) -> None:
         """
         Auto-queue high-confidence learning to Learning Exchange.
-        
+
         Args:
             learning: The created Learning object
             detection: The detection result with feedback info
         """
         try:
             # Import here to avoid circular imports
-            from nanofolks.agent.learning_exchange import InsightCategory, ApplicabilityScope
-            
+            from nanofolks.agent.learning_exchange import ApplicabilityScope, InsightCategory
+
             feedback_type = detection["type"]
             category_str = self._map_feedback_type_to_category(feedback_type)
-            
+
             # Map category string to enum (strings are like "user_preference", enums are like USER_PREFERENCE)
             category_map = {
                 "user_preference": InsightCategory.USER_PREFERENCE,
@@ -235,11 +233,11 @@ class LearningManager:
                 "integration_tip": InsightCategory.INTEGRATION_TIP,
             }
             category = category_map.get(category_str, InsightCategory.REASONING_PATTERN)
-            
+
             # Queue the insight
             title = f"{feedback_type.title()}: {learning.content[:50]}"
             description = learning.recommendation or f"{feedback_type} feedback: {learning.content}"
-            
+
             self.exchange.queue_insight(
                 category=category,
                 title=title,
@@ -249,7 +247,7 @@ class LearningManager:
                 evidence={"learning_id": learning.id},
                 context={"sentiment": learning.sentiment, "source": "user_feedback"},
             )
-            
+
             logger.info(
                 f"Queued learning {learning.id} to exchange "
                 f"(type: {feedback_type}, confidence: {learning.confidence:.2f})"
@@ -257,12 +255,12 @@ class LearningManager:
         except Exception as e:
             # Non-blocking: log but don't fail
             logger.warning(f"Failed to queue learning to exchange: {e}")
-    
+
     def _create_learning_from_detection(self, detection: dict, context: Optional[str] = None) -> Learning:
         """Convert detection result to Learning object."""
         feedback_type = detection["type"]
         content = detection["content"]
-        
+
         # Map feedback type to sentiment
         sentiment_map = {
             "correction": "negative",
@@ -271,12 +269,12 @@ class LearningManager:
             "negative": "negative",
         }
         sentiment = sentiment_map.get(feedback_type, "neutral")
-        
+
         # Generate recommendation based on type
         recommendation = self._generate_recommendation(content, feedback_type)
-        
+
         now = datetime.now()
-        
+
         return Learning(
             id=str(uuid4()),
             content=content,
@@ -292,7 +290,7 @@ class LearningManager:
             times_accessed=0,
             last_accessed=None,
         )
-    
+
     def _generate_recommendation(self, content: str, feedback_type: str) -> str:
         """Generate actionable recommendation from feedback."""
         if feedback_type == "preference":
@@ -303,102 +301,102 @@ class LearningManager:
             return "Continue this approach"
         else:
             return f"Note: {content}"
-    
+
     def _map_feedback_type_to_category(self, feedback_type: str) -> str:
         """
         Map feedback type to InsightCategory for Learning Exchange.
-        
+
         Args:
             feedback_type: Type of feedback detected (correction, preference, etc.)
-            
+
         Returns:
             InsightCategory string value
         """
         return FEEDBACK_TO_INSIGHT_CATEGORY.get(feedback_type, "reasoning_pattern")
-    
+
     async def _check_contradictions(self, new_learning: Learning) -> bool:
         """
         Check if new learning contradicts existing ones.
-        
+
         Args:
             new_learning: Newly detected learning
-            
+
         Returns:
             True if contradiction found and handled
         """
         # Get existing learnings
         existing = self.store.get_all_learnings(active_only=True)
-        
+
         # Simple contradiction detection: similar content but different sentiment
         for old in existing:
             # Check if similar (simple text similarity)
             similarity = self._calculate_similarity(
-                new_learning.content, 
+                new_learning.content,
                 old.content
             )
-            
+
             if similarity > 0.7:  # 70% similar
                 if new_learning.sentiment != old.sentiment:
                     # Contradiction! Mark old as superseded
                     old.superseded_by = new_learning.id
                     self.store.update_learning(old)
-                    
+
                     # Boost new learning
                     new_learning.relevance_score = 1.0
-                    
+
                     logger.info(f"Detected contradiction: {old.id} superseded by {new_learning.id}")
                     return True
-        
+
         return False
-    
+
     def _calculate_similarity(self, text1: str, text2: str) -> float:
         """Calculate simple text similarity (can be enhanced with embeddings)."""
         # Word overlap similarity
         words1 = set(text1.lower().split())
         words2 = set(text2.lower().split())
-        
+
         if not words1 or not words2:
             return 0.0
-        
+
         intersection = words1 & words2
         union = words1 | words2
-        
+
         return len(intersection) / len(union)
-    
+
     def apply_decay(self) -> dict:
         """
         Apply relevance decay to all learnings.
         Should be called periodically (e.g., daily via background job).
-        
+
         Returns:
             Stats about decay applied
         """
         learnings = self.store.get_all_learnings(active_only=True)
         now = datetime.now()
-        
+
         stats = {
             "total": len(learnings),
             "decayed": 0,
             "unchanged": 0,
             "removed": 0,
         }
-        
+
         for learning in learnings:
             if not learning.updated_at:
                 continue
-            
+
             # Calculate days since last update
             days_old = (now - learning.updated_at).days
-            
+
             if days_old < 1:
                 stats["unchanged"] += 1
                 continue
-            
+
             # Apply decay: relevance *= (0.95 ^ days_old)
             decay_factor = (1 - self.decay_rate) ** days_old
             old_score = learning.relevance_score
             learning.relevance_score *= decay_factor
-            
+
             # Remove very old learnings (relevance < 0.1)
             if learning.relevance_score < 0.1:
                 self.store.delete_learning(learning.id)
@@ -411,53 +409,53 @@ class LearningManager:
                     f"Decayed learning {learning.id}: "
                     f"{old_score:.2f} -> {learning.relevance_score:.2f}"
                 )
-        
+
         logger.info(f"Decay applied: {stats}")
         return stats
-    
+
     def boost_on_access(self, learning_id: str, boost_factor: float = 1.2) -> Optional[Learning]:
         """
         Boost relevance when a learning is accessed/used.
-        
+
         Args:
             learning_id: Learning to boost
             boost_factor: Multiplier (default 1.2 = 20% boost)
-            
+
         Returns:
             Updated learning or None
         """
         learning = self.store.get_learning(learning_id)
         if not learning:
             return None
-        
+
         # Boost relevance (cap at 1.0)
         learning.relevance_score = min(1.0, learning.relevance_score * boost_factor)
         learning.times_accessed += 1
         learning.last_accessed = datetime.now()
         learning.updated_at = datetime.now()
-        
+
         self.store.update_learning(learning)
-        
+
         logger.debug(f"Boosted learning {learning_id}: score={learning.relevance_score:.2f}")
-        
+
         return learning
-    
+
     def get_relevant_learnings(self, topic: Optional[str] = None, limit: int = 10) -> list[Learning]:
         """
         Get most relevant learnings, optionally filtered by topic.
-        
+
         Args:
             topic: Optional topic filter
             limit: Maximum results
-            
+
         Returns:
             List of relevant learnings
         """
         learnings = self.store.get_high_relevance_learnings(min_score=0.5, limit=limit * 2)
-        
+
         # Sort by relevance (already sorted by DB, but double-check)
         learnings.sort(key=lambda l: l.relevance_score, reverse=True)
-        
+
         return learnings[:limit]
 
 
@@ -470,19 +468,19 @@ def create_learning_manager(
 ) -> LearningManager:
     """
     Factory function to create LearningManager.
-    
+
     Args:
         store: TurboMemoryStore instance
         embedding_provider: Optional EmbeddingProvider
         exchange: Optional LearningExchange instance for auto-queuing
         bot_name: Name of this bot instance
         **kwargs: Additional arguments passed to LearningManager
-        
+
     Returns:
         LearningManager instance
     """
     return LearningManager(
-        store, 
+        store,
         embedding_provider=embedding_provider,
         exchange=exchange,
         bot_name=bot_name,

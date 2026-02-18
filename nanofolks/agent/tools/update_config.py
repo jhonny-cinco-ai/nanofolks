@@ -6,12 +6,13 @@ and security considerations.
 """
 
 from pathlib import Path
-from typing import Any, get_origin, get_args
+from typing import Any
+
 from loguru import logger
 
 from nanofolks.agent.tools.base import Tool
-from nanofolks.config.loader import load_config, save_config, get_config_path
-from nanofolks.config.schema import Config, ToolsConfig, RoutingConfig
+from nanofolks.config.loader import get_config_path, load_config, save_config
+from nanofolks.config.schema import Config
 from nanofolks.security.sanitizer import SecretSanitizer
 
 
@@ -23,7 +24,7 @@ class ConfigUpdateError(Exception):
 class UpdateConfigTool(Tool):
     """
     Tool to update nanofolks configuration values.
-    
+
     This tool provides secure configuration updates with:
     - Path validation (dot notation like 'providers.openrouter.apiKey')
     - Type validation and conversion
@@ -31,9 +32,9 @@ class UpdateConfigTool(Tool):
     - Backup before changes
     - Support for arrays (append/remove)
     """
-    
+
     name = "update_config"
-    
+
     # Configuration schema for validation
     SCHEMA = {
         'agents': {
@@ -303,14 +304,14 @@ class UpdateConfigTool(Tool):
             }
         },
     }
-    
+
     def __init__(self):
         self.sanitizer = SecretSanitizer()
-    
+
     @property
     def description(self) -> str:
         return """Update nanofolks configuration values.
-        
+
 Use this tool to change configuration settings. Paths use dot notation:
 - providers.openrouter.apiKey
 - channels.telegram.enabled
@@ -321,7 +322,7 @@ Examples:
 - Enable Telegram: {"path": "channels.telegram.enabled", "value": true}
 - Change model: {"path": "agents.defaults.model", "value": "anthropic/claude-opus-4-5"}
 """
-    
+
     @property
     def parameters(self) -> dict[str, Any]:
         return {
@@ -343,74 +344,74 @@ Examples:
             },
             "required": ["path", "value"]
         }
-    
+
     async def execute(self, path: str, value: Any, operation: str = "set", **kwargs) -> str:
         """
         Update a configuration value.
-        
+
         Args:
             path: Dot-notation path (e.g., 'providers.openrouter.apiKey')
             value: New value
             operation: 'set', 'append', or 'remove'
-            
+
         Returns:
             Success message or error
         """
         try:
             # Load current config
             config = load_config()
-            
+
             # Parse the path
             parts = path.split('.')
             if len(parts) < 2:
                 return f"Error: Invalid path '{path}'. Must have at least 2 parts (e.g., 'providers.openrouter.apiKey')"
-            
+
             # Get schema info for this path
             schema_info = self._get_schema_info(parts)
-            
+
             # Validate and convert value
             validated_value = self._validate_value(value, schema_info, path)
             if validated_value is None:
                 return f"Error: Invalid value '{value}' for path '{path}'"
-            
+
             # Check for secrets in the value
             if isinstance(validated_value, str) and self.sanitizer.has_secrets(validated_value):
                 # Secrets detected - log at debug level only
                 logger.debug("Configuration update contains secrets (stored securely)")
-            
+
             # Backup existing config
             self._backup_config()
-            
+
             # Navigate to the target and update
             success = self._update_config_value(config, parts, validated_value, operation)
-            
+
             if not success:
                 return f"Error: Could not update path '{path}'"
-            
+
             # Save the config
             save_config(config)
-            
+
             # Log success at debug level only (avoid cluttering CLI output)
             logger.debug(f"Configuration updated: {path}")
-            
+
             return f"✓ Updated {path} successfully"
-            
+
         except ConfigUpdateError as e:
             logger.error(f"Config update failed: {e}")
             return f"Error: {str(e)}"
         except Exception as e:
             logger.error(f"Unexpected error updating config: {e}")
             return f"Error: Failed to update configuration - {str(e)}"
-    
+
     def _get_schema_info(self, parts: list[str]) -> dict:
         """Get schema information for a configuration path."""
         category = parts[0]
-        
+
         if category not in self.SCHEMA:
             return {}
-        
+
         schema = self.SCHEMA[category]
-        
+
         # Navigate nested schema
         current = schema
         for part in parts[1:]:
@@ -422,13 +423,13 @@ Examples:
                 current = current['channels'][part]
             else:
                 break
-        
+
         return current if isinstance(current, dict) else {}
-    
+
     def _validate_value(self, value: Any, schema: dict, path: str) -> Any:
         """Validate and convert a value according to schema."""
         field_type = schema.get('type', 'string')
-        
+
         try:
             if field_type == 'string':
                 str_value = str(value)
@@ -440,14 +441,14 @@ Examples:
                             f"Value does not match required pattern. {schema.get('help', '')}"
                         )
                 return str_value
-            
+
             elif field_type == 'boolean':
                 if isinstance(value, bool):
                     return value
                 if isinstance(value, str):
                     return value.lower() in ('true', 'yes', '1', 'on')
                 return bool(value)
-            
+
             elif field_type == 'integer':
                 int_value = int(value)
                 if 'min' in schema and int_value < schema['min']:
@@ -455,7 +456,7 @@ Examples:
                 if 'max' in schema and int_value > schema['max']:
                     raise ConfigUpdateError(f"Value must be <= {schema['max']}")
                 return int_value
-            
+
             elif field_type == 'float':
                 float_value = float(value)
                 if 'min' in schema and float_value < schema['min']:
@@ -463,7 +464,7 @@ Examples:
                 if 'max' in schema and float_value > schema['max']:
                     raise ConfigUpdateError(f"Value must be <= {schema['max']}")
                 return float_value
-            
+
             elif field_type == 'array':
                 if isinstance(value, list):
                     # Ensure all items are strings
@@ -487,33 +488,33 @@ Examples:
                         return [item.strip() for item in value.split(',') if item.strip()]
                 # Single non-string value (e.g., int)
                 return [str(value)]
-            
+
             elif field_type == 'enum':
                 options = schema.get('options', [])
                 str_value = str(value)
                 if str_value not in options:
                     raise ConfigUpdateError(f"Value must be one of: {', '.join(options)}")
                 return str_value
-            
+
             elif field_type == 'path':
                 # Expand user home directory
                 path_value = str(value)
                 if path_value.startswith('~'):
                     path_value = str(Path.home() / path_value[2:])
                 return path_value
-            
+
             elif field_type == 'url':
                 url_value = str(value)
                 if url_value and not url_value.startswith(('http://', 'https://', 'ws://', 'wss://')):
                     raise ConfigUpdateError("Value must be a valid URL")
                 return url_value if url_value else None
-            
+
             else:
                 return str(value)
-                
-        except (ValueError, TypeError) as e:
+
+        except (ValueError, TypeError):
             raise ConfigUpdateError(f"Invalid value type. Expected {field_type}, got {type(value).__name__}")
-    
+
     def _backup_config(self):
         """Create a backup of the current config file."""
         config_path = get_config_path()
@@ -525,26 +526,26 @@ Examples:
                 logger.debug(f"Config backed up to {backup_path}")
             except Exception as e:
                 logger.warning(f"Failed to backup config: {e}")
-    
+
     def _update_config_value(self, config: Config, parts: list[str], value: Any, operation: str) -> bool:
         """
         Update a value in the config object.
-        
+
         Args:
             config: Config object to update
             parts: Path parts (can be camelCase or snake_case)
             value: New value
             operation: 'set', 'append', or 'remove'
-            
+
         Returns:
             True if successful
         """
         from nanofolks.config.loader import camel_to_snake
-        
+
         # Convert parts to snake_case for Python attribute access
         # Pydantic models use snake_case for attribute names (e.g., api_key, not apiKey)
         snake_parts = [camel_to_snake(p) for p in parts]
-        
+
         try:
             # Navigate to the parent object
             current = config
@@ -553,16 +554,16 @@ Examples:
                     current = getattr(current, part)
                 else:
                     return False
-            
+
             # Get the final attribute name
             final_part = snake_parts[-1]
-            
+
             if operation == 'set':
                 if hasattr(current, final_part):
                     setattr(current, final_part, value)
                     return True
                 return False
-            
+
             elif operation == 'append':
                 # Append to array
                 if hasattr(current, final_part):
@@ -572,7 +573,7 @@ Examples:
                             arr.append(value)
                         return True
                 return False
-            
+
             elif operation == 'remove':
                 # Remove from array
                 if hasattr(current, final_part):
@@ -581,32 +582,32 @@ Examples:
                         arr.remove(value)
                         return True
                 return False
-            
+
             return False
-            
+
         except Exception as e:
             logger.error(f"Error updating config value: {e}")
             return False
-    
+
     def get_required_for_startup(self) -> dict:
         """Get configuration required for startup."""
         required = {}
-        
+
         # Check providers - at least one with apiKey
         required['providers'] = {
             'description': 'At least one LLM provider with API key',
             'providers': list(self.SCHEMA['providers']['providers'].keys()),
         }
-        
+
         return required
-    
+
     def validate_model_for_routing(self, model: str) -> dict:
         """
         Validate if a model is compatible with configured providers.
-        
+
         Args:
             model: Model string (e.g., "anthropic/claude-3-opus" or "gpt-4o")
-            
+
         Returns:
             Dict with validation results:
             - valid: bool - Whether model format is valid
@@ -623,20 +624,20 @@ Examples:
             'warning': None,
             'suggestion': None
         }
-        
+
         if not model or not isinstance(model, str):
             result['valid'] = False
             result['warning'] = "Model name cannot be empty"
             return result
-        
+
         # Parse provider from model string
         # Format can be: "provider/model" or just "model"
         provider_name = None
-        
+
         if '/' in model:
             # Extract provider from "provider/model" format
             provider_name = model.split('/')[0].lower()
-            
+
             # Map common aliases
             provider_aliases = {
                 'anthropic': 'anthropic',
@@ -672,30 +673,30 @@ Examples:
                 provider_name = 'moonshot'
             elif 'gemini' in model_lower:
                 provider_name = 'gemini'
-        
+
         result['provider'] = provider_name
-        
+
         if not provider_name:
             # Can't determine provider - assume it's valid but warn
             result['warning'] = f"Could not determine provider for model '{model}'. Ensure you have the correct provider configured."
             return result
-        
+
         # Check if provider is configured
         provider_config = getattr(config.providers, provider_name, None)
         if provider_config and provider_config.api_key:
             result['provider_configured'] = True
         else:
             result['provider_configured'] = False
-            
+
             # Get list of configured providers for suggestion
             configured = [
                 name for name in self.SCHEMA['providers']['providers'].keys()
                 if getattr(getattr(config.providers, name, None), 'api_key', None)
             ]
-            
+
             # Special handling for gateway providers
             is_gateway = provider_name in ['openrouter', 'aihubmix']
-            
+
             if configured:
                 if is_gateway:
                     result['warning'] = (
@@ -730,19 +731,19 @@ Examples:
                         f"but no providers are configured yet."
                     )
                     result['suggestion'] = "Run 'nanofolks onboard' to configure your first provider."
-        
+
         return result
-    
+
     def get_config_summary(self) -> dict:
         """Get a summary of current configuration."""
         config = load_config()
-        
+
         summary = {
             'providers': {},
             'channels': {},
             'has_required_config': False,
         }
-        
+
         # Check providers
         for provider_name in self.SCHEMA['providers']['providers'].keys():
             provider = getattr(config.providers, provider_name, None)
@@ -756,12 +757,12 @@ Examples:
                     'configured': False,
                     'has_key': False,
                 }
-        
+
         # Check if any provider is configured
         summary['has_required_config'] = any(
             p['has_key'] for p in summary['providers'].values()
         )
-        
+
         # Check channels
         for channel_name in self.SCHEMA['channels']['channels'].keys():
             channel = getattr(config.channels, channel_name, None)
@@ -769,5 +770,5 @@ Examples:
                 summary['channels'][channel_name] = {
                     'enabled': getattr(channel, 'enabled', False),
                 }
-        
+
         return summary

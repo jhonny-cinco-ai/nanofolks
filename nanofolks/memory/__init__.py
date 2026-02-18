@@ -4,62 +4,62 @@ A lightweight, local-first memory system for the nanofolks AI assistant.
 Provides semantic search, entity tracking, and knowledge graph capabilities.
 """
 
-from nanofolks.memory.models import (
-    Event,
-    Entity,
-    Edge,
-    Fact,
-    Topic,
-    SummaryNode,
-    Learning,
-)
-from nanofolks.memory.store import TurboMemoryStore
-from nanofolks.memory.embeddings import (
-    EmbeddingProvider,
-    pack_embedding,
-    unpack_embedding,
-    cosine_similarity,
-)
 from nanofolks.memory.background import (
     ActivityTracker,
     BackgroundProcessor,
 )
-from nanofolks.memory.extraction import (
-    Gliner2Extractor,
-    ExtractionResult,
-    extract_entities,
-)
-from nanofolks.memory.graph import (
-    KnowledgeGraphManager,
-    create_entity_resolver,
-)
-from nanofolks.memory.summaries import (
-    SummaryTreeManager,
-    create_summary_manager,
+from nanofolks.memory.bot_memory import (
+    BotExpertise,
+    BotMemory,
+    CrossPollination,
+    SharedMemoryPool,
 )
 from nanofolks.memory.context import (
     ContextAssembler,
     ContextBudget,
     create_context_assembler,
 )
-from nanofolks.memory.retrieval import (
-    MemoryRetrieval,
-    create_retrieval,
+from nanofolks.memory.embeddings import (
+    EmbeddingProvider,
+    cosine_similarity,
+    pack_embedding,
+    unpack_embedding,
+)
+from nanofolks.memory.extraction import (
+    ExtractionResult,
+    Gliner2Extractor,
+    extract_entities,
+)
+from nanofolks.memory.graph import (
+    KnowledgeGraphManager,
+    create_entity_resolver,
 )
 from nanofolks.memory.learning import (
-    LearningManager,
     FeedbackDetector,
+    LearningManager,
     create_learning_manager,
+)
+from nanofolks.memory.models import (
+    Edge,
+    Entity,
+    Event,
+    Fact,
+    Learning,
+    SummaryNode,
+    Topic,
 )
 from nanofolks.memory.preferences import (
     PreferencesAggregator,
     create_preferences_aggregator,
 )
-from nanofolks.memory.bot_memory import (
-    BotMemory,
-    SharedMemoryPool,
-    CrossPollination,
-    BotExpertise,
+from nanofolks.memory.retrieval import (
+    MemoryRetrieval,
+    create_retrieval,
+)
+from nanofolks.memory.store import TurboMemoryStore
+from nanofolks.memory.summaries import (
+    SummaryTreeManager,
+    create_summary_manager,
 )
 
 __all__ = [

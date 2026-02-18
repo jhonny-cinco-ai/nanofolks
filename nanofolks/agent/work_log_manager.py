@@ -4,30 +4,32 @@ This module provides persistent storage and management of work logs
 using SQLite, with support for querying, formatting, and retrieval.
 """
 
-import sqlite3
 import json
-from pathlib import Path
+import sqlite3
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
 
-from nanofolks.agent.work_log import WorkLog, WorkLogEntry, LogLevel, RoomType, WorkspaceType
 from nanofolks.agent.learning_exchange import (
-    LearningExchange, LearningPackage, InsightCategory, ApplicabilityScope
+    ApplicabilityScope,
+    InsightCategory,
+    LearningExchange,
+    LearningPackage,
 )
+from nanofolks.agent.work_log import LogLevel, WorkLog, WorkLogEntry, WorkspaceType
 from nanofolks.config.loader import get_data_dir
 
 
 class WorkLogManager:
     """Manages work logs for agent sessions.
-    
+
     Provides persistent storage via SQLite, with support for creating,
     retrieving, and formatting work logs. Uses a singleton pattern for
 the current active log.
     """
-    
+
     def __init__(self, enabled: bool = True, bot_name: str = "leader"):
         """Initialize the work log manager.
-        
+
         Args:
             enabled: Whether work logging is enabled
             bot_name: Name of this bot (for Learning Exchange)
@@ -38,11 +40,11 @@ the current active log.
         self.db_path = get_data_dir() / "work_logs.db"
         self.learning_exchange: Optional[LearningExchange] = None
         self._init_db()
-    
+
     def _init_db(self):
         """Initialize SQLite database for work logs with multi-agent support."""
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         with sqlite3.connect(self.db_path) as conn:
             # Create work_logs table with multi-agent fields
             conn.execute("""
@@ -61,7 +63,7 @@ the current active log.
                     coordinator TEXT
                 )
             """)
-            
+
             # Create work_log_entries table with multi-agent fields
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS work_log_entries (
@@ -95,46 +97,46 @@ the current active log.
                     FOREIGN KEY (work_log_id) REFERENCES work_logs(id)
                 )
             """)
-            
+
             # Create indexes for faster queries
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_entries_work_log 
+                CREATE INDEX IF NOT EXISTS idx_entries_work_log
                 ON work_log_entries(work_log_id)
             """)
-            
+
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_work_logs_session 
+                CREATE INDEX IF NOT EXISTS idx_work_logs_session
                 ON work_logs(session_id)
             """)
-            
+
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_work_logs_time 
+                CREATE INDEX IF NOT EXISTS idx_work_logs_time
                 ON work_logs(start_time DESC)
             """)
-            
+
             # Multi-agent indexes
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_entries_workspace 
+                CREATE INDEX IF NOT EXISTS idx_entries_workspace
                 ON work_log_entries(workspace_id)
             """)
-            
+
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_entries_bot 
+                CREATE INDEX IF NOT EXISTS idx_entries_bot
                 ON work_log_entries(bot_name)
             """)
-            
+
             conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_entries_coordination 
+                CREATE INDEX IF NOT EXISTS idx_entries_coordination
                 ON work_log_entries(coordinator_mode)
             """)
-    
+
     def start_session(self, session_id: str, query: str,
                        workspace_id: str = "general",
                        workspace_type: Optional[WorkspaceType] = None,
                        participants: Optional[list] = None,
                        coordinator: Optional[str] = None) -> WorkLog:
         """Start a new work log session.
-        
+
         Args:
             session_id: Unique identifier for this session
             query: The user's original query/message
@@ -142,7 +144,7 @@ the current active log.
             workspace_type: Type of workspace (OPEN, PROJECT, DIRECT, COORDINATION)
             participants: List of bot names in this workspace
             coordinator: Name of coordinator bot (if in coordinator mode)
-            
+
         Returns:
             The created WorkLog instance
         """
@@ -157,13 +159,13 @@ the current active log.
                 participants=participants or ["leader"],
                 coordinator=coordinator
             )
-        
+
         # Initialize Learning Exchange for this session
         self.learning_exchange = LearningExchange(
             bot_name=self.bot_name,
             workspace_id=workspace_id or "general"
         )
-        
+
         self.current_log = WorkLog(
             session_id=session_id,
             query=query,
@@ -173,13 +175,13 @@ the current active log.
             participants=participants or ["leader"],
             coordinator=coordinator
         )
-        
+
         # Save to database with multi-agent fields
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(
-                    """INSERT INTO work_logs 
-                       (id, session_id, query, start_time, workspace_id, workspace_type, participants_json, coordinator) 
+                    """INSERT INTO work_logs
+                       (id, session_id, query, start_time, workspace_id, workspace_type, participants_json, coordinator)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     (session_id, session_id, query, self.current_log.start_time.isoformat(),
                      workspace_id, (workspace_type or WorkspaceType.OPEN).value,
@@ -190,7 +192,7 @@ the current active log.
             try:
                 with sqlite3.connect(self.db_path) as conn:
                     conn.execute(
-                        """UPDATE work_logs 
+                        """UPDATE work_logs
                            SET workspace_id = ?, workspace_type = ?, participants_json = ?, coordinator = ?
                            WHERE session_id = ?""",
                         (workspace_id, (workspace_type or WorkspaceType.OPEN).value,
@@ -198,15 +200,15 @@ the current active log.
                     )
             except Exception:
                 pass
-        
+
         return self.current_log
-    
+
     def log(self, level: LogLevel, category: str, message: str,
             details: Optional[dict] = None, confidence: Optional[float] = None,
             duration_ms: Optional[int] = None, bot_name: str = "leader",
             triggered_by: str = "user") -> Optional[WorkLogEntry]:
         """Add an entry to the current work log.
-        
+
         Args:
             level: Severity/importance level
             category: Type of activity
@@ -216,40 +218,40 @@ the current active log.
             duration_ms: How long this step took
             bot_name: Which bot created this entry (multi-agent)
             triggered_by: Who triggered this action (multi-agent)
-            
+
         Returns:
             The created WorkLogEntry, or None if logging disabled
         """
         if not self.enabled or not self.current_log:
             return None
-        
+
         entry = self.current_log.add_entry(
             level=level, category=category, message=message,
             details=details, confidence=confidence, duration_ms=duration_ms,
             bot_name=bot_name, triggered_by=triggered_by
         )
-        
+
         # Save to database
         self._save_entry(entry)
         return entry
-    
+
     def log_tool(self, tool_name: str, tool_input: dict, tool_output: any,
                 tool_status: str, duration_ms: int) -> Optional[WorkLogEntry]:
         """Log a tool execution.
-        
+
         Args:
             tool_name: Name of the tool
             tool_input: Input parameters
             tool_output: Tool result
             tool_status: Execution status
             duration_ms: Execution time in milliseconds
-            
+
         Returns:
             The created WorkLogEntry, or None if logging disabled
         """
         if not self.enabled or not self.current_log:
             return None
-        
+
         entry = self.current_log.add_tool_entry(
             tool_name=tool_name,
             tool_input=tool_input,
@@ -257,70 +259,70 @@ the current active log.
             tool_status=tool_status,
             duration_ms=duration_ms
         )
-        
+
         self._save_entry(entry)
         return entry
-    
+
     def log_bot_message(self, bot_name: str, message: str,
                        response_to: int = None, mentions: list = None) -> Optional[WorkLogEntry]:
         """Log a bot-to-bot communication message.
-        
+
         Args:
             bot_name: Name of the bot sending the message
             message: The message content
             response_to: Step number this responds to (for threading)
             mentions: List of bot mentions (e.g., ["@researcher", "@coder"])
-            
+
         Returns:
             The created WorkLogEntry, or None if logging disabled
         """
         if not self.enabled or not self.current_log:
             return None
-        
+
         entry = self.current_log.add_bot_message(
             bot_name=bot_name,
             message=message,
             response_to=response_to,
             mentions=mentions or []
         )
-        
+
         self._save_entry(entry)
         return entry
-    
+
     def log_escalation(self, reason: str, bot_name: str = "leader") -> Optional[WorkLogEntry]:
         """Log an escalation that needs user attention.
-        
+
         Args:
             reason: Why this needs user attention
             bot_name: Which bot triggered the escalation
-            
+
         Returns:
             The created WorkLogEntry, or None if logging disabled
         """
         if not self.enabled or not self.current_log:
             return None
-        
+
         entry = self.current_log.add_escalation(
             reason=reason,
             bot_name=bot_name
         )
-        
+
         self._save_entry(entry)
         return entry
-    
+
     def _save_entry(self, entry: WorkLogEntry):
         """Save an entry to the database with multi-agent support.
-        
+
         Args:
             entry: The WorkLogEntry to save
         """
         if not self.current_log:
             return
-        
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(
-                        """INSERT INTO work_log_entries 
+                        """INSERT INTO work_log_entries
                        (work_log_id, step, timestamp, level, category, message,
                         details_json, confidence, duration_ms, tool_name,
                         tool_input_json, tool_output_json, tool_status,
@@ -362,23 +364,23 @@ the current active log.
         except Exception as e:
             # Log error but don't crash the agent
             print(f"Warning: Failed to save work log entry: {e}")
-    
+
     def end_session(self, final_output: str):
         """End the current work log session.
-        
+
         Args:
             final_output: The final response/output
         """
         if not self.enabled or not self.current_log:
             return
-        
+
         self.current_log.end_time = datetime.now()
         self.current_log.final_output = final_output
-        
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(
-                    """UPDATE work_logs 
+                    """UPDATE work_logs
                        SET end_time = ?, final_output = ?, entry_count = ?
                        WHERE session_id = ?""",
                     (
@@ -390,12 +392,12 @@ the current active log.
                 )
         except Exception as e:
             print(f"Warning: Failed to update work log: {e}")
-        
+
         self.current_log = None
-    
+
     def get_last_log(self) -> Optional[WorkLog]:
         """Get the most recent work log.
-        
+
         Returns:
             The most recent WorkLog, or None if no logs exist
         """
@@ -406,21 +408,21 @@ the current active log.
                     "SELECT * FROM work_logs ORDER BY start_time DESC LIMIT 1"
                 )
                 row = cursor.fetchone()
-                
+
                 if not row:
                     return None
-                
+
                 return self._load_log_from_row(conn, row)
         except Exception as e:
             print(f"Warning: Failed to load work log: {e}")
             return None
-    
+
     def get_log_by_session(self, session_id: str) -> Optional[WorkLog]:
         """Get a specific work log by session ID.
-        
+
         Args:
             session_id: The session ID to look up
-            
+
         Returns:
             The WorkLog, or None if not found
         """
@@ -432,22 +434,22 @@ the current active log.
                     (session_id,)
                 )
                 row = cursor.fetchone()
-                
+
                 if not row:
                     return None
-                
+
                 return self._load_log_from_row(conn, row)
         except Exception as e:
             print(f"Warning: Failed to load work log: {e}")
             return None
-    
+
     def get_logs_by_workspace(self, workspace_id: str, limit: int = 10) -> List[WorkLog]:
         """Get work logs for a specific workspace.
-        
+
         Args:
             workspace_id: The workspace ID (e.g., "#project-alpha")
             limit: Maximum number of logs to return
-            
+
         Returns:
             List of WorkLog instances for the workspace
         """
@@ -455,72 +457,72 @@ the current active log.
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute(
-                    """SELECT * FROM work_logs 
-                       WHERE workspace_id = ? 
-                       ORDER BY start_time DESC 
+                    """SELECT * FROM work_logs
+                       WHERE workspace_id = ?
+                       ORDER BY start_time DESC
                        LIMIT ?""",
                     (workspace_id, limit)
                 )
-                
+
                 logs = []
                 for row in cursor.fetchall():
                     log = self._load_log_from_row(conn, row)
                     if log:
                         logs.append(log)
-                
+
                 return logs
         except Exception as e:
             print(f"Warning: Failed to load workspace logs: {e}")
             return []
-    
+
     def get_all_logs(self, limit: int = 10, workspace: Optional[str] = None) -> List[WorkLog]:
         """Get all work logs, optionally filtered by workspace.
-        
+
         Args:
             limit: Maximum number of logs to return
             workspace: Optional workspace ID to filter by
-            
+
         Returns:
             List of WorkLog instances
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.row_factory = sqlite3.Row
-                
+
                 if workspace:
                     cursor = conn.execute(
-                        """SELECT * FROM work_logs 
-                           WHERE workspace_id = ? 
-                           ORDER BY start_time DESC 
+                        """SELECT * FROM work_logs
+                           WHERE workspace_id = ?
+                           ORDER BY start_time DESC
                            LIMIT ?""",
                         (workspace, limit)
                     )
                 else:
                     cursor = conn.execute(
-                        """SELECT * FROM work_logs 
-                           ORDER BY start_time DESC 
+                        """SELECT * FROM work_logs
+                           ORDER BY start_time DESC
                            LIMIT ?""",
                         (limit,)
                     )
-                
+
                 logs = []
                 for row in cursor.fetchall():
                     log = self._load_log_from_row(conn, row)
                     if log:
                         logs.append(log)
-                
+
                 return logs
         except Exception as e:
             print(f"Warning: Failed to load work logs: {e}")
             return []
-    
+
     def _load_log_from_row(self, conn: sqlite3.Connection, row: sqlite3.Row) -> WorkLog:
         """Load a WorkLog and its entries from database rows.
-        
+
         Args:
             conn: Database connection
             row: The work_logs row
-            
+
         Returns:
             Populated WorkLog instance
         """
@@ -536,14 +538,14 @@ the current active log.
             participants=json.loads(row['participants_json']) if 'participants_json' in row.keys() and row['participants_json'] else ['leader'],
             coordinator=row['coordinator'] if 'coordinator' in row.keys() else None
         )
-        
+
         # Load entries
         entries_cursor = conn.execute(
-            """SELECT * FROM work_log_entries 
+            """SELECT * FROM work_log_entries
                WHERE work_log_id = ? ORDER BY step""",
             (row['session_id'],)
         )
-        
+
         for entry_row in entries_cursor:
             log.entries.append(WorkLogEntry(
                 timestamp=datetime.fromisoformat(entry_row['timestamp']),
@@ -572,15 +574,15 @@ the current active log.
                 shareable_insight=bool(entry_row['shareable_insight']) if 'shareable_insight' in entry_row.keys() else False,
                 insight_category=entry_row['insight_category'] if 'insight_category' in entry_row.keys() else None
             ))
-        
+
         return log
-    
+
     def get_formatted_log(self, mode: str = "summary") -> str:
         """Get the current or last log formatted for display.
-        
+
         Args:
             mode: Format mode - "summary", "detailed", or "debug"
-            
+
         Returns:
             Formatted string representation
         """
@@ -588,10 +590,10 @@ the current active log.
             log = self.current_log
         else:
             log = self.get_last_log()
-        
+
         if not log:
             return "No work log available"
-        
+
         if mode == "summary":
             return self._format_summary(log)
         elif mode == "detailed":
@@ -600,51 +602,51 @@ the current active log.
             return self._format_debug(log)
         else:
             return self._format_summary(log)
-    
+
     def _format_summary(self, log: WorkLog) -> str:
         """Format work log as a high-level summary.
-        
+
         Args:
             log: The work log to format
-            
+
         Returns:
             Summary string
         """
         lines = [
-            f"Work Log Summary",
+            "Work Log Summary",
             f"Query: {log.query[:80]}{'...' if len(log.query) > 80 else ''}",
             f"Steps: {len(log.entries)}",
             f"Duration: {self._format_duration(log)}",
             "",
             "Key Events:"
         ]
-        
+
         # Show key decisions and tools
         for entry in log.entries:
             if entry.level in [LogLevel.DECISION, LogLevel.TOOL, LogLevel.ERROR]:
                 icon = self._get_level_icon(entry.level)
                 lines.append(f"  {icon} Step {entry.step}: {entry.message}")
-        
+
         # Show errors if any
         errors = [e for e in log.entries if e.level == LogLevel.ERROR]
         if errors:
             lines.extend(["", "Errors:"])
             for error in errors:
                 lines.append(f"  ❌ Step {error.step}: {error.message}")
-        
+
         return "\n".join(lines)
-    
+
     def _format_detailed(self, log: WorkLog) -> str:
         """Format work log with all details.
-        
+
         Args:
             log: The work log to format
-            
+
         Returns:
             Detailed string
         """
         lines = [
-            f"Detailed Work Log",
+            "Detailed Work Log",
             f"{'=' * 50}",
             f"Session: {log.session_id}",
             f"Query: {log.query}",
@@ -654,40 +656,40 @@ the current active log.
             "Steps:",
             f"{'-' * 50}"
         ]
-        
+
         for entry in log.entries:
             icon = self._get_level_icon(entry.level)
             lines.append(f"\n{icon} Step {entry.step} [{entry.level.value.upper()}]")
             lines.append(f"   Time: {entry.timestamp.strftime('%H:%M:%S')}")
             lines.append(f"   Category: {entry.category}")
             lines.append(f"   Message: {entry.message}")
-            
+
             if entry.confidence:
                 lines.append(f"   Confidence: {entry.confidence:.0%}")
             if entry.duration_ms:
                 lines.append(f"   Duration: {entry.duration_ms}ms")
             if entry.tool_name:
                 lines.append(f"   Tool: {entry.tool_name} ({entry.tool_status})")
-        
+
         return "\n".join(lines)
-    
+
     def _format_debug(self, log: WorkLog) -> str:
         """Format work log as JSON for debugging.
-        
+
         Args:
             log: The work log to format
-            
+
         Returns:
             JSON string
         """
         return log.to_json(indent=2)
-    
+
     def _get_level_icon(self, level: LogLevel) -> str:
         """Get emoji icon for log level.
-        
+
         Args:
             level: The log level
-            
+
         Returns:
             Emoji string
         """
@@ -702,28 +704,28 @@ the current active log.
             LogLevel.TOOL: "🔧"
         }
         return icons.get(level, "•")
-    
+
     def _format_duration(self, log: WorkLog) -> str:
         """Format duration nicely.
-        
+
         Args:
             log: The work log
-            
+
         Returns:
             Human-readable duration string
         """
         if not log.end_time:
             return "In progress"
-        
+
         duration = (log.end_time - log.start_time).total_seconds()
         if duration < 60:
             return f"{duration:.1f}s"
         else:
             return f"{duration/60:.1f}m"
-    
+
     def cleanup_old_logs(self, days: int = 30):
         """Delete work logs older than specified days.
-        
+
         Args:
             days: Number of days to keep
         """
@@ -731,21 +733,21 @@ the current active log.
             with sqlite3.connect(self.db_path) as conn:
                 # Delete old entries first (foreign key constraint)
                 conn.execute("""
-                    DELETE FROM work_log_entries 
+                    DELETE FROM work_log_entries
                     WHERE work_log_id IN (
-                        SELECT session_id FROM work_logs 
+                        SELECT session_id FROM work_logs
                         WHERE start_time < datetime('now', '-{} days')
                     )
                 """.format(days))
-                
+
                 # Delete old logs
                 conn.execute("""
-                    DELETE FROM work_logs 
+                    DELETE FROM work_logs
                     WHERE start_time < datetime('now', '-{} days')
                 """.format(days))
         except Exception as e:
             print(f"Warning: Failed to cleanup old logs: {e}")
-    
+
     def queue_insight(self, category: InsightCategory, title: str,
                      description: str, confidence: float,
                      scope: ApplicabilityScope = ApplicabilityScope.GENERAL,
@@ -754,10 +756,10 @@ the current active log.
                      evidence: Optional[dict] = None,
                      context: Optional[dict] = None) -> Optional[LearningPackage]:
         """Queue a high-confidence insight for distribution to other bots.
-        
+
         Only insights with confidence >= 0.85 will be queued. This method
         integrates with the Learning Exchange system.
-        
+
         Args:
             category: What type of insight? (USER_PREFERENCE, TOOL_PATTERN, etc.)
             title: Short summary
@@ -768,14 +770,14 @@ the current active log.
             applicable_bots: Specific bots (for TEAM/BOT_SPECIFIC scope)
             evidence: Supporting data (examples, metrics, etc.)
             context: Additional context (versions, environment, etc.)
-            
+
         Returns:
-            The LearningPackage if queued, None if confidence too low or 
+            The LearningPackage if queued, None if confidence too low or
             learning exchange not initialized
         """
         if not self.learning_exchange:
             return None
-        
+
         return self.learning_exchange.queue_insight(
             category=category,
             title=title,
@@ -787,35 +789,35 @@ the current active log.
             evidence=evidence,
             context=context
         )
-    
+
     def auto_queue_insights_from_log(self, log: Optional[WorkLog] = None) -> List[LearningPackage]:
         """Automatically queue shareable insights from a work log.
-        
-        Scans the log for entries marked as shareable_insight with 
+
+        Scans the log for entries marked as shareable_insight with
         confidence >= 0.85 and queues them for distribution.
-        
+
         Args:
             log: WorkLog to scan (defaults to current log)
-            
+
         Returns:
             List of LearningPackages that were queued
         """
         if not self.learning_exchange:
             return []
-        
+
         if log is None:
             log = self.current_log
-        
+
         if log is None:
             return []
-        
+
         queued = []
         for entry in log.entries:
             # Look for entries marked as shareable with high confidence
-            if (entry.shareable_insight and 
-                entry.confidence and 
+            if (entry.shareable_insight and
+                entry.confidence and
                 entry.confidence >= 0.85):
-                
+
                 # Create insight from entry data
                 package = self.learning_exchange.queue_insight(
                     category=InsightCategory(entry.insight_category or "user_preference"),
@@ -830,43 +832,43 @@ the current active log.
                         "bot_name": entry.bot_name,
                     }
                 )
-                
+
                 if package:
                     queued.append(package)
-        
+
         return queued
-    
+
     def get_learning_exchange(self) -> Optional[LearningExchange]:
         """Get the current Learning Exchange instance.
-        
+
         Returns:
             The LearningExchange, or None if not initialized
         """
         return self.learning_exchange
-    
+
     def get_pending_insights(self) -> List[LearningPackage]:
         """Get all pending insights in the queue.
-        
+
         Returns:
             List of queued LearningPackages
         """
         if not self.learning_exchange:
             return []
-        
+
         return self.learning_exchange.queue.get_all_pending()
-    
+
     def distribute_insights(self) -> dict:
         """Distribute all queued insights to registered callbacks.
-        
+
         This should be called at the end of a session or periodically
         to push insights to other bot instances.
-        
+
         Returns:
             Distribution statistics dict
         """
         if not self.learning_exchange:
             return {"total_queued": 0, "total_distributed": 0}
-        
+
         return self.learning_exchange.distribute_insights()
 
 
@@ -876,7 +878,7 @@ _work_log_manager: Optional[WorkLogManager] = None
 
 def get_work_log_manager() -> WorkLogManager:
     """Get or create the global work log manager instance.
-    
+
     Returns:
         The global WorkLogManager instance
     """

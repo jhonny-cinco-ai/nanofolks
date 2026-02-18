@@ -5,28 +5,28 @@ from typing import Any
 
 from loguru import logger
 
+from nanofolks.bots.room_manager import get_room_manager
 from nanofolks.bus.events import InboundMessage, OutboundMessage
 from nanofolks.bus.queue import MessageBus
-from nanofolks.bots.room_manager import get_room_manager
 
 
 class BaseChannel(ABC):
     """
     Abstract base class for chat channel implementations.
-    
+
     Each channel (Telegram, Discord, etc.) should implement this interface
     to integrate with the nanofolks message bus.
-    
+
     Supports room-centric architecture where channels join rooms
     for cross-platform conversation continuity.
     """
-    
+
     name: str = "base"
-    
+
     def __init__(self, config: Any, bus: MessageBus):
         """
         Initialize the channel.
-        
+
         Args:
             config: Channel-specific configuration.
             bus: The message bus for communication.
@@ -34,50 +34,50 @@ class BaseChannel(ABC):
         self.config = config
         self.bus = bus
         self._running = False
-    
+
     @abstractmethod
     async def start(self) -> None:
         """
         Start the channel and begin listening for messages.
-        
+
         This should be a long-running async task that:
         1. Connects to the chat platform
         2. Listens for incoming messages
         3. Forwards messages to the bus via _handle_message()
         """
         pass
-    
+
     @abstractmethod
     async def stop(self) -> None:
         """Stop the channel and clean up resources."""
         pass
-    
+
     @abstractmethod
     async def send(self, msg: OutboundMessage) -> None:
         """
         Send a message through this channel.
-        
+
         Args:
             msg: The message to send.
         """
         pass
-    
+
     def is_allowed(self, sender_id: str) -> bool:
         """
         Check if a sender is allowed to use this bot.
-        
+
         Args:
             sender_id: The sender's identifier.
-        
+
         Returns:
             True if allowed, False otherwise.
         """
         allow_list = getattr(self.config, "allow_from", [])
-        
+
         # If no allow list, allow everyone
         if not allow_list:
             return True
-        
+
         sender_str = str(sender_id)
         if sender_str in allow_list:
             return True
@@ -86,7 +86,7 @@ class BaseChannel(ABC):
                 if part and part in allow_list:
                     return True
         return False
-    
+
     async def _handle_message(
         self,
         sender_id: str,
@@ -97,10 +97,10 @@ class BaseChannel(ABC):
     ) -> None:
         """
         Handle an incoming message from the chat platform.
-        
+
         This method checks permissions, performs room-centric routing,
         and forwards to the bus.
-        
+
         Args:
             sender_id: The sender's identifier.
             chat_id: The chat/channel identifier.
@@ -114,7 +114,7 @@ class BaseChannel(ABC):
                 f"Add them to allowFrom list in config to grant access."
             )
             return
-        
+
         # Create message
         msg = InboundMessage(
             channel=self.name,
@@ -124,12 +124,12 @@ class BaseChannel(ABC):
             media=media or [],
             metadata=metadata or {}
         )
-        
+
         # Room-centric routing: look up which room this channel/chat belongs to
         try:
             room_manager = get_room_manager()
             room_id = room_manager.get_room_for_channel(self.name, chat_id)
-            
+
             if room_id:
                 msg.set_room(room_id)
                 logger.debug(f"Routed {self.name}:{chat_id} to room:{room_id}")
@@ -140,9 +140,9 @@ class BaseChannel(ABC):
                 logger.info(f"Auto-joined {self.name}:{chat_id} to room:general")
         except Exception as e:
             logger.warning(f"Room routing failed: {e}, using channel-based routing")
-        
+
         await self.bus.publish_inbound(msg)
-    
+
     @property
     def is_running(self) -> bool:
         """Check if the channel is running."""

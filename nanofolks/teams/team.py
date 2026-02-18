@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 
 class TeamName(Enum):
@@ -29,7 +29,7 @@ class BotTeamProfile:
 
     def get_default_display_name(self) -> str:
         """Get the default display name for this bot.
-        
+
         Returns:
             bot_name if set, otherwise falls back to bot_title
         """

@@ -7,13 +7,12 @@ from typing import Any, Callable, Dict, Optional
 from loguru import logger
 
 from nanofolks.models.role_card import RoleCard
-from nanofolks.models.room import Room
-from nanofolks.teams import TeamManager, get_team
+from nanofolks.teams import TeamManager
 
 
 class SpecialistBot(ABC):
     """Abstract base class for all bot implementations with autonomous heartbeat.
-    
+
     Each bot runs its own independent heartbeat with:
     - Role-specific periodic checks
     - Domain-optimized intervals
@@ -31,7 +30,7 @@ class SpecialistBot(ABC):
         workspace_path: Optional["Path"] = None
     ):
         """Initialize a bot with a role card.
-        
+
         Args:
             role_card: Role card defining bot's personality and constraints
             bus: InterBotBus for communication with coordinator
@@ -54,30 +53,30 @@ class SpecialistBot(ABC):
             "created_at": datetime.now().isoformat(),
             "heartbeat_history": [],  # History of heartbeat executions
         }
-        
+
         # Apply theme if available
         if theme_manager and theme_manager.current_theme:
             self._apply_theme_to_role_card()
-        
+
         # Apply custom name if provided (highest priority)
         if custom_name:
             self.set_display_name(custom_name)
-        
+
         # Heartbeat service (initialized lazily)
         self._heartbeat = None
         self._heartbeat_config = None
-    
+
     @property
     def workspace(self) -> Optional["Path"]:
         """Get workspace path."""
         return self._workspace_path
-    
+
     @workspace.setter
     def workspace(self, path: "Path"):
         """Set workspace path."""
         self._workspace_path = path
         self._dm_room_manager = None  # Reset DM manager
-    
+
     @property
     def dm_room_manager(self):
         """Get or create the DM room manager."""
@@ -85,21 +84,21 @@ class SpecialistBot(ABC):
             from nanofolks.bots.dm_room_manager import BotDMRoomManager
             self._dm_room_manager = BotDMRoomManager(self._workspace_path)
         return self._dm_room_manager
-    
+
     def _create_tool_registry(self, workspace: "Path | None" = None):
         """Create a tool registry for this bot based on permissions.
-        
+
         Args:
             workspace: Path to workspace
-            
+
         Returns:
             ToolRegistry configured for this bot, or None if no workspace
         """
         if not workspace:
             return None
-        
+
         from nanofolks.agent.tools.factory import create_bot_registry
-        
+
         return create_bot_registry(
             workspace=workspace,
             bot_name=self.role_card.bot_name,
@@ -109,7 +108,7 @@ class SpecialistBot(ABC):
         """Apply current theme to role card display name and personality."""
         if not self._theme_manager or not self._theme_manager.current_theme:
             return
-        
+
         try:
             theming = self._theme_manager.get_bot_theming(self.role_card.bot_name)
             if theming:
@@ -120,15 +119,15 @@ class SpecialistBot(ABC):
                     logger.debug(
                         f"[{self.role_card.bot_name}] Applied theme display name: {title}"
                     )
-                
+
                 # Update greeting if theme provides one
                 if theming.get("greeting"):
                     self.role_card.greeting = theming["greeting"]
-                
+
                 # Update voice if theme provides one
                 if theming.get("voice"):
                     self.role_card.voice = theming["voice"]
-                    
+
         except Exception as e:
             logger.warning(f"[{self.role_card.bot_name}] Failed to apply theme: {e}")
 
@@ -150,7 +149,7 @@ class SpecialistBot(ABC):
     @property
     def display_name(self) -> str:
         """Get bot display name (user-customizable).
-        
+
         Returns:
             Display name (falls back to title if not set)
         """
@@ -158,7 +157,7 @@ class SpecialistBot(ABC):
 
     def set_display_name(self, name: str) -> None:
         """Set a custom display name for this bot.
-        
+
         Args:
             name: Custom display name (e.g., "Blackbeard", "Slash", "Neo")
         """
@@ -178,11 +177,11 @@ class SpecialistBot(ABC):
 
     def can_perform_action(self, action: str, context: Optional[Dict] = None) -> tuple[bool, Optional[str]]:
         """Validate if bot can perform an action (check hard bans).
-        
+
         Args:
             action: Action description
             context: Additional context about the action (tool name, parameters, etc.)
-            
+
         Returns:
             Tuple of (is_allowed, error_message)
         """
@@ -190,10 +189,10 @@ class SpecialistBot(ABC):
 
     def get_greeting(self, workspace: Optional[Workspace] = None) -> str:
         """Get bot's greeting for a workspace.
-        
+
         Args:
             workspace: Workspace context (optional)
-            
+
         Returns:
             Greeting message
         """
@@ -201,7 +200,7 @@ class SpecialistBot(ABC):
 
     def record_learning(self, lesson: str, confidence: float = 0.7) -> None:
         """Record a private learning.
-        
+
         Args:
             lesson: What was learned
             confidence: How confident in this learning (0.0-1.0)
@@ -214,7 +213,7 @@ class SpecialistBot(ABC):
 
     def record_mistake(self, error: str, recovery: str, lesson: Optional[str] = None) -> None:
         """Record a mistake and how it was recovered.
-        
+
         Args:
             error: What went wrong
             recovery: How the error was fixed
@@ -227,12 +226,12 @@ class SpecialistBot(ABC):
         }
         if lesson:
             record["lesson"] = lesson
-        
+
         self.private_memory["mistakes"].append(record)
 
     def add_expertise(self, domain: str) -> None:
         """Add a domain to bot's expertise.
-        
+
         Args:
             domain: Domain name
         """
@@ -241,7 +240,7 @@ class SpecialistBot(ABC):
 
     def update_confidence(self, delta: float) -> None:
         """Update bot's confidence level.
-        
+
         Args:
             delta: Change in confidence (-1.0 to 1.0)
         """
@@ -251,7 +250,7 @@ class SpecialistBot(ABC):
 
     def get_summary(self) -> Dict[str, Any]:
         """Get a summary of bot's status and learnings.
-        
+
         Returns:
             Summary dictionary
         """
@@ -286,7 +285,7 @@ class SpecialistBot(ABC):
         tool_registry=None,
     ) -> None:
         """Initialize bot's autonomous heartbeat.
-        
+
         Args:
             config: Heartbeat configuration (uses default if None)
             workspace: Path to bot's workspace (for HEARTBEAT.md)
@@ -303,23 +302,23 @@ class SpecialistBot(ABC):
             # Load default config for this bot type
             from nanofolks.bots.heartbeat_configs import get_bot_heartbeat_config
             config = get_bot_heartbeat_config(self.role_card.bot_name)
-        
+
         self._heartbeat_config = config
-        
+
         # Import here to avoid circular imports
         from nanofolks.heartbeat.bot_heartbeat import BotHeartbeatService
-        
+
         # Wrap callbacks to include bot context
         def tick_callback(tick):
             self._on_heartbeat_tick_complete(tick)
             if on_tick_complete:
                 on_tick_complete(tick)
-        
+
         def check_callback(result):
             self._on_check_complete(result)
             if on_check_complete:
                 on_check_complete(result)
-        
+
         self._heartbeat = BotHeartbeatService(
             bot_instance=self,
             config=config,
@@ -333,7 +332,7 @@ class SpecialistBot(ABC):
             on_check_complete=check_callback,
             tool_registry=tool_registry,
         )
-        
+
         logger.info(
             f"[{self.role_card.bot_name}] Heartbeat initialized: "
             f"{config.interval_s}s interval, {len(config.checks)} checks"
@@ -344,7 +343,7 @@ class SpecialistBot(ABC):
         if self._heartbeat is None:
             # Auto-initialize with defaults
             self.initialize_heartbeat()
-        
+
         if self._heartbeat:
             await self._heartbeat.start()
 
@@ -366,23 +365,23 @@ class SpecialistBot(ABC):
 
     async def trigger_heartbeat_now(self, reason: str = "manual"):
         """Manually trigger a heartbeat tick.
-        
+
         Args:
             reason: Why heartbeat is being triggered
-            
+
         Returns:
             HeartbeatTick result
         """
         if self._heartbeat is None:
             self.initialize_heartbeat()
-        
+
         if self._heartbeat is not None:
             return await self._heartbeat.trigger_now(reason)
         return None
 
     def _on_heartbeat_tick_complete(self, tick) -> None:
         """Internal handler for tick completion.
-        
+
         Records to bot's private memory and logs learning.
         """
         # Record to private memory
@@ -393,14 +392,14 @@ class SpecialistBot(ABC):
             "success_rate": tick.get_success_rate(),
             "failed_checks": [r.check_name for r in tick.get_failed_checks()],
         }
-        
+
         self.private_memory["heartbeat_history"].append(tick_summary)
-        
+
         # Trim history if too long
         max_history = tick.config.retain_history_count if tick.config else 100
         if len(self.private_memory["heartbeat_history"]) > max_history:
             self.private_memory["heartbeat_history"] = self.private_memory["heartbeat_history"][-max_history:]
-        
+
         # Record learning
         success_rate = tick.get_success_rate()
         if success_rate >= 0.9:
@@ -437,19 +436,19 @@ class SpecialistBot(ABC):
         data: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Notify coordinator of heartbeat finding.
-        
+
         Args:
             message: Notification message
             priority: Priority level (low/normal/high/critical)
             data: Additional data to include
-            
+
         Returns:
             True if notification sent successfully
         """
         if self.bus is None:
             logger.warning(f"[{self.role_card.bot_name}] No bus available for notification")
             return False
-        
+
         try:
             # Create notification payload
             notification = {
@@ -462,14 +461,14 @@ class SpecialistBot(ABC):
                 "source": "heartbeat",
                 "timestamp": datetime.now().isoformat()
             }
-            
+
             # Send via bus if available
             if hasattr(self.bus, 'send_message'):
                 self.bus.send_message(notification)
-            
+
             logger.info(f"[{self.role_card.bot_name}] Notified coordinator: {message}")
             return True
-            
+
         except Exception as e:
             logger.error(f"[{self.role_card.bot_name}] Failed to notify coordinator: {e}")
             return False
@@ -481,12 +480,12 @@ class SpecialistBot(ABC):
         data: Optional[Dict[str, Any]] = None
     ) -> bool:
         """Escalate issue to coordinator for human attention.
-        
+
         Args:
             message: Escalation message
             priority: Priority level
             data: Supporting data
-            
+
         Returns:
             True if escalation sent successfully
         """
@@ -505,33 +504,33 @@ class SpecialistBot(ABC):
         timeout_seconds: int = 60
     ) -> tuple[bool, Optional[str]]:
         """Send a direct message to another specialist bot.
-        
+
         This enables bot-to-bot communication for simple queries without
         going through the Leader. Use this for:
         - Quick questions ("What's the coding standard for X?")
         - Information requests ("Do you have data on Y?")
         - Clarifications ("Can you verify this fact?")
-        
+
         For complex coordination or task delegation, use notify_coordinator()
         or ask Leader to invoke the bot.
-        
+
         Messages are logged to DM rooms for transparency - users can peek
         into bot-to-bot conversations.
-        
+
         Args:
             recipient_bot: Name of target bot (e.g., "coder", "researcher")
             message: Message content
             context: Additional context data
             expect_reply: Whether to wait for a response
             timeout_seconds: How long to wait for reply (if expect_reply=True)
-            
+
         Returns:
             Tuple of (success, reply_message or None)
             If expect_reply=False: (True, None) on success, (False, None) on failure
             If expect_reply=True: (True, reply) on success, (False, error) on failure/timeout
         """
         from nanofolks.models.bot_dm_room import BotMessageType
-        
+
         # Log to DM room for transparency (before sending)
         if self.dm_room_manager:
             msg_type = BotMessageType.QUERY if expect_reply else BotMessageType.INFO
@@ -542,15 +541,16 @@ class SpecialistBot(ABC):
                 message_type=msg_type,
                 context=context
             )
-        
+
         if self.bus is None:
             logger.warning(f"[{self.role_card.bot_name}] No bus available for messaging")
             return False, "No message bus available"
-        
+
         try:
-            from nanofolks.coordinator.models import BotMessage, MessageType
             import uuid
-            
+
+            from nanofolks.coordinator.models import BotMessage, MessageType
+
             # Create message
             bot_message = BotMessage(
                 id=str(uuid.uuid4()),
@@ -561,34 +561,34 @@ class SpecialistBot(ABC):
                 context=context or {},
                 conversation_id=context.get("conversation_id") if context else None
             )
-            
+
             # Send message
             message_id = self.bus.send_message(bot_message)
-            
+
             logger.info(
                 f"[{self.role_card.bot_name}] Sent message to @{recipient_bot}: "
                 f"{message[:50]}..."
             )
-            
+
             if not expect_reply:
                 return True, None
-            
+
             # Wait for reply
             import asyncio
             start_time = asyncio.get_event_loop().time()
-            
+
             while (asyncio.get_event_loop().time() - start_time) < timeout_seconds:
                 # Check inbox for reply
                 inbox = self.bus.get_inbox(self.role_card.bot_name)
-                
+
                 # Look for reply to our message
                 for msg in reversed(inbox):
-                    if (msg.sender_id == recipient_bot and 
+                    if (msg.sender_id == recipient_bot and
                         msg.context.get("reply_to") == message_id):
                         logger.info(
                             f"[{self.role_card.bot_name}] Received reply from @{recipient_bot}"
                         )
-                        
+
                         # Log reply to DM room for transparency
                         if self.dm_room_manager:
                             from nanofolks.models.bot_dm_room import BotMessageType
@@ -599,17 +599,17 @@ class SpecialistBot(ABC):
                                 message_type=BotMessageType.RESPONSE,
                                 context={"reply_to": message_id}
                             )
-                        
+
                         return True, msg.content
-                
+
                 await asyncio.sleep(0.5)  # Check every 500ms
-            
+
             # Timeout
             logger.warning(
                 f"[{self.role_card.bot_name}] Timeout waiting for reply from @{recipient_bot}"
             )
             return False, f"Timeout waiting for reply from @{recipient_bot}"
-            
+
         except Exception as e:
             logger.error(f"[{self.role_card.bot_name}] Failed to send message to @{recipient_bot}: {e}")
             return False, str(e)
@@ -622,19 +622,19 @@ class SpecialistBot(ABC):
         timeout_seconds: int = 60
     ) -> tuple[bool, Optional[str]]:
         """Ask another bot a question and wait for answer.
-        
+
         Convenience wrapper around send_message_to_bot() that always
         expects a reply.
-        
+
         Args:
             recipient_bot: Name of bot to ask (e.g., "coder", "researcher")
             question: The question to ask
             context: Additional context
             timeout_seconds: How long to wait for answer
-            
+
         Returns:
             Tuple of (success, answer or error_message)
-            
+
         Example:
             success, answer = await social_bot.ask_bot(
                 "coder",
@@ -654,13 +654,13 @@ class SpecialistBot(ABC):
     @abstractmethod
     async def process_message(self, message: str, workspace: Workspace) -> str:
         """Process a message and generate response.
-        
+
         This is the main interaction method for the bot.
-        
+
         Args:
             message: User or system message
             workspace: Workspace context
-            
+
         Returns:
             Bot's response message
         """
@@ -669,13 +669,13 @@ class SpecialistBot(ABC):
     @abstractmethod
     async def execute_task(self, task: str, workspace: Workspace) -> Dict[str, Any]:
         """Execute a specific task.
-        
+
         This is for structured task execution (not conversational).
-        
+
         Args:
             task: Task description
             workspace: Workspace context
-            
+
         Returns:
             Task result dictionary
         """

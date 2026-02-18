@@ -8,7 +8,8 @@ Usage:
 """
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict
+
 from loguru import logger
 
 from nanofolks.heartbeat.check_registry import register_check
@@ -23,14 +24,14 @@ from nanofolks.heartbeat.check_registry import register_check
 )
 async def check_code_quality_scores(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Check code quality metrics across monitored repositories.
-    
+
     Analyzes linting scores, test coverage, complexity metrics, and
     documentation coverage. Flags repositories with declining quality.
-    
+
     Args:
         bot: The AuditorBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with quality analysis results
     """
@@ -39,41 +40,41 @@ async def check_code_quality_scores(bot, config: Dict[str, Any]) -> Dict[str, An
         repos = config.get("repositories", [])
         if hasattr(bot, 'get_monitored_repositories'):
             repos = await bot.get_monitored_repositories()
-        
+
         if not repos:
             return {
                 "success": True,
                 "message": "No repositories configured for quality monitoring",
                 "repositories_checked": 0
             }
-        
+
         quality_issues = []
-        
+
         for repo in repos:
             try:
                 if hasattr(bot, 'analyze_code_quality'):
                     quality = await bot.analyze_code_quality(repo)
                 else:
                     continue
-                
+
                 # Check for declining trends
                 thresholds = config.get("thresholds", {
                     "coverage": 70,
                     "lint_score": 80,
                     "complexity": 15
                 })
-                
+
                 issues = []
-                
+
                 if getattr(quality, 'test_coverage', 100) < thresholds["coverage"]:
                     issues.append(f"Test coverage below {thresholds['coverage']}%")
-                
+
                 if getattr(quality, 'lint_score', 100) < thresholds["lint_score"]:
                     issues.append(f"Lint score below {thresholds['lint_score']}")
-                
+
                 if getattr(quality, 'cyclomatic_complexity', 0) > thresholds["complexity"]:
                     issues.append(f"Complexity above {thresholds['complexity']}")
-                
+
                 if issues:
                     quality_issues.append({
                         "repository": repo,
@@ -84,10 +85,10 @@ async def check_code_quality_scores(bot, config: Dict[str, Any]) -> Dict[str, An
                             "complexity": getattr(quality, 'cyclomatic_complexity', None)
                         }
                     })
-                
+
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] Error analyzing {repo}: {e}")
-        
+
         # Notify if quality issues found
         if quality_issues:
             if hasattr(bot, 'notify_coordinator'):
@@ -105,7 +106,7 @@ async def check_code_quality_scores(bot, config: Dict[str, Any]) -> Dict[str, An
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len(quality_issues) == 0,
             "repositories_checked": len(repos),
@@ -113,7 +114,7 @@ async def check_code_quality_scores(bot, config: Dict[str, Any]) -> Dict[str, An
             "action_taken": action,
             "issues": quality_issues if quality_issues else None
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in check_code_quality_scores: {e}")
         return {
@@ -132,20 +133,20 @@ async def check_code_quality_scores(bot, config: Dict[str, Any]) -> Dict[str, An
 )
 async def audit_compliance_status(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Audit compliance with security, privacy, and regulatory policies.
-    
+
     Scans for hardcoded secrets, PII exposure, license compliance issues,
     and security policy violations.
-    
+
     Args:
         bot: The AuditorBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with compliance audit results
     """
     try:
         violations = []
-        
+
         # Check for security violations
         if hasattr(bot, 'scan_security_compliance'):
             try:
@@ -155,7 +156,7 @@ async def audit_compliance_status(bot, config: Dict[str, Any]) -> Dict[str, Any]
                 ])
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] Security scan error: {e}")
-        
+
         # Check for PII/ Privacy compliance
         if hasattr(bot, 'scan_privacy_compliance'):
             try:
@@ -165,7 +166,7 @@ async def audit_compliance_status(bot, config: Dict[str, Any]) -> Dict[str, Any]
                 ])
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] Privacy scan error: {e}")
-        
+
         # Check license compliance
         if hasattr(bot, 'check_license_compliance'):
             try:
@@ -175,11 +176,11 @@ async def audit_compliance_status(bot, config: Dict[str, Any]) -> Dict[str, Any]
                 ])
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] License check error: {e}")
-        
+
         # Categorize violations
         critical = [v for v in violations if v.get('severity') == 'critical']
         high = [v for v in violations if v.get('severity') == 'high']
-        
+
         # Escalate critical violations
         if critical:
             if hasattr(bot, 'escalate_to_coordinator'):
@@ -214,7 +215,7 @@ async def audit_compliance_status(bot, config: Dict[str, Any]) -> Dict[str, Any]
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len(critical) == 0,
             "violations_found": len(violations),
@@ -224,7 +225,7 @@ async def audit_compliance_status(bot, config: Dict[str, Any]) -> Dict[str, Any]
             "action_taken": action,
             "violations": violations[:20] if violations else None
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in audit_compliance_status: {e}")
         return {
@@ -243,14 +244,14 @@ async def audit_compliance_status(bot, config: Dict[str, Any]) -> Dict[str, Any]
 )
 async def review_audit_trail_integrity(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Review audit trails for completeness and detect suspicious gaps.
-    
+
     Checks that all required audit events are logged, timestamps are
     sequential, and no unauthorized modifications occurred.
-    
+
     Args:
         bot: The AuditorBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with audit trail integrity results
     """
@@ -258,7 +259,7 @@ async def review_audit_trail_integrity(bot, config: Dict[str, Any]) -> Dict[str,
         # Get audit check window
         lookback_hours = config.get("lookback_hours", 24)
         since = datetime.now() - timedelta(hours=lookback_hours)
-        
+
         if hasattr(bot, 'review_audit_trail'):
             audit_result = await bot.review_audit_trail(since=since)
         else:
@@ -267,13 +268,13 @@ async def review_audit_trail_integrity(bot, config: Dict[str, Any]) -> Dict[str,
                 "message": "Audit trail review not available",
                 "gaps_found": 0
             }
-        
+
         gaps = getattr(audit_result, 'gaps', [])
         anomalies = getattr(audit_result, 'anomalies', [])
-        
+
         # Analyze gaps
         critical_gaps = [g for g in gaps if g.get('severity') == 'critical']
-        
+
         if critical_gaps or len(anomalies) > 5:
             if hasattr(bot, 'escalate_to_coordinator'):
                 try:
@@ -307,7 +308,7 @@ async def review_audit_trail_integrity(bot, config: Dict[str, Any]) -> Dict[str,
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len(critical_gaps) == 0 and len(anomalies) <= 5,
             "events_reviewed": getattr(audit_result, 'events_reviewed', 0),
@@ -316,7 +317,7 @@ async def review_audit_trail_integrity(bot, config: Dict[str, Any]) -> Dict[str,
             "action_taken": action,
             "integrity_score": getattr(audit_result, 'integrity_score', 100)
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in review_audit_trail_integrity: {e}")
         return {
@@ -335,30 +336,30 @@ async def review_audit_trail_integrity(bot, config: Dict[str, Any]) -> Dict[str,
 )
 async def check_pending_reviews(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Check for pull requests and reviews requiring attention.
-    
+
     Monitors review queues for PRs that need auditor review or have
     been waiting too long for quality gate approval.
-    
+
     Args:
         bot: The AuditorBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with pending review status
     """
     try:
         max_wait_hours = config.get("max_wait_hours", 24)
-        
+
         if hasattr(bot, 'get_pending_reviews'):
             pending = await bot.get_pending_reviews()
         else:
             pending = []
-        
+
         # Categorize by urgency
         now = datetime.now()
         stale_reviews = []
         urgent_reviews = []
-        
+
         for review in pending:
             created = getattr(review, 'created_at', now)
             if isinstance(created, str):
@@ -366,9 +367,9 @@ async def check_pending_reviews(bot, config: Dict[str, Any]) -> Dict[str, Any]:
                     created = datetime.fromisoformat(created.replace('Z', '+00:00'))
                 except:
                     created = now
-            
+
             hours_waiting = (now - created).total_seconds() / 3600
-            
+
             review_data = {
                 "id": getattr(review, 'id', 'unknown'),
                 "title": getattr(review, 'title', 'Untitled'),
@@ -376,12 +377,12 @@ async def check_pending_reviews(bot, config: Dict[str, Any]) -> Dict[str, Any]:
                 "repository": getattr(review, 'repository', 'unknown'),
                 "hours_waiting": round(hours_waiting, 1)
             }
-            
+
             if hours_waiting > max_wait_hours * 2:
                 stale_reviews.append(review_data)
             elif getattr(review, 'requires_qa', False) or hours_waiting > max_wait_hours:
                 urgent_reviews.append(review_data)
-        
+
         # Notify if items need attention
         if stale_reviews:
             if hasattr(bot, 'escalate_to_coordinator'):
@@ -412,7 +413,7 @@ async def check_pending_reviews(bot, config: Dict[str, Any]) -> Dict[str, Any]:
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": True,
             "total_pending": len(pending),
@@ -421,7 +422,7 @@ async def check_pending_reviews(bot, config: Dict[str, Any]) -> Dict[str, Any]:
             "normal": len(pending) - len(stale_reviews) - len(urgent_reviews),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in check_pending_reviews: {e}")
         return {
@@ -440,14 +441,14 @@ async def check_pending_reviews(bot, config: Dict[str, Any]) -> Dict[str, Any]:
 )
 async def verify_research_outputs(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Verify research outputs from ResearcherBot for accuracy and completeness.
-    
+
     Checks that research includes verifiable sources, flags unverified claims,
     verifies citation completeness, and checks for conflicting information.
-    
+
     Args:
         bot: The AuditorBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with research verification results
     """
@@ -461,44 +462,44 @@ async def verify_research_outputs(bot, config: Dict[str, Any]) -> Dict[str, Any]
                 "message": "No research audit interface available",
                 "research_audited": 0
             }
-        
+
         if not pending_research:
             return {
                 "success": True,
                 "message": "No research outputs pending audit",
                 "research_audited": 0
             }
-        
+
         verification_results = []
         unverified_claims = []
         missing_sources = []
-        
+
         for research_item in pending_research:
             try:
                 # Check for source verification
                 has_sources = getattr(research_item, 'sources', None)
                 claims = getattr(research_item, 'claims', [])
                 verified_claims = getattr(research_item, 'verified_claims', [])
-                
+
                 item_issues = []
-                
+
                 # Check for unverified claims
                 if len(claims) > len(verified_claims):
                     unverified = [c for c in claims if c not in verified_claims]
                     item_issues.append(f"{len(unverified)} unverified claims")
                     unverified_claims.extend(unverified[:5])  # Track first 5
-                
+
                 # Check for missing sources
                 if not has_sources or len(has_sources) == 0:
                     item_issues.append("No sources provided")
                     missing_sources.append(getattr(research_item, 'id', 'unknown'))
-                
+
                 # Check source quality
                 if has_sources:
                     outdated_sources = [s for s in has_sources if getattr(s, 'is_outdated', False)]
                     if outdated_sources:
                         item_issues.append(f"{len(outdated_sources)} outdated sources not flagged")
-                
+
                 if item_issues:
                     verification_results.append({
                         "research_id": getattr(research_item, 'id', 'unknown'),
@@ -506,14 +507,14 @@ async def verify_research_outputs(bot, config: Dict[str, Any]) -> Dict[str, Any]
                         "issues": item_issues,
                         "severity": "high" if "No sources" in str(item_issues) else "medium"
                     })
-                
+
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] Error verifying research item: {e}")
-        
+
         # Report findings
         if verification_results:
             high_severity = [r for r in verification_results if r.get('severity') == 'high']
-            
+
             if high_severity and hasattr(bot, 'escalate_to_coordinator'):
                 try:
                     await bot.escalate_to_coordinator(
@@ -545,7 +546,7 @@ async def verify_research_outputs(bot, config: Dict[str, Any]) -> Dict[str, Any]
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len([r for r in verification_results if r.get('severity') == 'high']) == 0,
             "research_audited": len(pending_research),
@@ -555,7 +556,7 @@ async def verify_research_outputs(bot, config: Dict[str, Any]) -> Dict[str, Any]
             "missing_sources": len(missing_sources),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in verify_research_outputs: {e}")
         return {
@@ -574,14 +575,14 @@ async def verify_research_outputs(bot, config: Dict[str, Any]) -> Dict[str, Any]
 )
 async def check_creative_compliance(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Check creative outputs from CreativeBot for brand compliance.
-    
+
     Verifies that creative assets follow brand guidelines, are complete,
     don't contain copyrighted material, and are ready for handoff.
-    
+
     Args:
         bot: The AuditorBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with creative compliance results
     """
@@ -595,23 +596,23 @@ async def check_creative_compliance(bot, config: Dict[str, Any]) -> Dict[str, An
                 "message": "No creative audit interface available",
                 "assets_audited": 0
             }
-        
+
         if not pending_creative:
             return {
                 "success": True,
                 "message": "No creative assets pending audit",
                 "assets_audited": 0
             }
-        
+
         compliance_issues = []
         brand_violations = []
         copyright_risks = []
         incomplete_assets = []
-        
+
         for asset in pending_creative:
             try:
                 asset_issues = []
-                
+
                 # Check brand compliance
                 brand_check = getattr(asset, 'brand_compliance_check', None)
                 if brand_check and not getattr(brand_check, 'compliant', True):
@@ -621,13 +622,13 @@ async def check_creative_compliance(bot, config: Dict[str, Any]) -> Dict[str, An
                         "asset_id": getattr(asset, 'id', 'unknown'),
                         "violations": violations[:3]
                     })
-                
+
                 # Check for copyright/licensed material flags
                 if getattr(asset, 'uses_external_media', False):
                     if not getattr(asset, 'license_verified', False):
                         asset_issues.append("External media without verified license")
                         copyright_risks.append(getattr(asset, 'id', 'unknown'))
-                
+
                 # Check completeness
                 required_components = getattr(asset, 'required_components', [])
                 present_components = getattr(asset, 'present_components', [])
@@ -638,12 +639,12 @@ async def check_creative_compliance(bot, config: Dict[str, Any]) -> Dict[str, An
                         "asset_id": getattr(asset, 'id', 'unknown'),
                         "missing": missing
                     })
-                
+
                 # Check for internal paths/references
                 content = getattr(asset, 'content', '') or getattr(asset, 'description', '')
                 if content and ('/tmp/' in content or '/var/' in content or 'internal:' in content):
                     asset_issues.append("Contains internal references")
-                
+
                 if asset_issues:
                     compliance_issues.append({
                         "asset_id": getattr(asset, 'id', 'unknown'),
@@ -652,14 +653,14 @@ async def check_creative_compliance(bot, config: Dict[str, Any]) -> Dict[str, An
                         "issues": asset_issues,
                         "severity": "high" if "copyright" in str(asset_issues).lower() else "medium"
                     })
-                
+
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] Error checking creative asset: {e}")
-        
+
         # Report findings
         if compliance_issues:
             high_severity = [i for i in compliance_issues if i.get('severity') == 'high']
-            
+
             if high_severity and hasattr(bot, 'escalate_to_coordinator'):
                 try:
                     await bot.escalate_to_coordinator(
@@ -694,7 +695,7 @@ async def check_creative_compliance(bot, config: Dict[str, Any]) -> Dict[str, An
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len([i for i in compliance_issues if i.get('severity') == 'high']) == 0,
             "assets_audited": len(pending_creative),
@@ -705,7 +706,7 @@ async def check_creative_compliance(bot, config: Dict[str, Any]) -> Dict[str, An
             "incomplete_assets": len(incomplete_assets),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in check_creative_compliance: {e}")
         return {
@@ -724,14 +725,14 @@ async def check_creative_compliance(bot, config: Dict[str, Any]) -> Dict[str, An
 )
 async def assess_social_content_risk(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Audit social media content from SocialBot before it goes live.
-    
+
     Checks for unverified claims, sensitive topics, brand alignment,
     potential PR risks, and ensures content meets approval criteria.
-    
+
     Args:
         bot: The AuditorBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with social content risk assessment results
     """
@@ -745,24 +746,24 @@ async def assess_social_content_risk(bot, config: Dict[str, Any]) -> Dict[str, A
                 "message": "No social audit interface available",
                 "content_audited": 0
             }
-        
+
         if not pending_content:
             return {
                 "success": True,
                 "message": "No social content pending audit",
                 "content_audited": 0
             }
-        
+
         risk_flags = []
         unverified_claims = []
         sensitive_topics = []
         pr_risks = []
-        
+
         for content in pending_content:
             try:
                 content_issues = []
                 severity = "low"
-                
+
                 # Check for unverified numeric claims
                 content_text = getattr(content, 'text', '') or getattr(content, 'content', '')
                 if content_text:
@@ -770,7 +771,7 @@ async def assess_social_content_risk(bot, config: Dict[str, Any]) -> Dict[str, A
                     import re
                     numeric_patterns = re.findall(r'\b\d+%?\b|\b\d+x\b', content_text)
                     verified_numbers = getattr(content, 'verified_numbers', [])
-                    
+
                     for num in numeric_patterns:
                         if num not in verified_numbers:
                             content_issues.append(f"Unverified numeric claim: {num}")
@@ -780,12 +781,12 @@ async def assess_social_content_risk(bot, config: Dict[str, Any]) -> Dict[str, A
                                 "context": content_text[max(0, content_text.find(num)-20):content_text.find(num)+len(num)+20]
                             })
                             severity = "high"
-                
+
                 # Check for sensitive topics
                 sensitive_keywords = ['controversial', 'political', 'religious', 'legal', 'lawsuit']
                 topic_tags = getattr(content, 'topic_tags', [])
                 content_lower = content_text.lower() if content_text else ''
-                
+
                 for keyword in sensitive_keywords:
                     if keyword in content_lower or keyword in [t.lower() for t in topic_tags]:
                         content_issues.append(f"Sensitive topic detected: {keyword}")
@@ -794,25 +795,25 @@ async def assess_social_content_risk(bot, config: Dict[str, Any]) -> Dict[str, A
                             "topic": keyword
                         })
                         severity = max(severity, "high")
-                
+
                 # Check brand alignment
                 brand_score = getattr(content, 'brand_alignment_score', 100)
                 if brand_score < 70:
                     content_issues.append(f"Low brand alignment score: {brand_score}")
                     severity = max(severity, "medium")
-                
+
                 # Check for negative sentiment
                 sentiment = getattr(content, 'sentiment_analysis', {})
                 if sentiment.get('negative', 0) > 0.5:
                     content_issues.append("High negative sentiment detected")
                     pr_risks.append(getattr(content, 'id', 'unknown'))
                     severity = max(severity, "medium")
-                
+
                 # Check approval status
                 if getattr(content, 'bypass_audit', False):
                     content_issues.append("Content flagged to bypass audit - requires manual review")
                     severity = "critical"
-                
+
                 if content_issues:
                     risk_flags.append({
                         "content_id": getattr(content, 'id', 'unknown'),
@@ -821,14 +822,14 @@ async def assess_social_content_risk(bot, config: Dict[str, Any]) -> Dict[str, A
                         "issues": content_issues,
                         "severity": severity
                     })
-                
+
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] Error assessing social content: {e}")
-        
+
         # Report findings
         if risk_flags:
             critical_high = [f for f in risk_flags if f.get('severity') in ['critical', 'high']]
-            
+
             if critical_high and hasattr(bot, 'escalate_to_coordinator'):
                 try:
                     await bot.escalate_to_coordinator(
@@ -863,7 +864,7 @@ async def assess_social_content_risk(bot, config: Dict[str, Any]) -> Dict[str, A
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len([f for f in risk_flags if f.get('severity') == 'critical']) == 0,
             "content_audited": len(pending_content),
@@ -874,7 +875,7 @@ async def assess_social_content_risk(bot, config: Dict[str, Any]) -> Dict[str, A
             "sensitive_topics": len(sensitive_topics),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in assess_social_content_risk: {e}")
         return {
@@ -893,14 +894,14 @@ async def assess_social_content_risk(bot, config: Dict[str, Any]) -> Dict[str, A
 )
 async def verify_cross_bot_handoffs(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Verify that handoffs between bots are complete and compliant.
-    
+
     Checks that deliverables are transferred correctly, context is preserved,
     definition-of-done criteria are met, and no information is lost in handoffs.
-    
+
     Args:
         bot: The AuditorBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with handoff verification results
     """
@@ -914,28 +915,28 @@ async def verify_cross_bot_handoffs(bot, config: Dict[str, Any]) -> Dict[str, An
                 "message": "No handoff tracking available",
                 "handoffs_checked": 0
             }
-        
+
         if not handoffs:
             return {
                 "success": True,
                 "message": "No recent handoffs to verify",
                 "handoffs_checked": 0
             }
-        
+
         handoff_issues = []
         incomplete_handoffs = []
         context_gaps = []
         dod_failures = []
-        
+
         for handoff in handoffs:
             try:
                 issues = []
-                
+
                 # Check deliverable completeness
                 expected_deliverables = getattr(handoff, 'expected_deliverables', [])
                 actual_deliverables = getattr(handoff, 'actual_deliverables', [])
                 missing = [d for d in expected_deliverables if d not in actual_deliverables]
-                
+
                 if missing:
                     issues.append(f"Missing deliverables: {', '.join(missing[:3])}")
                     incomplete_handoffs.append({
@@ -944,34 +945,34 @@ async def verify_cross_bot_handoffs(bot, config: Dict[str, Any]) -> Dict[str, An
                         "to_bot": getattr(handoff, 'to_bot', 'unknown'),
                         "missing": missing
                     })
-                
+
                 # Check context transfer
                 context_transferred = getattr(handoff, 'context_transferred', True)
                 if not context_transferred:
                     issues.append("Context not properly transferred")
                     context_gaps.append(getattr(handoff, 'id', 'unknown'))
-                
+
                 # Check Definition of Done
                 dod_criteria = getattr(handoff, 'definition_of_done', [])
                 dod_met = getattr(handoff, 'dod_met', [])
                 failed_criteria = [c for c in dod_criteria if c not in dod_met]
-                
+
                 if failed_criteria:
                     issues.append(f"Definition of Done not met: {len(failed_criteria)} criteria")
                     dod_failures.append({
                         "handoff_id": getattr(handoff, 'id', 'unknown'),
                         "failed_criteria": failed_criteria[:5]
                     })
-                
+
                 # Check for information loss
                 info_loss_flags = getattr(handoff, 'information_loss_flags', [])
                 if info_loss_flags:
                     issues.append(f"Potential information loss: {len(info_loss_flags)} flags")
-                
+
                 # Check approval status
                 if getattr(handoff, 'requires_approval', False) and not getattr(handoff, 'approved', False):
                     issues.append("Handoff requires approval but not approved")
-                
+
                 if issues:
                     handoff_issues.append({
                         "handoff_id": getattr(handoff, 'id', 'unknown'),
@@ -980,14 +981,14 @@ async def verify_cross_bot_handoffs(bot, config: Dict[str, Any]) -> Dict[str, An
                         "issues": issues,
                         "severity": "high" if missing or failed_criteria else "medium"
                     })
-                
+
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] Error verifying handoff: {e}")
-        
+
         # Report findings
         if handoff_issues:
             high_severity = [h for h in handoff_issues if h.get('severity') == 'high']
-            
+
             if high_severity and hasattr(bot, 'escalate_to_coordinator'):
                 try:
                     await bot.escalate_to_coordinator(
@@ -1022,7 +1023,7 @@ async def verify_cross_bot_handoffs(bot, config: Dict[str, Any]) -> Dict[str, An
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": len([h for h in handoff_issues if h.get('severity') == 'high']) == 0,
             "handoffs_checked": len(handoffs),
@@ -1033,7 +1034,7 @@ async def verify_cross_bot_handoffs(bot, config: Dict[str, Any]) -> Dict[str, An
             "dod_failures": len(dod_failures),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in verify_cross_bot_handoffs: {e}")
         return {
@@ -1052,14 +1053,14 @@ async def verify_cross_bot_handoffs(bot, config: Dict[str, Any]) -> Dict[str, An
 )
 async def check_documentation_completeness(bot, config: Dict[str, Any]) -> Dict[str, Any]:
     """Audit documentation across all bot outputs for completeness.
-    
+
     Checks that deliverables include required documentation, READMEs are present,
     API docs are complete, and internal knowledge is captured.
-    
+
     Args:
         bot: The AuditorBot instance
         config: Check configuration
-        
+
     Returns:
         Dict with documentation completeness results
     """
@@ -1073,23 +1074,23 @@ async def check_documentation_completeness(bot, config: Dict[str, Any]) -> Dict[
                 "message": "No documentation tracking available",
                 "docs_checked": 0
             }
-        
+
         if not docs:
             return {
                 "success": True,
                 "message": "No documentation pending review",
                 "docs_checked": 0
             }
-        
+
         doc_issues = []
         missing_readmes = []
         incomplete_api_docs = []
         outdated_docs = []
-        
+
         for doc in docs:
             try:
                 issues = []
-                
+
                 # Check README completeness
                 if getattr(doc, 'requires_readme', False):
                     readme = getattr(doc, 'readme_present', False)
@@ -1102,7 +1103,7 @@ async def check_documentation_completeness(bot, config: Dict[str, Any]) -> Dict[
                         missing_sections = [s for s in required_sections if s not in readme_sections]
                         if missing_sections:
                             issues.append(f"README missing sections: {', '.join(missing_sections[:2])}")
-                
+
                 # Check API documentation
                 if getattr(doc, 'has_api', False):
                     api_docs = getattr(doc, 'api_documented', False)
@@ -1113,7 +1114,7 @@ async def check_documentation_completeness(bot, config: Dict[str, Any]) -> Dict[
                         coverage = getattr(doc, 'api_coverage', 0)
                         if coverage < 80:
                             issues.append(f"API documentation incomplete ({coverage}% coverage)")
-                
+
                 # Check for outdated documentation
                 last_updated = getattr(doc, 'last_updated', None)
                 if last_updated:
@@ -1129,14 +1130,14 @@ async def check_documentation_completeness(bot, config: Dict[str, Any]) -> Dict[
                             })
                     except:
                         pass
-                
+
                 # Check for TODO/FIXME markers
                 content = getattr(doc, 'content', '')
                 if content:
                     todos = content.count('TODO') + content.count('FIXME') + content.count('XXX')
                     if todos > 3:
                         issues.append(f"{todos} unresolved TODO/FIXME markers")
-                
+
                 if issues:
                     doc_issues.append({
                         "doc_id": getattr(doc, 'id', 'unknown'),
@@ -1145,10 +1146,10 @@ async def check_documentation_completeness(bot, config: Dict[str, Any]) -> Dict[
                         "issues": issues,
                         "severity": "medium"
                     })
-                
+
             except Exception as e:
                 logger.error(f"[{bot.role_card.bot_name}] Error checking documentation: {e}")
-        
+
         # Report findings
         if doc_issues:
             if hasattr(bot, 'notify_coordinator'):
@@ -1171,7 +1172,7 @@ async def check_documentation_completeness(bot, config: Dict[str, Any]) -> Dict[
                 action = "logged"
         else:
             action = None
-        
+
         return {
             "success": True,
             "docs_checked": len(docs),
@@ -1181,7 +1182,7 @@ async def check_documentation_completeness(bot, config: Dict[str, Any]) -> Dict[
             "outdated_docs": len(outdated_docs),
             "action_taken": action
         }
-        
+
     except Exception as e:
         logger.error(f"[{bot.role_card.bot_name}] Error in check_documentation_completeness: {e}")
         return {

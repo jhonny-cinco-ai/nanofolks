@@ -1,18 +1,18 @@
 """Team system for personality customization."""
 
-from .team import Team, TeamName, BotTeamProfile
+from .manager import TeamManager
 from .presets import (
+    AVAILABLE_TEAMS,
+    EXECUTIVE_SUITE,
+    FERAL_CLOWDER,
     PIRATE_CREW,
     ROCK_BAND,
-    SWAT_TEAM,
-    FERAL_CLOWDER,
-    EXECUTIVE_SUITE,
     SPACE_CREW,
-    AVAILABLE_TEAMS,
+    SWAT_TEAM,
     get_team,
     list_teams,
 )
-from .manager import TeamManager
+from .team import BotTeamProfile, Team, TeamName
 
 __all__ = [
     "Team",

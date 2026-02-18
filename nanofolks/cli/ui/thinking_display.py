@@ -11,9 +11,8 @@ Features:
 """
 
 from typing import Optional
-from rich.console import Console
+
 from rich.text import Text
-from rich.style import Style
 
 from nanofolks.agent.work_log import WorkLog
 from nanofolks.cli.ui.thinking_summary import ThinkingSummaryBuilder
@@ -21,10 +20,10 @@ from nanofolks.cli.ui.thinking_summary import ThinkingSummaryBuilder
 
 class ThinkingDisplay:
     """Manages display and state of collapsible thinking section.
-    
+
     Renders bot thinking/reasoning in an expandable/collapsible format
     that users can toggle with a keypress.
-    
+
     Attributes:
         log: The work log being displayed
         expanded: Whether the thinking section is currently expanded
@@ -34,7 +33,7 @@ class ThinkingDisplay:
         use_colors: Whether to use colors in output
         show_stats: Whether to show statistics in expanded view
     """
-    
+
     # Colors for different elements
     COLORS = {
         "header": "dim cyan",
@@ -46,7 +45,7 @@ class ThinkingDisplay:
         "error": "red",
         "divider": "dim",
     }
-    
+
     def __init__(
         self,
         work_log: WorkLog,
@@ -55,7 +54,7 @@ class ThinkingDisplay:
         show_stats: bool = True,
     ):
         """Initialize the thinking display.
-        
+
         Args:
             work_log: The work log to display
             bot_name: Optional bot name to filter entries
@@ -67,14 +66,14 @@ class ThinkingDisplay:
         self.expanded = False
         self.use_colors = use_colors
         self.show_stats = show_stats
-        
+
         # Generate summary and details
         self.summary = ThinkingSummaryBuilder.generate_summary(work_log)
         self.details = ThinkingSummaryBuilder.generate_details(work_log, bot_name)
-    
+
     def render(self) -> str:
         """Render the appropriate view (collapsed or expanded).
-        
+
         Returns:
             String representation ready for printing
         """
@@ -82,13 +81,13 @@ class ThinkingDisplay:
             return self.render_expanded()
         else:
             return self.render_collapsed()
-    
+
     def render_collapsed(self) -> str:
         """Render single-line collapsed view.
-        
+
         Output format:
             💭 Thinking: <summary> [SPACE to expand]
-        
+
         Returns:
             Collapsed view string
         """
@@ -102,10 +101,10 @@ class ThinkingDisplay:
             return str(text)
         else:
             return f"💭 Thinking: {self.summary} [SPACE to expand]"
-    
+
     def render_expanded(self) -> str:
         """Render multi-line expanded view.
-        
+
         Output format:
             💭 Thinking [↓] <bot filter if applicable>
                Step 1 🎯 Decision: ...
@@ -113,12 +112,12 @@ class ThinkingDisplay:
                ...
             [Statistics if enabled]
             [Press any key to continue...]
-        
+
         Returns:
             Expanded view string
         """
         lines = []
-        
+
         # Build header
         if self.use_colors:
             header = Text()
@@ -133,11 +132,11 @@ class ThinkingDisplay:
             if self.bot_name:
                 header += f" (@{self.bot_name})"
             lines.append(header)
-        
+
         # Add detail lines with indentation
         for detail in self.details:
             lines.append(f"   {detail}")
-        
+
         # Add statistics if enabled
         if self.show_stats:
             stats = self.get_stats()
@@ -147,39 +146,39 @@ class ThinkingDisplay:
                 lines.append(f"[dim]{stats_line}[/dim]")
             else:
                 lines.append(stats_line)
-        
+
         # Add footer
         lines.append("")
         if self.use_colors:
             lines.append("[dim][Press any key to continue...][/dim]")
         else:
             lines.append("[Press any key to continue...]")
-        
+
         return "\n".join(lines)
-    
+
     def toggle(self) -> None:
         """Toggle between expanded and collapsed state."""
         self.expanded = not self.expanded
-    
+
     def expand(self) -> None:
         """Expand the thinking display."""
         self.expanded = True
-    
+
     def collapse(self) -> None:
         """Collapse the thinking display."""
         self.expanded = False
-    
+
     def get_stats(self) -> dict:
         """Get statistics about the thinking process.
-        
+
         Returns:
             Dictionary with thinking stats
         """
         return ThinkingSummaryBuilder.get_summary_stats(self.log)
-    
+
     def get_line_count(self) -> int:
         """Get number of lines when expanded.
-        
+
         Returns:
             Number of lines the expanded view will take
         """
@@ -187,14 +186,14 @@ class ThinkingDisplay:
         return 3 + len(self.details)
 
 
-def create_thinking_display(work_log: WorkLog, 
+def create_thinking_display(work_log: WorkLog,
                            bot_name: Optional[str] = None) -> ThinkingDisplay:
     """Factory function to create a thinking display.
-    
+
     Args:
         work_log: The work log to display
         bot_name: Optional bot name for filtering
-        
+
     Returns:
         Initialized ThinkingDisplay instance
     """

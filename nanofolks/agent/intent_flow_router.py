@@ -1,10 +1,10 @@
 """Intent Flow Router - Routes messages to appropriate flow based on detected intent."""
 
-from typing import Optional, List, Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from loguru import logger
 
-from nanofolks.agent.intent_detector import IntentDetector, Intent, IntentType, FlowType
+from nanofolks.agent.intent_detector import FlowType, Intent, IntentDetector, IntentType
 
 if TYPE_CHECKING:
     from nanofolks.bus.events import InboundMessage, OutboundMessage
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 class IntentFlowRouter:
     """Routes messages to appropriate flow based on detected intent.
-    
+
     Flow Types:
     - SIMULTANEOUS: All bots respond at once (CHAT intent)
     - QUICK: 1-2 questions then answer (ADVICE/RESEARCH intent)
@@ -27,7 +27,7 @@ class IntentFlowRouter:
 
     def __init__(self, agent_loop: "AgentLoop"):
         """Initialize the router.
-        
+
         Args:
             agent_loop: Reference to the main AgentLoop for delegating responses
         """
@@ -37,16 +37,16 @@ class IntentFlowRouter:
 
     async def route(self, msg: "InboundMessage", session: "Session") -> "OutboundMessage":
         """Route message to appropriate flow based on intent.
-        
+
         Args:
             msg: Inbound message
             session: Current session
-            
+
         Returns:
             OutboundMessage with appropriate response
         """
         intent = self.intent_detector.detect(msg.content)
-        
+
         logger.info(
             f"Intent detected: {intent.intent_type.value} "
             f"(confidence: {intent.confidence:.2f}, flow: {intent.flow_type.value})"
@@ -70,7 +70,7 @@ class IntentFlowRouter:
     async def _handle_cancellation(self, msg: "InboundMessage") -> "OutboundMessage":
         """Handle cancellation request."""
         logger.info("User requested cancellation")
-        
+
         from nanofolks.bus.events import OutboundMessage
         return OutboundMessage(
             channel=msg.channel,
@@ -80,29 +80,29 @@ class IntentFlowRouter:
         )
 
     async def _handle_simultaneous(
-        self, 
-        msg: "InboundMessage", 
+        self,
+        msg: "InboundMessage",
         intent: Intent,
         session: "Session"
     ) -> "OutboundMessage":
         """Handle CHAT intent - simultaneous multi-bot response.
-        
+
         Uses existing Phase 1 multi-bot infrastructure for communal experience.
         """
         from nanofolks.bots.dispatch import DispatchTarget
-        
+
         bots = self.intent_detector.get_all_bots_for_intent(intent)
-        
+
         logger.info(f"Simultaneous flow: all bots responding: {', '.join(bots)}")
-        
+
         dispatch_result = {
             'is_multi_bot': True,
             'mode': DispatchTarget.MULTI_BOT,
             'bots': bots,
             'primary_bot': 'leader',
-            'reason': f'CHAT intent - simultaneous response',
+            'reason': 'CHAT intent - simultaneous response',
         }
-        
+
         return await self.agent._handle_multi_bot_response(msg, dispatch_result, session)
 
     async def _handle_quick(
@@ -112,17 +112,17 @@ class IntentFlowRouter:
         session: "Session"
     ) -> "OutboundMessage":
         """Handle ADVICE/RESEARCH intents - quick 1-2 questions then answer.
-        
+
         This flow asks 1-2 clarifying questions, then provides the answer.
         Uses persisted state via ProjectStateManager for durability.
         """
         from nanofolks.agent.project_state import ProjectStateManager
-        
+
         room_id = msg.session_key
         state_manager = ProjectStateManager(self.agent.workspace, room_id)
-        
+
         quick_state = state_manager.get_quick_flow_state()
-        
+
         if quick_state is None:
             state_manager.start_quick_flow(intent.intent_type.value, msg.content)
             quick_state = state_manager.get_quick_flow_state()
@@ -134,15 +134,15 @@ class IntentFlowRouter:
                     content="Sorry, I couldn't start the quick flow. Please try again.",
                     metadata={'phase': 'error', 'intent': intent.intent_type.value}
                 )
-        
+
         if quick_state.questions_asked < 1:
             quick_state.user_answers.append(msg.content)
             state_manager.update_quick_flow_state(quick_state.questions_asked, quick_state.user_answers)
-            
+
             question = await self._generate_quick_question_llm(intent, quick_state)
             quick_state.questions_asked += 1
             state_manager.update_quick_flow_state(quick_state.questions_asked, quick_state.user_answers)
-            
+
             from nanofolks.bus.events import OutboundMessage
             return OutboundMessage(
                 channel=msg.channel,
@@ -158,7 +158,7 @@ class IntentFlowRouter:
             quick_state.user_answers.append(msg.content)
             answer = await self._generate_quick_answer_llm(intent, quick_state, msg.content)
             state_manager.clear_quick_flow_state()
-            
+
             from nanofolks.bus.events import OutboundMessage
             return OutboundMessage(
                 channel=msg.channel,
@@ -177,45 +177,45 @@ class IntentFlowRouter:
         session: "Session"
     ) -> "OutboundMessage":
         """Handle BUILD/TASK/EXPLORE intents - full discovery flow.
-        
+
         This starts the structured discovery → synthesis → approval → execution flow.
         Creates a new project room for BUILD/TASK/EXPLORE intents.
-        
+
         Leader decides which bots to invite based on analyzing the request.
         """
-        from nanofolks.agent.project_state import ProjectStateManager, ProjectPhase
+        from nanofolks.agent.project_state import ProjectPhase, ProjectStateManager
         from nanofolks.bots.room_manager import get_room_manager
-        
+
         room_id = msg.session_key
         is_new_project = False
-        
+
         if room_id == "general" or not room_id:
             room_manager = get_room_manager()
-            
+
             room_name = self._extract_project_name(msg.content, intent)
-            
+
             new_room = room_manager.create_project_room(room_name, bots=["leader"])
             room_id = new_room.id
-            
+
             is_new_project = True
             logger.info(f"Created project room '{room_id}' with Leader. Leader will invite specialists as needed.")
-        
+
         state_manager = ProjectStateManager(self.agent.workspace, room_id)
-        
+
         if state_manager.state.phase == ProjectPhase.IDLE:
             bots_in_room = ["leader"]
-            
+
             state_manager.start_discovery(
-                msg.content, 
+                msg.content,
                 intent.intent_type.value,
                 bots_in_room
             )
-            
+
             first_bot = bots_in_room[0] if bots_in_room else "leader"
             question = await self._generate_discovery_question_llm(first_bot, state_manager, intent)
-            
+
             state_manager.log_discovery_entry(first_bot, question, is_question=True)
-            
+
             from nanofolks.bus.events import OutboundMessage
             return OutboundMessage(
                 channel=msg.channel,
@@ -229,84 +229,84 @@ class IntentFlowRouter:
                     'is_new_project': is_new_project,
                 }
             )
-        
+
         return await self._continue_full_flow(msg, state_manager, session)
-    
+
     def _extract_project_name(self, content: str, intent: Intent) -> str:
         """Extract a project name from the user's message.
-        
+
         Args:
             content: User's message content
             intent: Detected intent
-            
+
         Returns:
             A name suitable for a project room
         """
         content_lower = content.lower()
-        
+
         words = content_lower.split()
         for i, word in enumerate(words):
             if word in ['build', 'create', 'make', 'develop'] and i + 1 < len(words):
                 project_name = ' '.join(words[i+1:]).strip('.,!?')
                 if project_name:
                     return project_name[:50]
-        
+
         for i, word in enumerate(words):
             if word in ['project', 'for', 'to'] and i + 1 < len(words):
                 project_name = ' '.join(words[i+1:]).strip('.,!?')
                 if project_name:
                     return project_name[:50]
-        
+
         return f"project-{intent.intent_type.value.lower()}"
-    
+
     async def _leader_decides_bots(self, content: str, intent: Intent) -> List[str]:
         """Leader decides which bots to invite based on analyzing the request.
-        
+
         This is a keyword-based heuristic. In production, this could use LLM
         to analyze the request and determine appropriate team composition.
-        
+
         Args:
             content: User's request
             intent: Detected intent
-            
+
         Returns:
             List of bot names to invite to the project
         """
         content_lower = content.lower()
         bots = ["leader"]
-        
+
         has_research = any(w in content_lower for w in [
             'research', 'data', 'analyze', 'market', 'competitor', 'information',
             'learn about', 'find out', 'investigate', 'study'
         ])
-        
+
         has_creative = any(w in content_lower for w in [
             'design', 'creative', 'visual', 'brand', 'logo', 'image', 'photo',
             'art', 'style', 'content', 'write', 'copy', 'marketing', 'campaign'
         ])
-        
+
         has_coding = any(w in content_lower for w in [
             'build', 'code', 'develop', 'website', 'app', 'api', 'software',
             'program', 'technical', 'database', 'functionality', 'feature'
         ])
-        
+
         has_social = any(w in content_lower for w in [
             'social media', 'twitter', 'facebook', 'instagram', 'linkedin',
             'marketing', 'audience', 'community', 'engagement', 'followers'
         ])
-        
+
         has_auditing = any(w in content_lower for w in [
             'review', 'audit', 'check', 'verify', 'validate', 'quality',
             'test', 'security', 'compliance', 'risk'
         ])
-        
+
         if intent.intent_type.value in ['build', 'task', 'explore']:
             has_coding = True
             has_creative = True
-        
+
         if intent.intent_type.value == 'build':
             has_research = True
-        
+
         if has_research and "researcher" not in bots:
             bots.append("researcher")
         if has_creative and "creative" not in bots:
@@ -317,7 +317,7 @@ class IntentFlowRouter:
             bots.append("social")
         if has_auditing and "auditor" not in bots:
             bots.append("auditor")
-        
+
         logger.info(f"Leader decided to invite: {bots} for request: {content[:50]}...")
         return bots
 
@@ -329,9 +329,9 @@ class IntentFlowRouter:
     ) -> "OutboundMessage":
         """Continue an existing full discovery flow."""
         from nanofolks.agent.project_state import ProjectPhase
-        
+
         state = state_manager.state
-        
+
         if state.phase == ProjectPhase.DISCOVERY:
             return await self._continue_discovery(msg, state_manager)
         elif state.phase == ProjectPhase.APPROVAL:
@@ -340,7 +340,7 @@ class IntentFlowRouter:
             return await self._handle_execution(msg, state_manager)
         elif state.phase == ProjectPhase.REVIEW:
             return await self._handle_review(msg, state_manager)
-        
+
         from nanofolks.bus.events import OutboundMessage
         return OutboundMessage(
             channel=msg.channel,
@@ -355,18 +355,17 @@ class IntentFlowRouter:
         state_manager: "ProjectStateManager"
     ) -> "OutboundMessage":
         """Continue discovery phase."""
-        from nanofolks.agent.project_state import ProjectPhase
-        
+
         state_manager.log_discovery_entry("user", msg.content, is_question=False)
-        
+
         if state_manager._is_discovery_complete():
             state_manager.complete_discovery()
-            
+
             synthesis = await self._generate_synthesis_llm(state_manager)
             state_manager.set_synthesis(synthesis)
-            
+
             formatted = self._format_synthesis(synthesis)
-            
+
             from nanofolks.bus.events import OutboundMessage
             return OutboundMessage(
                 channel=msg.channel,
@@ -374,11 +373,11 @@ class IntentFlowRouter:
                 content=formatted,
                 metadata={'phase': 'approval'}
             )
-        
+
         next_bot = state_manager._get_next_bot()
         question = await self._generate_discovery_question_llm(next_bot, state_manager, None)
         state_manager.log_discovery_entry(next_bot, question, is_question=True)
-        
+
         from nanofolks.bus.events import OutboundMessage
         return OutboundMessage(
             channel=msg.channel,
@@ -394,12 +393,12 @@ class IntentFlowRouter:
     ) -> "OutboundMessage":
         """Handle approval response."""
         approved = self._check_approval(msg.content)
-        
+
         if approved:
             state_manager.handle_approval(approved=True)
-            
+
             execution_content = self._get_execution_context(state_manager)
-            
+
             from nanofolks.bus.events import OutboundMessage
             return OutboundMessage(
                 channel=msg.channel,
@@ -409,11 +408,11 @@ class IntentFlowRouter:
             )
         else:
             state_manager.handle_approval(approved=False, feedback=msg.content)
-            
+
             next_bot = state_manager._get_next_bot()
             question = f"Noted! {await self._generate_discovery_question_llm(next_bot, state_manager, None)}"
             state_manager.log_discovery_entry(next_bot, question, is_question=True)
-            
+
             from nanofolks.bus.events import OutboundMessage
             return OutboundMessage(
                 channel=msg.channel,
@@ -431,7 +430,7 @@ class IntentFlowRouter:
         from nanofolks.agent.project_state import ProjectPhase
         state_manager.state.phase = ProjectPhase.REVIEW
         state_manager._save_state()
-        
+
         from nanofolks.bus.events import OutboundMessage
         return OutboundMessage(
             channel=msg.channel,
@@ -447,7 +446,7 @@ class IntentFlowRouter:
     ) -> "OutboundMessage":
         """Handle final review."""
         state_manager.complete_review()
-        
+
         from nanofolks.bus.events import OutboundMessage
         return OutboundMessage(
             channel=msg.channel,
@@ -459,7 +458,7 @@ class IntentFlowRouter:
     async def _generate_quick_question_llm(self, intent: Intent, state: Any) -> str:
         """Generate a quick clarifying question using LLM."""
         user_goal = getattr(state, 'user_goal', state.get('user_goal', ''))
-        
+
         prompt = f"""You are a helpful assistant. The user wants to {intent.intent_type.value.lower()}.
 
 User's original request: {user_goal}
@@ -489,17 +488,17 @@ Question:"""
         return "Can you tell me a bit more about what you're looking for?"
 
     async def _generate_quick_answer_llm(
-        self, 
-        intent: Intent, 
-        state: Any, 
+        self,
+        intent: Intent,
+        state: Any,
         user_context: str
     ) -> str:
         """Generate a quick answer after clarification using LLM."""
         user_goal = getattr(state, 'user_goal', state.get('user_goal', ''))
         user_answers = getattr(state, 'user_answers', state.get('user_answers', []))
-        
+
         answers = "\n".join(f"- {a}" for a in user_answers)
-        
+
         prompt = f"""You are a helpful assistant. The user wants to {intent.intent_type.value.lower()}.
 
 Original request: {user_goal}
@@ -529,7 +528,7 @@ Provide a helpful, concise answer to their request. Be specific and actionable."
     ) -> str:
         """Generate a discovery phase question using LLM."""
         state = state_manager.state
-        
+
         prompt = f"""You are @{bot_name}, a specialist in this team.
 
 The user wants to: {state.user_goal}
@@ -539,7 +538,7 @@ Intent type: {state.intent_type}
 Questions already asked:
 """
         for entry in state.discovery_log:
-            prefix = "❓" if entry.get('is_question', True) else "💬"
+            "❓" if entry.get('is_question', True) else "💬"
             prompt += f"- @{entry['bot']}: {entry['content']}\n"
 
         prompt += f"""
@@ -574,7 +573,7 @@ Keep it brief (1-2 sentences)."""
     async def _generate_synthesis_llm(self, state_manager: "ProjectStateManager") -> dict:
         """Generate synthesis from discovery log using LLM."""
         state = state_manager.state
-        
+
         prompt = f"""You are the Team Leader. Synthesize the discovery conversation into a project brief.
 
 User's Original Goal: {state.user_goal}
@@ -582,7 +581,7 @@ User's Original Goal: {state.user_goal}
 Discovery Conversation:
 """
         for entry in state.discovery_log:
-            prefix = "❓" if entry.get('is_question', True) else "💬"
+            "❓" if entry.get('is_question', True) else "💬"
             prompt += f"- @{entry['bot']}: {entry['content']}\n"
 
         prompt += """
@@ -603,7 +602,7 @@ Create a structured project brief in JSON format:
   }},
   "next_steps": {{
     "leader": "coordination task",
-    "researcher": "research task", 
+    "researcher": "research task",
     "creative": "design task",
     "coder": "implementation task",
     "social": "outreach task",
@@ -650,20 +649,20 @@ Generate ONLY the JSON, no other text."""
     def _format_synthesis(self, synthesis: dict) -> str:
         """Format synthesis for user display."""
         sections = ["# 📋 Project Brief", "", f"## Goal: {synthesis.get('goal', 'TBD')}"]
-        
+
         scope = synthesis.get('scope', {})
         if scope.get('included'):
             sections.extend(["", "## In Scope"])
             for item in scope['included']:
                 sections.append(f"- {item}")
-        
+
         constraints = synthesis.get('constraints', {})
         if constraints:
             sections.extend(["", "## Constraints"])
             for k, v in constraints.items():
                 if v:
                     sections.append(f"- **{k}**: {v}")
-        
+
         sections.extend(["", "---", "**Approve?** Reply 'yes' or describe changes."])
         return "\n".join(sections)
 
@@ -676,15 +675,15 @@ Generate ONLY the JSON, no other text."""
         """Get execution instructions."""
         synthesis = state_manager.state.synthesis
         next_steps = synthesis.get('next_steps', {})
-        
+
         sections = ["# 🚀 Execution Phase", ""]
-        
+
         for bot, task in next_steps.items():
             if task:
-                emoji = {'leader': '👑', 'researcher': '📊', 'coder': '💻', 
+                emoji = {'leader': '👑', 'researcher': '📊', 'coder': '💻',
                         'creative': '🎨', 'social': '📱', 'auditor': '🔍'}.get(bot, '🤖')
                 sections.append(f"{emoji} **@{bot}**: {task}")
-        
+
         sections.extend(["", "Execute your tasks and report when complete."])
         return "\n".join(sections)
 

@@ -11,17 +11,18 @@ Key Principle:
 """
 
 import json
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass, asdict
+
 from loguru import logger
 
 
 @dataclass
 class AuditEntry:
     """An audit log entry with symbolic references only.
-    
+
     IMPORTANT: This class NEVER stores actual API keys.
     All key references are symbolic like {{openrouter_key}}.
     """
@@ -37,10 +38,10 @@ class AuditEntry:
 
 class SecureAuditLogger:
     """Audit logger that never exposes actual API keys.
-    
+
     This logger provides defense-in-depth by ensuring that even if
     audit logs are compromised, no actual API keys are exposed.
-    
+
     Example:
         >>> audit = SecureAuditLogger()
         >>> audit.log_tool_execution(
@@ -49,27 +50,27 @@ class SecureAuditLogger:
         ...     success=True,
         ...     duration_ms=245
         ... )
-        
+
     Log output:
-        {"timestamp": "2026-02-16T10:30:00Z", "operation": "tool.web_search", 
+        {"timestamp": "2026-02-16T10:30:00Z", "operation": "tool.web_search",
          "key_ref": "{{brave_key}}", "success": true, "duration_ms": 245}
     """
-    
+
     def __init__(self, log_path: Optional[Path] = None):
         """Initialize the secure audit logger.
-        
+
         Args:
             log_path: Path to the audit log file. Defaults to ~/.nanofolks/audit.log
         """
         if log_path is None:
             log_path = Path.home() / ".nanofolks" / "audit.log"
-        
+
         self.log_path = log_path
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     def _write_entry(self, entry: AuditEntry) -> None:
         """Write an entry to the audit log.
-        
+
         Args:
             entry: The audit entry to write
         """
@@ -78,16 +79,16 @@ class SecureAuditLogger:
                 f.write(json.dumps(asdict(entry)) + '\n')
         except Exception as e:
             logger.error(f"Failed to write audit log: {e}")
-    
-    def log(self, operation: str, key_ref: str, success: bool, 
+
+    def log(self, operation: str, key_ref: str, success: bool,
             duration_ms: int, error: Optional[str] = None,
             details: Optional[dict] = None,
             room_id: Optional[str] = None) -> None:
         """Log an operation with symbolic key reference only.
-        
+
         IMPORTANT: key_ref must be a symbolic reference like {{openrouter_key}},
         not an actual API key.
-        
+
         Args:
             operation: The operation being performed (e.g., "tool.web_search")
             key_ref: Symbolic key reference like {{openrouter_key}}
@@ -107,15 +108,15 @@ class SecureAuditLogger:
             error=error,
             details=details
         )
-        
+
         self._write_entry(entry)
-    
+
     def log_tool_execution(self, tool_name: str, key_ref: str,
                           success: bool, duration_ms: int,
                           error: Optional[str] = None,
                           room_id: Optional[str] = None) -> None:
         """Log tool execution with symbolic key reference.
-        
+
         Args:
             tool_name: Name of the tool being executed
             key_ref: Symbolic key reference like {{brave_key}}
@@ -132,14 +133,14 @@ class SecureAuditLogger:
             error=error,
             room_id=room_id
         )
-    
+
     def log_api_call(self, provider: str, key_ref: str,
                      success: bool, duration_ms: int,
                      error: Optional[str] = None,
                      tokens_used: Optional[int] = None,
                      room_id: Optional[str] = None) -> None:
         """Log an API call with symbolic key reference.
-        
+
         Args:
             provider: Provider name (e.g., "openrouter", "anthropic")
             key_ref: Symbolic key reference like {{openrouter_key}}
@@ -150,7 +151,7 @@ class SecureAuditLogger:
             room_id: Optional room ID for room-centric context
         """
         details = {"tokens_used": tokens_used} if tokens_used else None
-        
+
         self.log(
             operation=f"api.{provider}",
             key_ref=key_ref,
@@ -160,13 +161,13 @@ class SecureAuditLogger:
             details=details,
             room_id=room_id
         )
-    
+
     def log_key_operation(self, operation: str, key_ref: str,
-                          success: bool, 
+                          success: bool,
                           details: Optional[dict] = None,
                           room_id: Optional[str] = None) -> None:
         """Log a key management operation.
-        
+
         Args:
             operation: The key operation (e.g., "key.store", "key.retrieve")
             key_ref: Symbolic key reference
@@ -182,34 +183,34 @@ class SecureAuditLogger:
             details=details,
             room_id=room_id
         )
-    
+
     def get_entries(self, limit: int = 100) -> list[AuditEntry]:
         """Get recent audit entries.
-        
+
         Args:
             limit: Maximum number of entries to return
-            
+
         Returns:
             List of audit entries (most recent first)
         """
         if not self.log_path.exists():
             return []
-        
+
         entries = []
         try:
             with open(self.log_path, 'r') as f:
                 lines = f.readlines()
-            
+
             for line in reversed(lines[-limit:]):
                 try:
                     data = json.loads(line.strip())
                     entries.append(AuditEntry(**data))
                 except Exception:
                     continue
-                    
+
         except Exception as e:
             logger.error(f"Failed to read audit log: {e}")
-        
+
         return entries
 
 
@@ -219,7 +220,7 @@ _audit_logger: Optional[SecureAuditLogger] = None
 
 def get_audit_logger() -> SecureAuditLogger:
     """Get the global audit logger instance.
-    
+
     Returns:
         The global SecureAuditLogger instance
     """
@@ -229,12 +230,12 @@ def get_audit_logger() -> SecureAuditLogger:
     return _audit_logger
 
 
-def log_tool_execution(tool_name: str, key_ref: str, 
+def log_tool_execution(tool_name: str, key_ref: str,
                        success: bool, duration_ms: int,
                        error: Optional[str] = None,
                        room_id: Optional[str] = None) -> None:
     """Convenience function for logging tool execution.
-    
+
     Args:
         tool_name: Name of the tool
         key_ref: Symbolic key reference
@@ -252,10 +253,10 @@ def log_api_call(provider: str, key_ref: str,
                  tokens_used: Optional[int] = None,
                  room_id: Optional[str] = None) -> None:
     """Convenience function for logging API calls.
-    
+
     Args:
         provider: Provider name
-        key_ref: Symbolic key reference  
+        key_ref: Symbolic key reference
         success: Whether call succeeded
         duration_ms: Call duration
         error: Optional error message

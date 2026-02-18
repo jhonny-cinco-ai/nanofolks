@@ -1,10 +1,10 @@
 """Session management module."""
 
-from nanofolks.session.manager import SessionManager, Session
 from nanofolks.session.dual_mode import (
     RoomSessionManager,
     create_session_manager,
 )
+from nanofolks.session.manager import Session, SessionManager
 
 __all__ = [
     "SessionManager",

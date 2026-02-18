@@ -1,53 +1,53 @@
 """Bot system for multi-agent orchestration."""
 
 from .base import SpecialistBot
+
+# Import check modules to ensure registration
+from .checks import (
+    auditor_checks,
+    coder_checks,
+    coordinator_checks,
+    creative_checks,
+    researcher_checks,
+    social_checks,
+)
 from .definitions import (
+    BUILTIN_BOTS,
+    BotCapabilities,
+    BotRegistry,
     RoleCard,
     RoleCardDomain,
-    BotCapabilities,
-    BUILTIN_BOTS,
-    get_role_card,
-    list_bots,
-    is_valid_bot,
-    BotRegistry,
     get_bot_registry,
+    get_role_card,
+    is_valid_bot,
     list_available_bots,
-)
-from .room_manager import RoomManager, get_room_manager
-from .implementations import (
-    BotLeader,
-    ResearcherBot,
-    CoderBot,
-    SocialBot,
-    CreativeBot,
-    AuditorBot,
+    list_bots,
 )
 
 # Heartbeat configurations and checks
 from .heartbeat_configs import (
-    RESEARCHER_CONFIG,
-    CODER_CONFIG,
-    SOCIAL_CONFIG,
     AUDITOR_CONFIG,
-    CREATIVE_CONFIG,
+    CODER_CONFIG,
     COORDINATOR_CONFIG,
+    CREATIVE_CONFIG,
     DEFAULT_CONFIGS,
-    get_bot_heartbeat_config,
+    RESEARCHER_CONFIG,
+    SOCIAL_CONFIG,
     get_all_heartbeat_configs,
+    get_bot_heartbeat_config,
     load_config_from_file,
-    save_heartbeat_config,
     merge_config,
+    save_heartbeat_config,
 )
-
-# Import check modules to ensure registration
-from .checks import (
-    researcher_checks,
-    coder_checks,
-    social_checks,
-    auditor_checks,
-    creative_checks,
-    coordinator_checks,
+from .implementations import (
+    AuditorBot,
+    BotLeader,
+    CoderBot,
+    CreativeBot,
+    ResearcherBot,
+    SocialBot,
 )
+from .room_manager import RoomManager, get_room_manager
 
 __all__ = [
     # Base classes

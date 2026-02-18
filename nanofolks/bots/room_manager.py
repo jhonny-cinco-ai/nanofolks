@@ -13,7 +13,7 @@ from datetime import datetime
 from loguru import logger
 
 from nanofolks.config.loader import get_data_dir
-from nanofolks.models.room import Room, RoomType
+from nanofolks.models.room import Room, RoomType, RoomMember
 
 
 class RoomManager:
@@ -67,9 +67,12 @@ class RoomManager:
         """Create the default General room with Leader."""
         general = Room(
             id=self.DEFAULT_ROOM_ID,
+            name=self.DEFAULT_ROOM_NAME,
             type=RoomType.OPEN,
-            participants=["leader"],  # Only Leader initially
+            room_type="open",
+            participants=["leader"],
             owner="user",
+            description="General conversation room",
             created_at=datetime.now(),
         )
         
@@ -81,34 +84,11 @@ class RoomManager:
     def _save_room(self, room: Room) -> None:
         """Save room to disk."""
         room_file = self.rooms_dir / f"{room.id}.json"
-        room_data = self._room_to_dict(room)
-        room_file.write_text(json.dumps(room_data, indent=2, default=str))
-    
-    def _room_to_dict(self, room: Room) -> dict:
-        """Convert room to dictionary."""
-        return {
-            "id": room.id,
-            "type": room.type.value,
-            "participants": room.participants,
-            "owner": room.owner,
-            "created_at": room.created_at.isoformat(),
-            "summary": room.summary,
-            "auto_archive": room.auto_archive,
-            "coordinator_mode": room.coordinator_mode,
-        }
+        room_file.write_text(json.dumps(room.to_dict(), indent=2, default=str))
     
     def _room_from_dict(self, data: dict) -> Room:
         """Create room from dictionary."""
-        return Room(
-            id=data["id"],
-            type=RoomType(data["type"]),
-            participants=data.get("participants", []),
-            owner=data.get("owner", "user"),
-            created_at=datetime.fromisoformat(data["created_at"]),
-            summary=data.get("summary", ""),
-            auto_archive=data.get("auto_archive", False),
-            coordinator_mode=data.get("coordinator_mode", False),
-        )
+        return Room.from_dict(data)
     
     @property
     def default_room(self) -> Room:
@@ -357,7 +337,8 @@ class RoomManager:
             True if successful
         """
         # Verify room exists
-        if room_id not in self._rooms:
+        room = self._rooms.get(room_id)
+        if not room:
             logger.error(f"Cannot join to non-existent room: {room_id}")
             return False
         
@@ -367,6 +348,16 @@ class RoomManager:
         # Add mapping
         self._channel_mappings[channel_key] = room_id
         self._save_channel_mappings()
+        
+        # Add channel as room member
+        member = RoomMember(
+            id=channel_key,
+            member_type="channel",
+            channel=channel,
+            chat_id=chat_id
+        )
+        room.add_member(member)
+        self._save_room(room)
         
         logger.info(f"Mapped {channel_key} -> room:{room_id}")
         return True
@@ -387,6 +378,12 @@ class RoomManager:
             room_id = self._channel_mappings[channel_key]
             del self._channel_mappings[channel_key]
             self._save_channel_mappings()
+            
+            # Remove from room members
+            room = self._rooms.get(room_id)
+            if room:
+                room.remove_member(channel_key)
+                self._save_room(room)
             
             logger.info(f"Removed mapping for {channel_key} (was in room:{room_id})")
             return True

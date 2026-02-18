@@ -16,6 +16,17 @@ class RoomType(Enum):
 
 
 @dataclass
+class RoomMember:
+    """A member (user or channel) in a room."""
+    id: str  # Unique member ID
+    member_type: str  # 'user', 'channel', 'bot'
+    channel: Optional[str] = None  # For channel members: telegram, discord, etc.
+    chat_id: Optional[str] = None  # For channel members: chat ID
+    joined_at: datetime = field(default_factory=datetime.now)
+    metadata: Dict = field(default_factory=dict)
+
+
+@dataclass
 class Message:
     """A message in a room."""
 
@@ -48,10 +59,21 @@ class Room:
     """A room for crew collaboration."""
 
     id: str  # "general", "project-alpha", "dm-researcher"
-    type: RoomType  # OPEN, PROJECT, DIRECT, COORDINATION
+    name: str = ""  # Display name (e.g., "General", "Project Website")
+    type: RoomType = RoomType.OPEN  # OPEN, PROJECT, DIRECT, COORDINATION
+    room_type: str = "open"  # String form for compatibility
+    
+    # Participants (bots)
     participants: List[str] = field(default_factory=list)  # ["leader", "researcher"]
+    
+    # Members (users and channels)
+    members: List[RoomMember] = field(default_factory=list)
+    
+    # Metadata
     owner: str = "user"  # "user" or bot name if coordination mode
+    description: str = ""
     created_at: datetime = field(default_factory=datetime.now)
+    updated_at: datetime = field(default_factory=datetime.now)
 
     # Memory
     shared_context: SharedContext = field(default_factory=SharedContext)
@@ -67,6 +89,54 @@ class Room:
     # Metadata
     deadline: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    
+    def __post_init__(self):
+        """Set defaults after initialization."""
+        if not self.name:
+            self.name = self.id
+        if not self.room_type and self.type:
+            self.room_type = self.type.value
+    
+    def add_member(self, member: RoomMember) -> None:
+        """Add a member to the room.
+        
+        Args:
+            member: RoomMember to add
+        """
+        existing = [m for m in self.members if m.id == member.id]
+        if not existing:
+            self.members.append(member)
+            self.updated_at = datetime.now()
+    
+    def remove_member(self, member_id: str) -> bool:
+        """Remove a member from the room.
+        
+        Args:
+            member_id: Member ID to remove
+            
+        Returns:
+            True if removed, False if not found
+        """
+        for i, m in enumerate(self.members):
+            if m.id == member_id:
+                self.members.pop(i)
+                self.updated_at = datetime.now()
+                return True
+        return False
+    
+    def get_member(self, member_id: str) -> Optional[RoomMember]:
+        """Get a member by ID.
+        
+        Args:
+            member_id: Member ID to find
+            
+        Returns:
+            RoomMember or None if not found
+        """
+        for m in self.members:
+            if m.id == member_id:
+                return m
+        return None
 
     def add_message(self, sender: str, content: str) -> Message:
         """Add a message to room history.
@@ -192,3 +262,69 @@ class Room:
             **kwargs,
         }
         self.shared_context.events.append(event)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize room to dictionary."""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.type.value if isinstance(self.type, RoomType) else self.type,
+            "room_type": self.room_type,
+            "participants": self.participants,
+            "members": [
+                {
+                    "id": m.id,
+                    "member_type": m.member_type,
+                    "channel": m.channel,
+                    "chat_id": m.chat_id,
+                    "joined_at": m.joined_at.isoformat() if m.joined_at else None,
+                    "metadata": m.metadata,
+                }
+                for m in self.members
+            ],
+            "owner": self.owner,
+            "description": self.description,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "summary": self.summary,
+            "auto_archive": self.auto_archive,
+            "archive_after_days": self.archive_after_days,
+            "coordinator_mode": self.coordinator_mode,
+            "escalation_threshold": self.escalation_threshold,
+            "deadline": self.deadline,
+            "metadata": self.metadata,
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Room":
+        """Deserialize room from dictionary."""
+        members = []
+        for m_data in data.get("members", []):
+            members.append(RoomMember(
+                id=m_data["id"],
+                member_type=m_data["member_type"],
+                channel=m_data.get("channel"),
+                chat_id=m_data.get("chat_id"),
+                joined_at=datetime.fromisoformat(m_data["joined_at"]) if m_data.get("joined_at") else datetime.now(),
+                metadata=m_data.get("metadata", {}),
+            ))
+        
+        return cls(
+            id=data["id"],
+            name=data.get("name", data["id"]),
+            type=RoomType(data.get("type", data.get("room_type", "open"))),
+            room_type=data.get("room_type", data.get("type", "open")),
+            participants=data.get("participants", []),
+            members=members,
+            owner=data.get("owner", "user"),
+            description=data.get("description", ""),
+            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now(),
+            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else datetime.now(),
+            summary=data.get("summary", ""),
+            auto_archive=data.get("auto_archive", False),
+            archive_after_days=data.get("archive_after_days", 30),
+            coordinator_mode=data.get("coordinator_mode", False),
+            escalation_threshold=data.get("escalation_threshold", "medium"),
+            deadline=data.get("deadline"),
+            metadata=data.get("metadata", {}),
+        )

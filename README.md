@@ -574,18 +574,134 @@ A **room** is a conversation context where:
 | **DIRECT** | 1-on-1 with a bot | Private DM with @researcher |
 | **COORDINATION** | Leader-managed room | Autonomous coordination mode |
 
-### Creating and Managing Rooms
+### Room-Centric Architecture
 
-## Current Architecture
-Nanofolks uses a room-centric architecture where rooms are the primary collaboration spaces. Rooms persist context across conversations and are accessible across platforms using a consistent room ID. Key aspects:
-- Room types: OPEN, PROJECT, DIRECT, COORDINATION
-- Cross-platform continuity: room IDs work in CLI, Telegram, Discord, etc.
-- Storage: per-room JSON files under ~/.nanofolks/rooms and a channel_mappings.json to route channels to rooms
-- Leader coordinates and bots participate within rooms
+Nanofolks uses a **room-centric architecture** where everything is organized by room. This provides:
 
-Create rooms for different projects or contexts:
+| Benefit | Description |
+|---------|-------------|
+| **Persistent Sessions** | Conversation history is stored per-room |
+| **Cross-Platform Continuity** | Same room ID works across Telegram, Discord, CLI, etc. |
+| **Organized Storage** | All data (sessions, memory, work logs) organized by room |
+| **Easy Retrieval** | Find conversations by room name |
+
+#### How It Works
+
+```
+room:general          → Default room for all conversations
+room:project-abc123  → Project room (multi-platform)
+```
+
+#### Storage Structure
+
+```
+~/.nanofolks/
+├── rooms/
+│   ├── general.json           # General room data
+│   ├── project-abc123.json    # Project room
+│   └── channel_mappings.json  # Maps channels to rooms
+├── project_states/            # Per-room discovery/flow state
+│   └── <room_id>.json
+└── work_logs.db              # Per-room work logs
+```
+
+### The @ Mention System
+
+Use **@** to direct messages to specific bots or the entire crew:
+
+#### Direct to a Bot
+```
+@researcher analyze market trends for Q3
+→ Researcher responds with analysis
+
+@coder implement user authentication
+→ Coder writes the code
+
+@creative design a landing page hero
+→ Creative creates concepts
+```
+
+#### Broadcast to All
+```
+@all review this architecture proposal
+→ All bots in the room respond with feedback
+
+@crew brainstorm marketing ideas
+→ Entire crew collaborates
+```
+
+#### Leader Coordination (Default)
+```
+I need help planning the product launch
+→ Leader coordinates which bots should help
+→ May involve researcher (market), creative (branding), coder (landing page)
+```
+
+### How @ Routing Works
+
+1. **@botname mentioned?** → Goes directly to that bot
+2. **@all or @crew mentioned?** → Broadcast to all room participants
+3. **No mention?** → Leader analyzes and coordinates response
+
+### Room Creation by Leader
+
+The Leader can create rooms automatically when you ask:
+
+```
+You: Create a room for the website redesign project
+Leader: Created room 'website-redesign' with appropriate team members
+
+You: Set up a space for the Q4 planning
+Leader: Created 'q4-planning' room with researcher and creative
+```
+
+### Shared Context
+
+Rooms maintain shared context across the conversation:
+
+```
+You: @researcher find data on renewable energy
+Researcher: [shares findings]
+
+You: @creative use that data for an infographic
+Creative: [accesses the same research context]
+
+You: @coder build a dashboard with those stats
+Coder: [references previous findings]
+```
+
+### CLI Commands
 
 ```bash
+# Create a new project room
+nanofolks room create project-alpha
+
+# Invite bots to the room
+nanofolks room invite project-alpha researcher
+nanofolks room invite project-alpha coder
+nanofolks room invite project-alpha creative
+
+# See who's in the room
+nanofolks room show project-alpha
+
+# List all your rooms
+nanofolks room list
+```
+
+### Best Practices
+
+**When to use @mentions:**
+- ✅ Use `@botname` when you know exactly who should help
+- ✅ Use `@all` for brainstorming or decisions needing multiple perspectives
+- ✅ No mention for general questions (Leader coordinates)
+
+**Room organization:**
+- Create PROJECT rooms for specific initiatives
+- Keep #general as OPEN for casual chat
+- Use DIRECT when you need a bot's specific expertise privately
+- Leader can auto-create rooms when you describe a project
+
+---
 
 ## 💓 Multi-Heartbeat System
 
@@ -920,197 +1036,6 @@ Monitors when you're active to:
 - Determine when to run background processing
 - Avoid interrupting conversations
 - Optimize memory extraction timing
-
----
-
-
-# Create a new project room
-nanofolks room create project-alpha
-
-
-# Invite bots to the room
-nanofolks room invite project-alpha researcher
-nanofolks room invite project-alpha coder
-nanofolks room invite project-alpha creative
-
-
-# See who's in the room
-nanofolks room show project-alpha
-
-
-# List all your rooms
-nanofolks room list
-```
-
-### The @ Mention System
-
-Use **@** to direct messages to specific bots or the entire crew:
-
-#### Direct to a Bot
-```
-@researcher analyze market trends for Q3
-→ ResearcherBot responds with analysis
-
-@coder implement user authentication
-→ CoderBot writes the code
-
-@creative design a landing page hero
-→ CreativeBot creates concepts
-```
-
-#### Broadcast to All
-```
-@all review this architecture proposal
-→ All bots in the room respond with feedback
-
-@crew brainstorm marketing ideas
-→ Entire crew collaborates on ideas
-```
-
-#### Leader Coordination (Default)
-```
-I need help planning the product launch
-→ Leader coordinates which bots should help
-→ May involve researcher (market), creative (branding), coder (landing page)
-```
-
-### How @ Routing Works
-
-When you send a message, Nanofolks intelligently routes it:
-
-1. **@botname mentioned?** → Goes directly to that bot
-2. **@all or @crew mentioned?** → Broadcast to all room participants
-3. **No mention?** → Leader analyzes and coordinates response
-
-```
-You: @researcher find competitors in the AI space
-    ↓
-ResearcherBot: Here's what I found...
-
-You: @all what do you think of this strategy?
-    ↓
-ResearcherBot: From a data perspective...
-CreativeBot: The branding approach should be...
-CoderBot: Technically, we could implement...
-Leader: Let me synthesize these perspectives...
-```
-
-### Direct Messages (DMs)
-
-Chat with a single bot privately without room context:
-
-```bash
-
-# DM a specific bot
-nanofolks agent -m "@researcher analyze this data privately"
-
-
-# Or enter interactive mode and use @ mentions
-nanofolks agent
-> @researcher what are the latest trends?
-```
-
-**DMs vs Rooms:**
-- **DMs** → Private 1-on-1, bot's individual expertise
-- **Rooms** → Collaborative, shared context, multiple perspectives
-
-### Room Creation by Leader
-
-The Leader can create rooms automatically when you ask:
-
-```
-You: Create a room for the website redesign project
-Leader: Created room 'website-redesign' with appropriate team members
-
-You: Set up a space for the Q4 planning
-Leader: Created 'q4-planning' room with researcher and creative
-```
-
-### Shared Context
-
-Rooms maintain shared context across the conversation:
-
-```
-You: @researcher find data on renewable energy
-ResearcherBot: [shares findings]
-
-You: @creative use that data for an infographic
-CreativeBot: [accesses the same research context]
-
-You: @coder build a dashboard with those stats
-CoderBot: [references previous findings]
-```
-
-### Room-Centric Architecture
-
-Nanofolks uses a **room-centric architecture** where everything is organized by room. This provides:
-
-| Benefit | Description |
-|---------|-------------|
-| **Persistent Sessions** | Conversation history is stored per-room, not per-channel |
-| **Cross-Platform Continuity** | Same room ID works across Telegram, Discord, Slack, etc. |
-| **Organized Storage** | All data (sessions, memory, work logs) organized by room |
-| **Easy Retrieval** | Find conversations by room name, not obscure session IDs |
-
-#### How It Works
-
-```
-room:cli_default          → CLI conversations
-room:telegram_123456      → Telegram chat
-room:discord_987654       → Discord channel
-room:project_website      → Project room (multi-platform)
-```
-
-#### Storage Structure
-
-```
- ~/.nanofolks/
- ├── rooms/
- │   ├── general.json        # General room data
- │   ├── website-redesign.json
- │   └── <room_id>.json
- │   channel_mappings.json   # channel:room mappings (room-centric routing)
- ├── project_states/         # Per-room discovery/flow state files
- │   └── <room_id>.json
- └── work_logs.db
- ```
-
-#### Cross-Platform Rooms
-
-Create rooms that work across platforms:
-
-```bash
-# Create a project room
-nanofolks room create website-redesign
-
-# Join from any platform - same room, same context
-# Telegram: @nanofolks invite me to website-redesign
-# Discord: /invite website-redesign
-# CLI: nanofolks room join website-redesign
-```
-
-### CLI Commands for Rooms
-
-| Command | Description |
-|---------|-------------|
-| `nanofolks room list` | Show all rooms |
-| `nanofolks room create <name>` | Create new room |
-| `nanofolks room invite <room> <bot>` | Add bot to room |
-| `nanofolks room remove <room> <bot>` | Remove bot from room |
-| `nanofolks room show <room>` | Show room details |
-
-### Best Practices
-
-**When to use @mentions:**
-- ✅ Use `@botname` when you know exactly who should help
-- ✅ Use `@all` for brainstorming or decisions needing multiple perspectives
-- ✅ No mention for general questions (Leader coordinates)
-
-**Room organization:**
-- Create PROJECT rooms for specific initiatives
-- Keep #general as OPEN for casual chat
-- Use DIRECT when you need a bot's specific expertise privately
-- Leader can auto-create rooms when you describe a project
 
 ---
 

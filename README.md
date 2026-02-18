@@ -576,6 +576,13 @@ A **room** is a conversation context where:
 
 ### Creating and Managing Rooms
 
+## Current Architecture
+Nanofolks uses a room-centric architecture where rooms are the primary collaboration spaces. Rooms persist context across conversations and are accessible across platforms using a consistent room ID. Key aspects:
+- Room types: OPEN, PROJECT, DIRECT, COORDINATION
+- Cross-platform continuity: room IDs work in CLI, Telegram, Discord, etc.
+- Storage: per-room JSON files under ~/.nanofolks/rooms and a channel_mappings.json to route channels to rooms
+- Leader coordinates and bots participate within rooms
+
 Create rooms for different projects or contexts:
 
 ```bash
@@ -1057,16 +1064,16 @@ room:project_website      → Project room (multi-platform)
 #### Storage Structure
 
 ```
-~/.nanofolks/
-├── room_sessions/          # Session history by room
-│   ├── cli_default.jsonl
-│   ├── telegram_123456.jsonl
-│   └── project_website.jsonl
-├── project_states/         # Discovery flow states
-│   ├── project_website.json
-│   └── project_website_quick.json
-└── work_logs.db           # Work logs with room IDs
-```
+ ~/.nanofolks/
+ ├── rooms/
+ │   ├── general.json        # General room data
+ │   ├── website-redesign.json
+ │   └── <room_id>.json
+ │   channel_mappings.json   # channel:room mappings (room-centric routing)
+ ├── project_states/         # Per-room discovery/flow state files
+ │   └── <room_id>.json
+ └── work_logs.db
+ ```
 
 #### Cross-Platform Rooms
 
@@ -1119,4 +1126,3 @@ docker run -v ~/.nanofolks:/root/.nanofolks --rm nanofolks onboard
 # Run gateway
 docker run -v ~/.nanofolks:/root/.nanofolks -p 18790:18790 nanofolks gateway
 ```
-

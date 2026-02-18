@@ -205,9 +205,23 @@ async def _read_interactive_input_async(room_id: str = "general") -> str:
         raise KeyboardInterrupt from exc
 
 
-def _print_agent_response(response: str, render_markdown: bool) -> None:
-    """Render assistant response with clean, copy-friendly header."""
+def _print_agent_response(response: str, render_markdown: bool, already_streamed: bool = False) -> None:
+    """Render assistant response with clean, copy-friendly header.
+    
+    Args:
+        response: The response content
+        render_markdown: Whether to render as markdown
+        already_streamed: If True, skip printing duplicate content (was shown in real-time)
+    """
     content = response or ""
+    
+    # If content was already streamed in real-time, just show the header
+    if already_streamed and content:
+        console.print()
+        console.print(f"{__logo__} [bold cyan]nanofolks[/bold cyan]")
+        console.print()
+        return
+    
     body = Markdown(content) if render_markdown else Text(content)
     console.print()
     # Use a simple header instead of a Panel box, making it easier to copy text
@@ -1375,13 +1389,12 @@ def chat(
                 console.print(f"[dim]{chunk}[/dim]\r", end="", highlight=False)
             else:
                 # Tool completed
-                console.print(f"[green]{chunk}[/green]")
+                console.print(f"[green]{chunk}[/green]\n")
         else:
-            # Regular content chunk
+            # Regular content chunk - show in real-time
             streaming_content += chunk
-            # Show last 80 chars of accumulated content
-            preview = streaming_content[-80:].replace("\n", " ").replace("\r", "")
-            console.print(f"[dim]🔄 Thinking: {preview}...[/dim]\r", end="", highlight=False)
+            # Show content directly (not just preview)
+            console.print(f"[cyan]{chunk}[/cyan]", end="", highlight=False)
 
     if message:
         # Single message mode
@@ -1389,7 +1402,7 @@ def chat(
             try:
                 with _thinking_ctx():
                     response = await agent_loop.process_direct(message, session_id, room_id=room, stream_callback=_stream_chunk)
-                _print_agent_response(response, render_markdown=markdown)
+                _print_agent_response(response, render_markdown=markdown, already_streamed=True)
 
                 # NEW: Show thinking logs after response
                 thinking_display = await _show_thinking_logs(agent_loop)
@@ -1830,7 +1843,7 @@ def chat(
                         response = await agent_loop.process_direct(user_input, session_id, room_id=room, stream_callback=_stream_chunk)
                     # Clear the streaming indicator line
                     console.print("\r" + " " * 50 + "\r", end="", highlight=False)
-                    _print_agent_response(response, render_markdown=markdown)
+                    _print_agent_response(response, render_markdown=markdown, already_streamed=True)
 
                     # NEW: Show thinking logs after response
                     thinking_display = await _show_thinking_logs(agent_loop)

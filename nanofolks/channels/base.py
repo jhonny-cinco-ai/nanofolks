@@ -1,12 +1,14 @@
 """Base channel interface for chat platforms."""
 
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 from loguru import logger
 
 from nanofolks.bus.events import InboundMessage, OutboundMessage
 from nanofolks.bus.queue import MessageBus
+from nanofolks.rooms.registry import RoomRegistry, get_room_registry
 
 
 class BaseChannel(ABC):
@@ -19,17 +21,23 @@ class BaseChannel(ABC):
     
     name: str = "base"
     
-    def __init__(self, config: Any, bus: MessageBus):
+    def __init__(self, config: Any, bus: MessageBus, workspace: Path | None = None):
         """
         Initialize the channel.
         
         Args:
             config: Channel-specific configuration.
             bus: The message bus for communication.
+            workspace: Workspace directory (required for room-centric routing).
         """
         self.config = config
         self.bus = bus
         self._running = False
+        
+        # Room registry for room-centric routing
+        self._room_registry: RoomRegistry | None = None
+        if workspace:
+            self._room_registry = get_room_registry(workspace)
     
     @abstractmethod
     async def start(self) -> None:
@@ -89,12 +97,14 @@ class BaseChannel(ABC):
         chat_id: str,
         content: str,
         media: list[str] | None = None,
-        metadata: dict[str, Any] | None = None
+        metadata: dict[str, Any] | None = None,
+        workspace: Path | None = None
     ) -> None:
         """
         Handle an incoming message from the chat platform.
         
         This method checks permissions and forwards to the bus.
+        Uses room-centric routing if workspace is provided.
         
         Args:
             sender_id: The sender's identifier.
@@ -102,6 +112,7 @@ class BaseChannel(ABC):
             content: Message text content.
             media: Optional list of media URLs.
             metadata: Optional channel-specific metadata.
+            workspace: Workspace directory for room registry lookup.
         """
         if not self.is_allowed(sender_id):
             logger.warning(
@@ -110,6 +121,7 @@ class BaseChannel(ABC):
             )
             return
         
+        # Create message
         msg = InboundMessage(
             channel=self.name,
             sender_id=str(sender_id),
@@ -118,6 +130,22 @@ class BaseChannel(ABC):
             media=media or [],
             metadata=metadata or {}
         )
+        
+        # Room-centric routing: look up which room this channel/chat belongs to
+        if workspace:
+            try:
+                registry = get_room_registry(workspace)
+                room_id = registry.get_room_for_channel(self.name, chat_id)
+                if room_id:
+                    msg.set_room(room_id)
+                    logger.debug(f"Routed {self.name}:{chat_id} to room:{room_id}")
+                else:
+                    # Auto-join to general room if not mapped
+                    registry.join_channel_to_room(self.name, chat_id, "general")
+                    msg.set_room("general")
+                    logger.info(f"Auto-joined {self.name}:{chat_id} to room:general")
+            except Exception as e:
+                logger.warning(f"Room routing failed: {e}, using channel-based routing")
         
         await self.bus.publish_inbound(msg)
     

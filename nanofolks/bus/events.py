@@ -16,12 +16,20 @@ class InboundMessage:
     timestamp: datetime = field(default_factory=datetime.now)
     media: list[str] = field(default_factory=list)  # Media URLs
     metadata: dict[str, Any] = field(default_factory=dict)  # Channel-specific data
+    room_id: str | None = None  # Room ID if part of room-centric routing
     
     @property
     def session_key(self) -> str:
         """Unique key for session identification (room-centric format)."""
-        # Use room-centric format: room:{channel}_{chat_id}
+        # If room_id is set, use it directly (true room-centric)
+        if self.room_id:
+            return f"room:{self.room_id}"
+        # Fallback to channel-based (legacy/compatibility)
         return f"room:{self.channel}_{self.chat_id}"
+    
+    def set_room(self, room_id: str) -> None:
+        """Set the room for this message (room-centric routing)."""
+        self.room_id = room_id
 
 
 @dataclass

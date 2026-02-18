@@ -116,7 +116,7 @@ def _create_entity_table(entities: list, show_all: bool = True) -> Table:
         table.add_column("Last Seen", style="dim")
         
         for entity in entities:
-            relations = ", ".join([rel.get("type", "unknown") for rel in entity.get("relations", [])]) if entity.get("relations") else "none")
+            relations = ", ".join([rel.get("type", "unknown") for rel in entity.get("relations", [])]) if entity.get("relations") else "none"
             
             first_seen = entity.get("first_seen_at", "Unknown")
             last_seen = entity.get("last_seen_at", "Unknown")
@@ -328,9 +328,8 @@ def memory_entity(
                         console.print(f"[dim]     {rel.get('description', 'No description')}")
             else:
                 console.print("[bold cyan]No relationships found for this entity")
-                
-            else:
-                console.print(f"[yellow]Entity '{name}' not found[/yellow]")
+            
+            console.print(f"[yellow]Entity '{name}' not found[/yellow]")
                 
         except Exception as e:
             console.print(f"[red]❌ Error loading entity: {e}")
@@ -362,7 +361,7 @@ def memory_summary(
                     console.print(f"[bold cyan]Type:[/bold cyan] {node.get('summary_type', 'unknown')}")
                     console.print(f"[bold cyan]Children: {len(node.get('children', []))}")
                     console.print(f"[bold cyan]Staleness: {node.get('staleness', 0)}")
-                    console.print(f"[bold cyan]Events: {len(node.get('events', [])}")
+                    console.print(f"[bold cyan]Events: {len(node.get('events', []))}")
                     console.print(f"[bold cyan]Created: {node.get('created_at', 'Unknown')}")
                     
                 if show_details and node.get('summary'):
@@ -458,7 +457,7 @@ def memory_export(
             # Add embedding vectors if available
             try:
                 from nanofolks.memory.models import Entity
-                embedding_entities = [e for e in entities if hasattr(e, 'embedding') else []]
+                embedding_entities = [e for e in entities if hasattr(e, 'embedding') and e.embedding]
                 export_data["entity_embeddings"] = embedding_entities
             except ImportError:
                 export_data["entity_embeddings"] = []
@@ -584,20 +583,26 @@ def memory_doctor():
                 
                 except Exception as e:
                     issues.append(f"Database access error: {e}")
+            except Exception:
+                pass
             
             # Check for learnings if available
+            learning_count = 0
             try:
                 from nanofolks.memory.models import Learning
                 learning_count = memory_store.get_learning_count()
                 if learning_count > 500:
                     issues.append(f"High learning count: {learning_count} (consider running memory forget)")
-                except ImportError:
-                    pass
+            except (ImportError, AttributeError):
+                pass
             
             # Check for learnings
+            try:
                 learning_stats = memory_store.get_learning_stats()
                 if learning_stats.get("decay_rate", 0) > 0:
                     issues.append(f"Learning decay rate: {learning_stats.get('decay_rate'):0.0}")
+            except (ImportError, AttributeError):
+                pass
             
             if not issues:
                 console.print("[green]✓ Memory system is healthy")
@@ -686,13 +691,13 @@ def session_compact():
                     "tokens_after": result.tokens_after,
                     "mode": result.mode
                 }
+            
+            last_compaction = session.metadata.get("last_compaction", {})
             console.print(f"[yellow]Compaction count since last compaction: {last_compaction.get('compactions', 0)}")
         else:
-                console.print("[green]✓ No compaction needed")
-        except Exception as e:
-            console.print(f"[red]❌ Compaction error: {e}")
-    else:
-        console.print("[yellow]⚠️ No sessions found[/yellow]")
+            console.print("[green]✓ No compaction needed")
+    except Exception as e:
+        console.print(f"[red]❌ Compaction error: {e}")
 
 
 @session_app.command("status")
@@ -759,7 +764,7 @@ def session_status():
                 if would_compact:
                     console.print("[red]⚠️ Would compact (80% threshold)[/red]")
                 elif compactions > 0:
-                    console.print(f"[yellow]⚠️ {compactions since last compaction[/yellow]")
+                    console.print(f"[yellow]⚠️ {compactions} compactions since last compaction[/yellow]")
                 else:
                     console.print(f"[green]✓ No compaction needed")
                 
@@ -771,17 +776,13 @@ def session_status():
                         console.print(f"[dim]Last compaction: {time_since_last} ago[/dim]")
                     else:
                         console.print("[bold cyan]Last compaction: Never")
-                    
-            else:
-                console.print("[bold cyan]Last compaction: Never")
-                
                 else:
                     console.print("[yellow]No last compaction")
             
             except Exception as e:
                 console.print(f"[red]❌ Session status error: {e}")
-        else:
-            console.print("[yellow]⚠️ No sessions found[/yellow]")
+    else:
+        console.print("[yellow]⚠️ No sessions found[/yellow]")
 
 
 @session_app.command("reset")

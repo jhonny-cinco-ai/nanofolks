@@ -109,7 +109,7 @@ class BotInvoker:
         bot_role: str,
         task: str,
         context: Optional[str] = None,
-        session_id: str = "invoke:default",
+        session_id: str = "room:invoke_general",
         origin_channel: str = "cli",
         origin_chat_id: str = "direct",
     ) -> str:

@@ -82,7 +82,7 @@ class AgentLoop:
         self._current_tier = "medium"
         
         # Room context for multi-agent collaboration
-        self._current_room_id: str = "default"
+        self._current_room_id: str = "general"
         self._current_room_type: str = "open"
         self._current_room_participants: list[str] = ["leader"]
         

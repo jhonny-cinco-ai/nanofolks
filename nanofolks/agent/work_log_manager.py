@@ -55,7 +55,7 @@ the current active log.
                     final_output TEXT,
                     entry_count INTEGER DEFAULT 0,
                     -- Multi-agent fields
-                    workspace_id TEXT DEFAULT 'default',
+                    workspace_id TEXT DEFAULT 'general',
                     workspace_type TEXT DEFAULT 'open',
                     participants_json TEXT DEFAULT '["leader"]',
                     coordinator TEXT
@@ -80,7 +80,7 @@ the current active log.
                     tool_output_json TEXT,
                     tool_status TEXT,
                     -- Multi-agent fields
-                    workspace_id TEXT DEFAULT 'default',
+                    workspace_id TEXT DEFAULT 'general',
                     workspace_type TEXT DEFAULT 'open',
                     participants_json TEXT DEFAULT '["leader"]',
                     bot_name TEXT DEFAULT 'leader',
@@ -129,7 +129,7 @@ the current active log.
             """)
     
     def start_session(self, session_id: str, query: str,
-                       workspace_id: str = "default",
+                       workspace_id: str = "general",
                        workspace_type: Optional[WorkspaceType] = None,
                        participants: Optional[list] = None,
                        coordinator: Optional[str] = None) -> WorkLog:
@@ -152,7 +152,7 @@ the current active log.
                 session_id=session_id,
                 query=query,
                 start_time=datetime.now(),
-                workspace_id=workspace_id or "default",
+                workspace_id=workspace_id or "general",
                 workspace_type=workspace_type or WorkspaceType.OPEN,
                 participants=participants or ["leader"],
                 coordinator=coordinator
@@ -161,14 +161,14 @@ the current active log.
         # Initialize Learning Exchange for this session
         self.learning_exchange = LearningExchange(
             bot_name=self.bot_name,
-            workspace_id=workspace_id or "default"
+            workspace_id=workspace_id or "general"
         )
         
         self.current_log = WorkLog(
             session_id=session_id,
             query=query,
             start_time=datetime.now(),
-            workspace_id=workspace_id or "default",
+            workspace_id=workspace_id or "general",
             workspace_type=workspace_type or WorkspaceType.OPEN,
             participants=participants or ["leader"],
             coordinator=coordinator
@@ -531,7 +531,7 @@ the current active log.
             end_time=datetime.fromisoformat(row['end_time']) if row['end_time'] else None,
             final_output=row['final_output'],
             # Multi-agent fields from DB
-            workspace_id=row['workspace_id'] if 'workspace_id' in row.keys() else 'default',
+            workspace_id=row['workspace_id'] if 'workspace_id' in row.keys() else 'general',
             workspace_type=WorkspaceType(row['workspace_type']) if 'workspace_type' in row.keys() else WorkspaceType.OPEN,
             participants=json.loads(row['participants_json']) if 'participants_json' in row.keys() and row['participants_json'] else ['leader'],
             coordinator=row['coordinator'] if 'coordinator' in row.keys() else None
@@ -559,7 +559,7 @@ the current active log.
                 tool_output=json.loads(entry_row['tool_output_json']) if entry_row['tool_output_json'] else None,
                 tool_status=entry_row['tool_status'],
                 # Multi-agent fields - use dict-like access with fallback
-                workspace_id=entry_row['workspace_id'] if 'workspace_id' in entry_row.keys() else 'default',
+                workspace_id=entry_row['workspace_id'] if 'workspace_id' in entry_row.keys() else 'general',
                 workspace_type=WorkspaceType(entry_row['workspace_type']) if 'workspace_type' in entry_row.keys() else WorkspaceType.OPEN,
                 participants=json.loads(entry_row['participants_json']) if 'participants_json' in entry_row.keys() and entry_row['participants_json'] else ['leader'],
                 bot_name=entry_row['bot_name'] if 'bot_name' in entry_row.keys() else 'leader',

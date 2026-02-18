@@ -648,11 +648,11 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
             
             # Optionally include recent activity for context continuity
             if include_recent:
-                # Get recent events from the default session or all events
+                # Get recent events from the general room or all events
                 recent_events = []
                 try:
-                    # Try to get events by session (default session)
-                    recent_events = self.memory.get_events_by_session(session_key="default", limit=recent_limit)
+                    # Try to get events by session (room:general)
+                    recent_events = self.memory.get_events_by_session(session_key="room:general", limit=recent_limit)
                 except:
                     # Fallback to getting all events
                     recent_events = []

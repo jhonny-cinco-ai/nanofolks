@@ -72,8 +72,8 @@ class WorkLogEntry:
     # Multi-Agent Extension Fields
     # ===============================
     
-    # Workspace context (single-bot: uses "default")
-    room_id: str = "default"  # "#general", "#project-refactor", or "default"
+    # Workspace context (room-centric: uses "general" as default)
+    room_id: str = "general"  # "#general", "#project-refactor", or "general"
     room_type: WorkspaceType = RoomType.OPEN
     participants: List[str] = field(default_factory=lambda: ["leader"])
     
@@ -112,7 +112,7 @@ class WorkLogEntry:
         Returns True if any multi-agent fields are set to non-default values.
         """
         return (
-            self.room_id != "default" or
+            self.room_id != "general" or
             self.room_type != RoomType.OPEN or
             len(self.participants) > 1 or
             self.bot_name != "leader" or
@@ -172,8 +172,8 @@ class WorkLog:
     entries: List[WorkLogEntry] = field(default_factory=list)
     final_output: Optional[str] = None
     
-    # Multi-agent context (single-bot: uses defaults)
-    room_id: str = "default"  # "#general", "#project-alpha", etc.
+    # Multi-agent context (room-centric: uses "general" as default)
+    room_id: str = "general"  # "#general", "#project-alpha", etc.
     room_type: WorkspaceType = RoomType.OPEN
     participants: List[str] = field(default_factory=lambda: ["leader"])
     coordinator: Optional[str] = None  # "leader" if in coordinator mode

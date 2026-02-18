@@ -17,7 +17,11 @@ from nanofolks.models.room import Room, RoomType
 
 
 class RoomManager:
-    """Manages all rooms with automatic default creation."""
+    """Manages all rooms with automatic default creation.
+    
+    Supports room-centric architecture where channels can join rooms
+    for cross-platform conversation continuity.
+    """
     
     # Default room that always exists
     DEFAULT_ROOM_ID = "general"
@@ -30,6 +34,13 @@ class RoomManager:
         self.rooms_dir.mkdir(parents=True, exist_ok=True)
         
         self._rooms: Dict[str, Room] = {}
+        
+        # Channel-to-room mapping for room-centric architecture
+        # Key: "channel:chat_id" (e.g., "telegram:123456"), Value: "room_id"
+        self._channel_mappings: Dict[str, str] = {}
+        self._mappings_file = self.rooms_dir / "channel_mappings.json"
+        self._load_channel_mappings()
+        
         self._load_or_create_default()
     
     def _load_or_create_default(self) -> None:
@@ -307,6 +318,132 @@ class RoomManager:
         if room:
             return room.participants.copy()
         return []
+    
+    # ========================================================================
+    # Room-Centric Architecture: Channel-to-Room Mapping
+    # ========================================================================
+    
+    def _load_channel_mappings(self) -> None:
+        """Load channel-to-room mappings from disk."""
+        if self._mappings_file.exists():
+            try:
+                with open(self._mappings_file, 'r') as f:
+                    self._channel_mappings = json.load(f)
+                logger.debug(f"Loaded {len(self._channel_mappings)} channel mappings")
+            except Exception as e:
+                logger.warning(f"Failed to load channel mappings: {e}")
+                self._channel_mappings = {}
+    
+    def _save_channel_mappings(self) -> None:
+        """Save channel-to-room mappings to disk."""
+        try:
+            with open(self._mappings_file, 'w') as f:
+                json.dump(self._channel_mappings, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save channel mappings: {e}")
+    
+    def join_channel_to_room(self, channel: str, chat_id: str, room_id: str) -> bool:
+        """Map a channel/chat to a room (room-centric architecture).
+        
+        This allows messages from this channel to be routed to the room,
+        enabling cross-platform conversation continuity.
+        
+        Args:
+            channel: Channel type (telegram, discord, slack, etc.)
+            chat_id: Chat/channel identifier
+            room_id: Room to join
+            
+        Returns:
+            True if successful
+        """
+        # Verify room exists
+        if room_id not in self._rooms:
+            logger.error(f"Cannot join to non-existent room: {room_id}")
+            return False
+        
+        # Create mapping key
+        channel_key = f"{channel}:{chat_id}"
+        
+        # Add mapping
+        self._channel_mappings[channel_key] = room_id
+        self._save_channel_mappings()
+        
+        logger.info(f"Mapped {channel_key} -> room:{room_id}")
+        return True
+    
+    def leave_channel_from_room(self, channel: str, chat_id: str) -> bool:
+        """Remove a channel from its room.
+        
+        Args:
+            channel: Channel type
+            chat_id: Chat identifier
+            
+        Returns:
+            True if removed, False if not mapped
+        """
+        channel_key = f"{channel}:{chat_id}"
+        
+        if channel_key in self._channel_mappings:
+            room_id = self._channel_mappings[channel_key]
+            del self._channel_mappings[channel_key]
+            self._save_channel_mappings()
+            
+            logger.info(f"Removed mapping for {channel_key} (was in room:{room_id})")
+            return True
+        
+        return False
+    
+    def get_room_for_channel(self, channel: str, chat_id: str) -> Optional[str]:
+        """Get room ID for a channel/chat.
+        
+        Args:
+            channel: Channel type
+            chat_id: Chat identifier
+            
+        Returns:
+            Room ID or None if not mapped
+        """
+        channel_key = f"{channel}:{chat_id}"
+        return self._channel_mappings.get(channel_key)
+    
+    def get_channel_mappings_for_room(self, room_id: str) -> List[Dict[str, str]]:
+        """Get all channel mappings for a room.
+        
+        Args:
+            room_id: Room identifier
+            
+        Returns:
+            List of {channel, chat_id} dicts
+        """
+        mappings = []
+        for channel_key, rid in self._channel_mappings.items():
+            if rid == room_id:
+                parts = channel_key.split(":", 1)
+                if len(parts) == 2:
+                    mappings.append({
+                        "channel": parts[0],
+                        "chat_id": parts[1]
+                    })
+        return mappings
+    
+    def auto_join_to_general(self, channel: str, chat_id: str) -> str:
+        """Auto-join a channel to the general room if not mapped.
+        
+        Args:
+            channel: Channel type
+            chat_id: Chat identifier
+            
+        Returns:
+            Room ID (general or existing mapping)
+        """
+        existing = self.get_room_for_channel(channel, chat_id)
+        if existing:
+            return existing
+        
+        # Auto-join to general
+        self.join_channel_to_room(channel, chat_id, self.DEFAULT_ROOM_ID)
+        logger.info(f"Auto-joined {channel}:{chat_id} to room:general")
+        return self.DEFAULT_ROOM_ID
 
 
 # Global instance

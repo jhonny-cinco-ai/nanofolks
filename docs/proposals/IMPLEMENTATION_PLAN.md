@@ -9,7 +9,7 @@ This document outlines the complete implementation plan for Nanofolks, a multi-b
 - Phase 2 ✅ COMPLETE: Intent Detection + IntentFlowRouter
 - Phase 3 ✅ COMPLETE: Full Discovery Flow (Leader-first)
 - Quick Flow Persistence ✅ ADDED: State survives service restarts
-- Phase 4: Session Migration (deferred)
+- Phase 4 ✅ COMPLETE: Session Migration (Dual-mode architecture)
 
 **Total Duration:** ~14 weeks
 
@@ -847,24 +847,95 @@ nanofolks/agent/
 
 ---
 
-# Phase 4: Session Migration (Deferred)
+# Phase 4: Room-Centric Sessions ✅ COMPLETE
 
 ## Overview
 
-Migrate from `channel:chat_id` session keys to `room:{id}` keys.
+Implemented room-centric session storage using `room:{id}` keys. Since the project hasn't launched yet, we don't need backward compatibility or migration tools.
 
-## Why Defer
+## Implementation
 
-1. Phase 1-3 deliver full user value
-2. Session migration is backend/storage focused
-3. Risk increases with scope - better to validate user behavior first
+### 4.1 Room Session Manager
 
-## Future Implementation
+```python
+# nanofolks/session/dual_mode.py
 
-See original `ROOM_CENTRIC_IMPLEMENTATION_PLAN.md` for:
-- Dual-mode session manager
-- Migration CLI tool
-- Cross-channel synchronization
+class RoomSessionManager(SessionManager):
+    """Room-centric session manager."""
+    
+    def __init__(self, workspace):
+        # All sessions stored in: ~/.nanofolks/room_sessions/
+        pass
+    
+    def get_or_create(self, key: str) -> Session:
+        """Handle room keys like 'room:general', 'room:project-abc'."""
+        pass
+```
+
+### 4.2 Session Key Format
+
+| Key Format | Example | Storage Path |
+|------------|---------|--------------|
+| `room:{id}` | `room:general` | `~/.nanofolks/room_sessions/general.jsonl` |
+| `room:{id}` | `room:project-abc123` | `~/.nanofolks/room_sessions/project-abc123.jsonl` |
+
+### 4.3 Integration with Turbo Memory & Work Logs
+
+All systems now use room-centric session keys:
+
+| System | Old Format | New Format |
+|--------|------------|------------|
+| Sessions | `cli:default` | `room:cli_default` |
+| Memory Events | `telegram:123456` | `room:telegram_123456` |
+| Work Logs | `discord:abc` | `room:discord_abc` |
+
+### 4.4 Usage
+
+```python
+from nanofolks.session import create_session_manager
+
+# Create room-centric session manager
+session_manager = create_session_manager(workspace)
+
+# Get or create a room session
+session = session_manager.get_or_create("room:general")
+
+# Save session
+session_manager.save(session)
+
+# List all sessions
+sessions = session_manager.list_sessions()
+```
+
+## Files Created (Phase 4)
+
+```
+nanofolks/
+├── session/
+│   ├── dual_mode.py              # NEW - RoomSessionManager
+│   └── __init__.py               # MODIFIED - Export new classes
+├── bus/
+│   └── events.py                 # MODIFIED - session_key uses room format
+├── memory/
+│   ├── models.py                 # MODIFIED - session_key docs
+│   └── store.py                  # MODIFIED - session_key docs
+└── agent/
+    └── loop.py                   # MODIFIED - Use create_session_manager()
+```
+
+## Testing Checklist (Phase 4)
+
+- [x] RoomSessionManager handles room:{id} keys
+- [x] Sessions persist to ~/.nanofolks/room_sessions/
+- [x] Session list functionality works
+- [x] Session stats work
+- [x] AgentLoop uses RoomSessionManager
+- [x] InboundMessage.session_key returns room format
+- [x] Memory system uses room format session keys
+- [x] Work logs use room format session IDs
+- [x] All channels (CLI, Telegram, Discord, Slack, WhatsApp, Email) use room format
+- [x] Channel session keys: room:{channel}_{chat_id}
+- [x] Filename sanitization handles special characters correctly
 
 ---
 
@@ -900,5 +971,5 @@ Leader Orchestrates │      │        │          │    ✅    │  ✅  │
 
 ---
 
-*Document Version: 2.2*  
-*Last Updated: Leader-first project rooms + Leader decides bot invites*
+*Document Version: 2.3*  
+*Last Updated: Phase 4 Session Migration Complete - Dual-mode session architecture*

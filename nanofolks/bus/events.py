@@ -19,8 +19,9 @@ class InboundMessage:
     
     @property
     def session_key(self) -> str:
-        """Unique key for session identification."""
-        return f"{self.channel}:{self.chat_id}"
+        """Unique key for session identification (room-centric format)."""
+        # Use room-centric format: room:{channel}_{chat_id}
+        return f"room:{self.channel}_{self.chat_id}"
 
 
 @dataclass

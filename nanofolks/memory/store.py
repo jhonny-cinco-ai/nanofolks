@@ -329,7 +329,7 @@ class TurboMemoryStore:
         Get events for a specific session.
         
         Args:
-            session_key: The session identifier (e.g., "cli:default")
+            session_key: The session identifier (e.g., "room:cli_default")
             limit: Maximum number of events to return
             offset: Number of events to skip
             

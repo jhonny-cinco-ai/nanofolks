@@ -22,7 +22,7 @@ class Event:
     direction: str  # "inbound", "outbound", "internal"
     event_type: str  # "message", "tool_call", "tool_result", "observation"
     content: str
-    session_key: str  # Format: "channel:chat_id"
+    session_key: str  # Format: "room:{channel}_{chat_id}" (room-centric)
     
     # Optional fields
     parent_event_id: Optional[str] = None  # For threading (e.g., tool_result → tool_call)

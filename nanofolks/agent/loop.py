@@ -23,7 +23,8 @@ from nanofolks.agent.tools.cron import CronTool
 from nanofolks.agent.tools.update_config import UpdateConfigTool
 from nanofolks.agent.stages import RoutingStage, RoutingContext
 from nanofolks.config.schema import RoutingConfig
-from nanofolks.session.manager import SessionManager, Session
+from nanofolks.session.manager import Session
+from nanofolks.session.dual_mode import create_session_manager
 from nanofolks.agent.work_log_manager import get_work_log_manager, LogLevel
 from nanofolks.agent.work_log import RoomType
 from nanofolks.reasoning.config import get_reasoning_config, ReasoningConfig
@@ -102,7 +103,19 @@ class AgentLoop:
         self.sanitizer = SecretSanitizer()
         
         self.context = ContextBuilder(workspace)
-        self.sessions = session_manager or SessionManager(workspace)
+        
+        # Initialize session manager (dual-mode with room-centric support)
+        if session_manager:
+            self.sessions = session_manager
+        else:
+            # Load config for session manager settings
+            try:
+                from nanofolks.config.loader import load_config
+                config = load_config()
+            except Exception:
+                config = None
+            self.sessions = create_session_manager(workspace, config)
+        
         self.tools = ToolRegistry()
         
         # Initialize smart router if enabled
@@ -1492,8 +1505,8 @@ class AgentLoop:
             origin_channel = "cli"
             origin_chat_id = msg.chat_id
         
-        # Use the origin session for context
-        session_key = f"{origin_channel}:{origin_chat_id}"
+        # Use the origin session for context (room-centric format)
+        session_key = f"room:{origin_channel}_{origin_chat_id}"
         session = self.sessions.get_or_create(session_key)
         
         # Update tool contexts
@@ -1583,7 +1596,7 @@ class AgentLoop:
     async def process_direct(
         self,
         content: str,
-        session_key: str = "cli:direct",
+        session_key: str = "room:cli_direct",
         channel: str = "cli",
         chat_id: str = "direct",
         room_id: str = "default",
@@ -1596,7 +1609,7 @@ class AgentLoop:
 
         Args:
             content: The message content.
-            session_key: Session identifier.
+            session_key: Session identifier (room-centric format: "room:{channel}_{chat_id}").
             channel: Source channel (for context).
             chat_id: Source chat ID (for context).
             room_id: Room identifier for multi-agent context.

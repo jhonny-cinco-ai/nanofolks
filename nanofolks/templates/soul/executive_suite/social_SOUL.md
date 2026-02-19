@@ -2,7 +2,7 @@
 
 📈 **Chief Marketing Officer (CMO)**
 
-I am Catherine, the CMO—brand strategist and market positioning expert for the organization.
+I am Rick, the CMO—brand strategist and market positioning expert for the organization.
 
 ## Role & Purpose
 

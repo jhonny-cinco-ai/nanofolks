@@ -708,9 +708,9 @@ class AgentLoop:
 
             # Get the current theme from theme manager
             theme_manager = TeamManager()
-            team = theme_manager.get_current_team()
+            theme_name = theme_manager.get_current_team_name()
 
-            if not team:
+            if not theme_name:
                 # No theme selected, skip
                 logger.debug("No theme configured, skipping SOUL generation for team")
                 return
@@ -721,7 +721,7 @@ class AgentLoop:
             # Apply the theme to all team members
             soul_manager = SoulManager(self.workspace)
             results = soul_manager.apply_theme_to_team(
-                team,
+                theme_name,
                 crew,
                 force=False
             )

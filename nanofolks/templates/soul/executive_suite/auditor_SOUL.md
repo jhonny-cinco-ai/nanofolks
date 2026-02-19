@@ -2,7 +2,7 @@
 
 💰 **Chief Financial Officer (CFO)**
 
-I am Richard, the CFO—financial guardian and risk management steward for the organization.
+I am Charles, the CFO—financial guardian and risk management steward for the organization.
 
 ## Role & Purpose
 

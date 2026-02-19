@@ -22,7 +22,8 @@ from rich.table import Table
 
 from nanofolks.models import Room, RoomType
 from nanofolks.soul import SoulManager
-from nanofolks.teams import TeamManager, get_team, list_teams
+from nanofolks.teams import TeamManager
+from nanofolks.templates import get_theme, list_themes
 
 console = Console()
 
@@ -441,12 +442,14 @@ Then restart nanofolks for secure access.
 
     def _show_team_for_theme(self, theme_name: str) -> None:
         """Show the full team composition for a theme."""
-        team = get_team(theme_name)
-        if not team:
+        from nanofolks.templates import get_theme, get_bot_theming
+
+        theme = get_theme(theme_name)
+        if not theme:
             return
 
-        console.print(f"\n[bold]Crew: {team.name.value}[/bold]\n")
-        console.print(f"[dim]{team.description}[/dim]\n")
+        console.print(f"\n[bold]Crew: {theme_name}[/bold]\n")
+        console.print(f"[dim]{theme['description']}[/dim]\n")
 
         # Create a table showing each team member
         team_table = Table(title="Your Crew Members", box=box.ROUNDED)
@@ -455,21 +458,15 @@ Then restart nanofolks for secure access.
         team_table.add_column("Description", style="white")
 
         # Add each bot
-        bots = [
-            ("Leader", team.leader, "leader"),
-            ("Researcher", team.researcher, "researcher"),
-            ("Coder", team.coder, "coder"),
-            ("Social", team.social, "social"),
-            ("Creative", team.creative, "creative"),
-            ("Auditor", team.auditor, "auditor"),
-        ]
+        bot_roles = ["leader", "researcher", "coder", "social", "creative", "auditor"]
 
-        for role, bot_theming, bot_name in bots:
+        for bot_name in bot_roles:
+            bot_theming = get_bot_theming(bot_name, theme_name)
             if bot_theming:
                 team_table.add_row(
-                    f"{bot_theming.emoji} {bot_theming.title}",
+                    f"{bot_theming['emoji']} {bot_theming['bot_title']}",
                     f"@{bot_name}",
-                    bot_theming.personality
+                    bot_theming['personality']
                 )
 
         console.print(team_table)
@@ -581,9 +578,8 @@ Then restart nanofolks for secure access.
         try:
             # Initialize SoulManager for workspace
             soul_manager = SoulManager(workspace_path)
-            team = get_team(self.selected_theme) if self.selected_theme else None
 
-            if team and self.selected_theme:
+            if self.selected_theme:
                 console.print("\n[cyan]Initializing crew personalities...[/cyan]")
 
                 # Apply theme to entire crew
@@ -591,7 +587,7 @@ Then restart nanofolks for secure access.
 
                 # Apply SOUL.md, IDENTITY.md, and ROLE.md themes
                 soul_results = soul_manager.apply_theme_to_team(
-                    team,
+                    self.selected_theme,
                     crew,
                     force=True
                 )
@@ -608,11 +604,12 @@ Then restart nanofolks for secure access.
                     )
 
                 # Show team personalities
+                from nanofolks.templates import get_bot_theming
                 console.print("\n[bold]Crew personalities configured:[/bold]")
                 for bot_name in crew:
-                    theming = team.get_bot_theming(bot_name)
+                    theming = get_bot_theming(bot_name, self.selected_theme)
                     if theming:
-                        console.print(f"  {theming.emoji} {theming.title} ({bot_name})")
+                        console.print(f"  {theming['emoji']} {theming['bot_title']} ({bot_name})")
 
             # Create per-bot files (AGENTS.md, IDENTITY.md if not already created, and HEARTBEAT.md)
             self._create_bot_files(workspace_path)

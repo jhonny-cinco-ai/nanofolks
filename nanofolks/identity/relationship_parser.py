@@ -256,21 +256,22 @@ class RelationshipParser:
             List of inferred BotRelationship objects
         """
         from nanofolks.teams import TeamManager
+        from nanofolks.templates import get_bot_theming
 
         relationships = []
 
         try:
             team_manager = TeamManager()
-            current_theme = team_manager.get_current_team()
+            current_theme_name = team_manager.get_current_team_name()
 
-            if not current_theme:
+            if not current_theme_name:
                 return relationships
 
             bots = ["leader", "researcher", "coder", "social", "creative", "auditor"]
             bots.remove(bot_name)  # Remove self
 
             for other_bot in bots:
-                profile = current_theme.get_bot_theming(other_bot)
+                profile = get_bot_theming(other_bot, current_theme_name)
                 if profile:
                     inferred_affinity = self._infer_affinity_from_profile(
                         bot_name, other_bot, profile
@@ -278,7 +279,7 @@ class RelationshipParser:
                     relationships.append(BotRelationship(
                         target_bot=other_bot,
                         affinity=inferred_affinity,
-                        description=f"Team member ({profile.bot_title})",
+                        description=f"Team member ({profile.get('bot_title', other_bot)})",
                         interaction_style="neutral"
                     ))
 
@@ -298,7 +299,7 @@ class RelationshipParser:
         Args:
             bot_name: Current bot
             other_bot: Other bot
-            profile: BotTeamProfile
+            profile: Bot profile with personality attribute
 
         Returns:
             Inferred affinity score

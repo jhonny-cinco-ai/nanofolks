@@ -128,3 +128,43 @@ def get_all_role_templates() -> dict[str, str]:
         if content:
             templates[bot_name] = content
     return templates
+
+
+# Import discovery functions for template-based theme management
+from nanofolks.templates.discovery import (
+    discover_themes,
+    get_theme,
+    list_themes,
+    get_bot_theming,
+    get_all_bots_theming,
+)
+from nanofolks.templates.parser import (
+    get_bot_metadata,
+    parse_soul_file,
+    parse_identity_file,
+    BotMetadata,
+)
+
+__all__ = [
+    # Template getters
+    "get_agents_template",
+    "get_all_agents_templates",
+    "get_soul_template_for_bot",
+    "get_identity_template_for_bot",
+    "get_role_template_for_bot",
+    "get_all_role_templates",
+    # Discovery functions
+    "discover_themes",
+    "get_theme",
+    "list_themes",
+    "get_bot_theming",
+    "get_all_bots_theming",
+    # Parser functions
+    "get_bot_metadata",
+    "parse_soul_file",
+    "parse_identity_file",
+    "BotMetadata",
+    # Constants
+    "BOT_NAMES",
+    "THEME_NAMES",
+]

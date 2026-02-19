@@ -3174,9 +3174,9 @@ theme_app = typer.Typer(help="Manage crew themes and bot personalities")
 @theme_app.command("list")
 def theme_list():
     """List available crew themes."""
-    from nanofolks.teams import list_teams
+    from nanofolks.templates import list_themes
 
-    themes = list_teams()
+    themes = list_themes()
 
     if not themes:
         console.print("[yellow]No themes available.[/yellow]")
@@ -3205,10 +3205,10 @@ def theme_set(
     """Set the crew theme."""
     import json
 
-    from nanofolks.teams import get_team
+    from nanofolks.templates import get_theme
 
     # Validate theme
-    team = get_team(theme_name)
+    team = get_theme(theme_name)
     if not team:
         console.print(f"[red]❌ Unknown theme: {theme_name}[/red]")
         console.print("\n[dim]Available themes:[/dim]")

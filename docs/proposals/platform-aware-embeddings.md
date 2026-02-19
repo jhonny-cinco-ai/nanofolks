@@ -460,6 +460,39 @@ Export bge-small to CoreML, run locally
 
 ---
 
+## Implementation Concerns
+
+### Primary Concern: Dimension Mismatch (768D vs 384D)
+
+**The Challenge:**
+- Apple NLContextualEmbedding produces 768-dimensional vectors
+- FastEmbed bge-small produces 384-dimensional vectors
+- Existing installations have 384D embeddings stored in the database
+
+**Recommended Solutions:**
+
+| Option | Approach | Pros | Cons |
+|--------|----------|------|------|
+| **A** Keep both | Store both 384D and 768D vectors | Zero migration, full compatibility | 2x storage |
+| **B** Re-embed on access | Detect dimension mismatch, re-embed transparently | Single storage | Performance hit on first access |
+| **C** Versioned schema | Add provider/dimension metadata to schema | Clean migration path | Schema change required |
+| **D** Fresh install only | Don't migrate, start fresh | Simplest | Data loss for upgrades |
+
+**Recommendation:** Start with **Option A (Keep both)** for zero-risk migration, then optionally re-embed over time.
+
+### Secondary Concerns
+
+1. **Quality Assurance**: Apple embeddings are unproven on MTEB benchmarks
+   - Recommendation: Run evaluation on existing test cases before full rollout
+
+2. **Cross-platform Consistency**: Same query returns different results on macOS vs Linux
+   - Recommendation: Allow explicit provider override via config for consistent behavior
+
+3. **Subprocess Overhead**: Starting Swift binary for each embedding is slow
+   - Recommendation: Consider PyObjC bridge as optimization after initial implementation
+
+---
+
 ## Open Questions
 
 1. **Quality Assurance**: How do we validate Apple embeddings meet our quality bar?

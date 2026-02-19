@@ -7,12 +7,15 @@ No legacy support needed since project hasn't launched yet.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from loguru import logger
 
 from nanofolks.session.manager import Session, SessionManager
 from nanofolks.utils.helpers import safe_filename
+
+if TYPE_CHECKING:
+    from nanofolks.config.schema import Config
 
 
 class RoomSessionManager(SessionManager):
@@ -26,20 +29,43 @@ class RoomSessionManager(SessionManager):
 
     Storage:
     - ~/.nanofolks/room_sessions/{room_id}.jsonl
+    
+    Supports CAS (Compare-And-Set) storage for conflict-free concurrent writes.
+    Enable via config.storage.use_cas_storage or NANOFOLKS_USE_CAS_STORAGE env var.
     """
 
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, config: "Config | None" = None):
         """
         Initialize room-centric session manager.
 
         Args:
             workspace: Workspace directory
+            config: Optional config object for feature flags
         """
         super().__init__(workspace)
 
-        # Room-centric storage directory
         self.room_sessions_dir = Path.home() / ".nanofolks" / "room_sessions"
         self.room_sessions_dir.mkdir(parents=True, exist_ok=True)
+        
+        self._config = config
+        self._cas_storage = None
+        
+        use_cas = self._get_cas_enabled()
+        if use_cas:
+            try:
+                from nanofolks.storage import SessionCASStorage
+                self._cas_storage = SessionCASStorage(self.room_sessions_dir)
+                logger.info("CAS storage enabled for RoomSessionManager")
+            except Exception as e:
+                logger.warning(f"Failed to initialize CAS storage: {e}")
+    
+    def _get_cas_enabled(self) -> bool:
+        """Check if CAS storage is enabled via config or environment variable."""
+        if self._config and hasattr(self._config, 'storage'):
+            return self._config.storage.use_cas_storage
+        
+        import os
+        return os.environ.get("NANOFOLKS_USE_CAS_STORAGE", "true").lower() == "true"
 
     def _get_room_session_path(self, room_key: str) -> Path:
         """Get file path for a room session.
@@ -126,10 +152,37 @@ class RoomSessionManager(SessionManager):
         Args:
             session: Session to save
         """
+        if self._cas_storage and self._get_cas_enabled():
+            self._save_cas(session)
+        else:
+            self._save_legacy(session)
+        
+        self._cache[session.key] = session
+    
+    def _save_cas(self, session: Session) -> None:
+        """Save session using CAS storage for conflict-free writes."""
+        messages = []
+        
+        metadata_line = {
+            "_type": "metadata",
+            "created_at": session.created_at.isoformat(),
+            "updated_at": session.updated_at.isoformat(),
+            "metadata": session.metadata
+        }
+        messages.append(metadata_line)
+        
+        for msg in session.messages:
+            messages.append(msg)
+        
+        result = self._cas_storage.save_session(session.key, messages)
+        if not result.success:
+            logger.warning(f"CAS write failed for {session.key}: {result.error}")
+    
+    def _save_legacy(self, session: Session) -> None:
+        """Save session using legacy file write (not thread-safe)."""
         path = self._get_room_session_path(session.key)
 
         with open(path, "w") as f:
-            # Write metadata first
             metadata_line = {
                 "_type": "metadata",
                 "created_at": session.created_at.isoformat(),
@@ -138,11 +191,8 @@ class RoomSessionManager(SessionManager):
             }
             f.write(json.dumps(metadata_line) + "\n")
 
-            # Write messages
             for msg in session.messages:
                 f.write(json.dumps(msg) + "\n")
-
-        self._cache[session.key] = session
 
     def delete(self, key: str) -> bool:
         """Delete a session.
@@ -213,9 +263,9 @@ def create_session_manager(workspace: Path, config: Any = None) -> RoomSessionMa
 
     Args:
         workspace: Workspace directory
-        config: Configuration object (optional, not used)
+        config: Configuration object (optional, for feature flags like storage.use_cas_storage)
 
     Returns:
         RoomSessionManager instance
     """
-    return RoomSessionManager(workspace)
+    return RoomSessionManager(workspace, config)

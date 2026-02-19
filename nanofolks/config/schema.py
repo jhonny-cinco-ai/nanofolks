@@ -576,10 +576,14 @@ class MemoryConfig(Base):
 
 
 class WorkLogsConfig(Base):
-    """Work logs configuration for transparency and debugging."""
+    """Work logs configuration."""
     enabled: bool = True
-    storage: str = "sqlite"  # "sqlite", "memory", "none"
     retention_days: int = 30
+
+
+class StorageConfig(Base):
+    """Storage configuration."""
+    use_cas_storage: bool = True  # Enable CAS (Compare-And-Set) for conflict-free concurrent writes
     show_in_response: bool = False  # Include in agent responses
     default_mode: str = "summary"  # "summary", "detailed", "debug"
     log_tool_calls: bool = True
@@ -601,6 +605,7 @@ class Config(BaseSettings):
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     work_logs: WorkLogsConfig = Field(default_factory=WorkLogsConfig)
+    storage: StorageConfig = Field(default_factory=StorageConfig)
 
     @property
     def workspace_path(self) -> Path:

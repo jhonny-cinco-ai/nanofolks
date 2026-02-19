@@ -296,6 +296,63 @@ Unlike simple chat histories, Nanofolks builds a persistent knowledge base that:
 
 ---
 
+## 💾 Session Storage & CAS
+
+Nanofolks uses **CAS (Compare-And-Set) storage** for conflict-free concurrent writes to session files.
+
+### The Problem
+
+When multiple channels (Telegram, Discord, WhatsApp) write to the same room simultaneously:
+- Race conditions can corrupt session files
+- Messages can be lost
+- Data inconsistency between channels
+
+### The Solution: CAS Storage
+
+```
+Traditional Write:     CAS Write:
+Read → Write           Read → Hash → Compare → Write
+   ↓                        ↓
+Write (overwrites)    Match? → Write (or retry)
+```
+
+| Feature | Description |
+|---------|-------------|
+| **ETag Versioning** | Each write includes a content hash |
+| **Conflict Detection** | Detects if another channel wrote first |
+| **Auto-Merge** | Merges concurrent writes automatically |
+| **Retry Logic** | Exponential backoff on conflicts |
+
+### Multi-Channel Safety
+
+CAS storage ensures:
+- ✅ No file corruption from concurrent writes
+- ✅ Message ordering preserved within rooms
+- ✅ Safe fallback if one channel crashes
+- ✅ Works alongside memory system (SQLite WAL)
+
+### Configuration
+
+CAS storage is **enabled by default**. To disable:
+
+```json
+{
+  "storage": {
+    "use_cas_storage": false
+  }
+}
+```
+
+Or via environment variable:
+```bash
+export NANOFOLKS_USE_CAS_STORAGE=false
+```
+
+> [!NOTE]
+> The memory system uses SQLite with WAL mode, which already handles concurrency safely. CAS storage specifically protects session (chat history) files.
+
+---
+
 
 ## 💭 Chain of Thought
 

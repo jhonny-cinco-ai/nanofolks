@@ -66,6 +66,9 @@ def configure_cli():
         elif choice == "gateway":
             _configure_gateway()
 
+        elif choice == "storage":
+            _configure_storage()
+
         elif choice == "status":
             _show_detailed_status()
 
@@ -205,8 +208,9 @@ def _show_main_menu(summary: dict) -> str:
         ("4", "routing", f"🧠 Smart Routing {routing_status}"),
         ("5", "tools", f"🛠️ Tool Settings {tools_status}"),
         ("6", "gateway", f"🌐 Gateway {gateway_status}"),
-        ("7", "status", "📊 View Full Status"),
-        ("8", "exit", "✓ Done" if has_required else "⏭ Skip for now"),
+        ("7", "storage", "💾 Storage"),
+        ("8", "status", "📊 View Full Status"),
+        ("9", "exit", "✓ Done" if has_required else "⏭ Skip for now"),
     ])
 
     for num, key, label in options:
@@ -1129,6 +1133,43 @@ def _configure_gateway():
                         console.print(f"[green]{result}[/green]")
                 except ValueError:
                     console.print("[red]Invalid port number[/red]")
+
+
+def _configure_storage():
+    """Configure storage settings."""
+    tool = UpdateConfigTool()
+
+    console.print(Panel(
+        "[bold]Storage Configuration[/bold]\n\n"
+        "Configure storage behavior for session data.",
+        border_style="blue"
+    ))
+
+    config = load_config()
+    use_cas = getattr(config.storage, 'use_cas_storage', True)
+
+    console.print(f"\nCAS Storage: {'[green]Enabled[/green]' if use_cas else '[dim]Disabled[/dim]'}")
+    console.print("[dim]CAS (Compare-And-Set) provides conflict-free concurrent writes.[/dim]")
+    console.print("[dim]Enable this for multi-channel setups to prevent file corruption.[/dim]")
+
+    console.print("\n  [1] Toggle CAS Storage")
+    console.print("  [0] Back")
+    console.print()
+
+    choice = Prompt.ask("Select", choices=["0", "1"], default="0")
+
+    if choice == "1":
+        new_value = not use_cas
+        with console.status("[cyan]Updating storage settings...[/cyan]", spinner="dots"):
+            result = asyncio.run(tool.execute(
+                path="storage.use_cas_storage",
+                value=new_value
+            ))
+        if "Error" not in result:
+            status = "enabled" if new_value else "disabled"
+            console.print(f"[green]✓ CAS Storage {status}[/green]")
+        else:
+            console.print(f"[red]{result}[/red]")
 
 
 def _configure_mcp_servers():

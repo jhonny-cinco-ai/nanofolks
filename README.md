@@ -761,7 +761,29 @@ Nanofolks doesn't just wait for you to message it. It can proactively act.
 
 ### Scheduled Tasks (Cron)
 
+Nanofolks supports cron-style scheduled tasks:
+
 ```bash
+nanofolks cron add --name "morning" --message "What's on my calendar?" --cron "0 9 * * *"
+nanofolks cron list
+nanofolks cron remove <id>
+```
+
+### Proactive Wake-Up
+
+The heartbeat system:
+- Wakes Nanofolks at scheduled times
+- Runs background tasks
+- Can message you proactively
+- Maintains state between runs
+
+### Activity Tracking
+
+Monitors when you're active to:
+- Determine when to run background processing
+- Avoid interrupting conversations
+- Optimize memory extraction timing
+
 
 ## 📝 Work Logs
 

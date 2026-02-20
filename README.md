@@ -283,6 +283,21 @@ A "crew" is a group of 6 AI characters, each with:
 - **Role** - What they're good at
 - **Expertise** - Specific knowledge domains
 
+### Themes & Personalities
+
+Nanofolks comes with **built-in themes** that give your crew distinct personalities:
+
+| Theme | Vibe | Example |
+|-------|------|---------|
+| **Pirate Crew** | Bold, adventurous | "Arr, let's find that treasure!" |
+| **Space Crew** | Sci-fi, mission-focused | "Engaging warp drive..." |
+| **Rock Band** | Creative, energetic | "Time to rock this!" |
+| **Executive Suite** | Professional, corporate | "Let's discuss the quarterly objectives" |
+| **SWAT Team** | Tactical, precise | "Moving in for the takedown" |
+| **Feral Clowder** | Chaotic, cat-like | "*knocks things off desk*"
+
+Choose a theme during setup to give your crew personality!
+
 ### Your Team
 
 Each Nanofolks crew has 6 bots:
@@ -300,19 +315,22 @@ Each Nanofolks crew has 6 bots:
 
 ```
 Workspace/
-├── bots/
-│   ├── leader.yaml      # Primary bot
-│   ├── specialist.yaml # Additional bots
-│   └── creative.yaml
+├── identity/            # Bot personalities & themes
+│   ├── pirate_crew/   # Pirate crew theme
+│   ├── space_crew/    # Space crew theme
+│   └── ...
+├── role/               # Bot roles (Leader, Coder, Researcher...)
+├── soul/               # Bot soul files (personality, greeting)
+├── bots/               # Bot agent instructions
 ├── memory/             # Shared knowledge
-├── skills/             # Crew skills
-└── config.yaml         # Crew configuration
+├── skills/            # Crew skills
+└── config.yaml        # Crew configuration
 ```
 
 ### Single Bot Mode
 
 Not ready for a full crew? Nanofolks works perfectly as a single assistant:
-- Default workspace has one bot
+- Default General room has one bot
 - Works in DM mode
 - Same memory and learning capabilities
 - Easy to add more bots later

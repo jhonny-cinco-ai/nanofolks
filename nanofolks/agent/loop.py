@@ -1137,6 +1137,7 @@ class AgentLoop:
         message_tool = self.tools.get("message")
         if isinstance(message_tool, MessageTool):
             message_tool.set_context(msg.channel, msg.chat_id)
+            message_tool.start_turn()
 
         invoke_tool = self.tools.get("invoke")
         if invoke_tool:
@@ -1581,6 +1582,20 @@ class AgentLoop:
 
         # Strip thinking blocks from final content
         final_content = self._strip_think(final_content) or final_content
+
+        # Check if message tool already sent in this turn - suppress duplicate reply
+        suppress_final_reply = False
+        if message_tool := self.tools.get("message"):
+            if isinstance(message_tool, MessageTool):
+                sent_targets = set(message_tool.get_turn_sends())
+                suppress_final_reply = (msg.channel, msg.chat_id) in sent_targets
+
+        if suppress_final_reply:
+            logger.info(
+                f"Skipping final auto-reply because message tool already sent to "
+                f"{msg.channel}:{msg.chat_id} in this turn"
+            )
+            return None
 
         return OutboundMessage(
             channel=msg.channel,

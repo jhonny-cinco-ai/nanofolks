@@ -271,6 +271,62 @@ Requires Node.js ≥18.
 This section explains the architectural concepts behind Nanofolks. Understanding these will help you configure and customize your crew.
 
 
+## 🤖 Multi-Bot Architecture
+
+Nanofolks supports multiple AI characters working together as a crew.
+
+### The Crew Concept
+
+A "crew" is a group of 6 AI characters, each with:
+
+- **Personality** - How they respond (from the theme)
+- **Role** - What they're good at
+- **Expertise** - Specific knowledge domains
+
+### Your Team
+
+Each Nanofolks crew has 6 bots:
+
+| Bot | Role | Expertise |
+|-----|------|-----------|
+| **Leader** (@leader) | Coordinates the crew | Planning, delegation, decision-making |
+| **Researcher** (@researcher) | Deep research | Analysis, information gathering |
+| **Coder** (@coder) | Technical implementation | Code, debugging, architecture |
+| **Social** (@social) | Community engagement | Communication, user relations |
+| **Creative** (@creative) | Creative work | Design, brainstorming, content |
+| **Auditor** (@auditor) | Quality review | Validation, compliance, testing |
+
+### How It Works
+
+```
+Workspace/
+├── bots/
+│   ├── leader.yaml      # Primary bot
+│   ├── specialist.yaml # Additional bots
+│   └── creative.yaml
+├── memory/             # Shared knowledge
+├── skills/             # Crew skills
+└── config.yaml         # Crew configuration
+```
+
+### Single Bot Mode
+
+Not ready for a full crew? Nanofolks works perfectly as a single assistant:
+- Default workspace has one bot
+- Works in DM mode
+- Same memory and learning capabilities
+- Easy to add more bots later
+
+### Why Multiple Bots?
+
+| Benefit | Example |
+|---------|---------|
+| **Specialization** | Coding bot, research bot |
+| **Personality** | Different characters for moods |
+| **Collaboration** | Bots discuss and debate |
+| **Reliability** | Backup if one is unavailable |
+
+
 ## 🧠 Memory System
 
 Nanofolks has a production-hardened memory system that learns from every conversation.
@@ -565,63 +621,7 @@ Output: "My API key is sk-or-v1-ab***..." (masked)
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🤖 Multi-Bot Architecture
-
-Nanofolks supports multiple AI characters working together as a crew.
-
-### The Crew Concept
-
-A "crew" is a group of 6 AI characters, each with:
-
-- **Personality** - How they respond (from the theme)
-- **Role** - What they're good at
-- **Expertise** - Specific knowledge domains
-
-### Your Team
-
-Each Nanofolks crew has 6 bots:
-
-| Bot | Role | Expertise |
-|-----|------|-----------|
-| **Leader** (@leader) | Coordinates the crew | Planning, delegation, decision-making |
-| **Researcher** (@researcher) | Deep research | Analysis, information gathering |
-| **Coder** (@coder) | Technical implementation | Code, debugging, architecture |
-| **Social** (@social) | Community engagement | Communication, user relations |
-| **Creative** (@creative) | Creative work | Design, brainstorming, content |
-| **Auditor** (@auditor) | Quality review | Validation, compliance, testing |
-
-### How It Works
-
-```
-Workspace/
-├── bots/
-│   ├── leader.yaml      # Primary bot
-│   ├── specialist.yaml # Additional bots
-│   └── creative.yaml
-├── memory/             # Shared knowledge
-├── skills/             # Crew skills
-└── config.yaml         # Crew configuration
-```
-
-### Single Bot Mode
-
-Not ready for a full crew? Nanofolks works perfectly as a single assistant:
-- Default workspace has one bot
-- Works in DM mode
-- Same memory and learning capabilities
-- Easy to add more bots later
-
-### Why Multiple Bots?
-
-| Benefit | Example |
-|---------|---------|
-| **Specialization** | Coding bot, research bot |
-| **Personality** | Different characters for moods |
-| **Collaboration** | Bots discuss and debate |
-| **Reliability** | Backup if one is unavailable |
-
 ---
-
 
 ## 🏠 Rooms & Collaboration
 

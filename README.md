@@ -469,6 +469,25 @@ Typical usage (45% simple, 35% medium, 15% complex, 5% reasoning):
 | **With routing** | $3.17 (blended) |
 | **Savings** | **Up to 96%** 🎉 |
 
+### Smart Routing Configuration
+
+Enable automatic model selection:
+
+```json
+{
+  "routing": {
+    "enabled": true,
+    "tiers": {
+      "simple": {"model": "gpt-4o-mini"},
+      "medium": {"model": "claude-sonnet-4"},
+      "complex": {"model": "claude-opus-4"},
+      "reasoning": {"model": "o3"}
+    }
+  }
+}
+```
+
+
 ---
 
 
@@ -545,10 +564,6 @@ Output: "My API key is sk-or-v1-ab***..." (masked)
 │ Logged: "Used {{github_token}}" (never the actual key)     │
 └─────────────────────────────────────────────────────────────┘
 ```
-
-### CLI Commands
-
-```bash
 
 ## 🤖 Multi-Bot Architecture
 
@@ -647,7 +662,7 @@ room:general          → Default room for all conversations
 room:project-abc123  → Project room (multi-platform)
 ```
 
-#### Storage Structure
+#### Room Storage Architecture
 
 ```
 ~/.nanofolks/
@@ -698,6 +713,19 @@ I need help planning the product launch
 2. **@all or @crew mentioned?** → Broadcast to all room participants
 3. **No mention?** → Leader analyzes and coordinates response
 
+#### Best Practices
+
+**When to use @mentions:**
+- ✅ Use `@botname` when you know exactly who should help
+- ✅ Use `@all` for brainstorming or decisions needing multiple perspectives
+- ✅ No mention for general questions (Leader coordinates)
+
+**Room organization:**
+- Create PROJECT rooms for specific initiatives
+- Keep #general as OPEN for casual chat
+- Use DIRECT when you need a bot's specific expertise privately
+- Leader can auto-create rooms when you describe a project
+
 ### Room Creation by Leader
 
 The Leader can create rooms automatically when you ask:
@@ -743,19 +771,6 @@ nanofolks room show project-alpha
 nanofolks room list
 ```
 
-### Best Practices
-
-**When to use @mentions:**
-- ✅ Use `@botname` when you know exactly who should help
-- ✅ Use `@all` for brainstorming or decisions needing multiple perspectives
-- ✅ No mention for general questions (Leader coordinates)
-
-**Room organization:**
-- Create PROJECT rooms for specific initiatives
-- Keep #general as OPEN for casual chat
-- Use DIRECT when you need a bot's specific expertise privately
-- Leader can auto-create rooms when you describe a project
-
 ---
 
 ## 💓 Multi-Heartbeat System
@@ -797,7 +812,7 @@ Work logs are stored in the workspace and can be:
 ---
 
 
-# Configuration
+# ⚙️ Configuration
 
 
 ## Providers
@@ -813,25 +828,6 @@ Nanofolks supports multiple AI providers:
 | **Groq** | Fast inference + voice | [console.groq.com](https://console.groq.com) |
 | **Gemini** | Google AI | [aistudio.google.com](https://aistudio.google.com) |
 | **vLLM** | Local models | Run your own server |
-
-
-## Smart Routing
-
-Enable automatic model selection:
-
-```json
-{
-  "routing": {
-    "enabled": true,
-    "tiers": {
-      "simple": {"model": "gpt-4o-mini"},
-      "medium": {"model": "claude-sonnet-4"},
-      "complex": {"model": "claude-opus-4"},
-      "reasoning": {"model": "o3"}
-    }
-  }
-}
-```
 
 
 ## Environment Variables
@@ -940,17 +936,17 @@ docker run -v ~/.nanofolks:/root/.nanofolks -p 18790:18790 nanofolks gateway
 ---
 
 
-# Philosophy
+# 💡 Philosophy
 
-Nanofolks isn't about replacing you.
-
-It's about expanding what you can do, by surrounding you with the right crew.
+> **Nanofolks isn't about replacing you.**
+> 
+> It's about expanding what you can do, by surrounding you with the right crew.
 
 We believe AI should:
-- Work *with* you, not *for* you
-- Have personality and character
-- Learn and improve over time
-- Feel like a team, not a tool
+- ✨ Work *with* you, not *for* you
+- 🎭 Have personality and character
+- 📈 Learn and improve over time
+- 🤝 Feel like a team, not a tool
 
 ---
 

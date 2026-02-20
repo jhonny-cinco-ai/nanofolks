@@ -75,6 +75,37 @@ def _resolve_env_for_mcp(env: dict[str, str] | None) -> dict[str, str] | None:
     return resolved if resolved else None
 
 
+def _resolve_headers(headers: dict[str, str] | None) -> dict[str, str] | None:
+    """Resolve symbolic references in HTTP headers.
+
+    Allows using {{symbolic_ref}} syntax in header values which are
+    resolved from KeyVault at connection time.
+
+    Example:
+        {"Authorization": "{{api_key}}"} -> {"Authorization": "Bearer sk-actual..."}
+    """
+    if not headers:
+        return None
+
+    from nanofolks.security.symbolic_converter import get_symbolic_converter
+    converter = get_symbolic_converter()
+
+    resolved = {}
+    for key, value in headers.items():
+        if converter.is_symbolic_ref(value):
+            actual_value = converter.resolve(value)
+            if actual_value:
+                logger.info(f"MCP: resolved header {key} from KeyVault")
+                resolved[key] = actual_value
+            else:
+                logger.warning(f"MCP: failed to resolve header {key} ({value}), keeping original")
+                resolved[key] = value
+        else:
+            resolved[key] = value
+
+    return resolved if resolved else None
+
+
 async def connect_mcp_servers(
     mcp_servers: dict, registry: ToolRegistry, stack: AsyncExitStack
 ) -> None:
@@ -93,9 +124,22 @@ async def connect_mcp_servers(
             elif cfg.url:
                 from mcp.client.streamable_http import streamable_http_client
 
-                read, write, _ = await stack.enter_async_context(
-                    streamable_http_client(cfg.url)
-                )
+                resolved_headers = _resolve_headers(cfg.headers)
+                if resolved_headers:
+                    import httpx
+                    http_client = await stack.enter_async_context(
+                        httpx.AsyncClient(
+                            headers=resolved_headers,
+                            follow_redirects=True
+                        )
+                    )
+                    read, write, _ = await stack.enter_async_context(
+                        streamable_http_client(cfg.url, http_client=http_client)
+                    )
+                else:
+                    read, write, _ = await stack.enter_async_context(
+                        streamable_http_client(cfg.url)
+                    )
             else:
                 logger.warning(
                     f"MCP server '{name}': no command or url configured, skipping"

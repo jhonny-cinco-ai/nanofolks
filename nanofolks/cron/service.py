@@ -47,7 +47,20 @@ def _compute_next_run(schedule: CronSchedule, now_ms: int) -> int | None:
             logger.warning(f"Failed to compute next cron run: {e}")
             return None
 
-    return None
+            return None
+
+
+def _validate_schedule_for_add(schedule: CronSchedule) -> None:
+    """Validate schedule fields that would otherwise create non-runnable jobs."""
+    if schedule.tz and schedule.kind != "cron":
+        raise ValueError("tz can only be used with cron schedules")
+
+    if schedule.kind == "cron" and schedule.tz:
+        try:
+            from zoneinfo import ZoneInfo
+            ZoneInfo(schedule.tz)
+        except Exception:
+            raise ValueError(f"unknown timezone '{schedule.tz}'") from None
 
 
 class CronService:
@@ -275,6 +288,7 @@ class CronService:
         delete_after_run: bool = False,
     ) -> CronJob:
         """Add a new job."""
+        _validate_schedule_for_add(schedule)
         store = self._load_store()
         now = _now_ms()
 

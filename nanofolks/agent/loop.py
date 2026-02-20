@@ -1421,6 +1421,8 @@ class AgentLoop:
                 if self._stream_callback:
                     clean = self._strip_think(response.content)
                     hint = self._tool_hint(response.tool_calls)
+                    if clean:
+                        await self._stream_callback(clean)
                     await self._stream_callback(f"↳ {hint}")
                 
                 # Add assistant message with tool calls

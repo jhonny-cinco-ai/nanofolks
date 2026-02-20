@@ -876,6 +876,7 @@ nanofolks routing test "msg" # Test classification
 nanofolks routing analytics  # Show cost savings
 ```
 
+
 ## Skills
 
 ```bash
@@ -894,18 +895,7 @@ nanofolks session compact    # Manual compaction
 ```
 
 
-## Routing
-
-```bash
-nanofolks routing status     # Show routing config
-nanofolks routing test "msg" # Test classification
-nanofolks routing analytics  # Show cost savings
-```
-
-
 ## Skills
-
-Skills extend Nanofolks' capabilities with specialized tools and knowledge.
 
 ### How Skills Work
 
@@ -997,157 +987,3 @@ This project is for educational, research, and technical exchange purposes only.
 <p align="center">
   <em>Your crew's already on it.</em>
 </p>
-
-# Check keyring status
-nanofolks security status
-
-
-# List all API keys and their storage location
-nanofolks security list
-
-
-# Add a key to the OS keyring
-nanofolks security add openrouter
-
-
-# Migrate existing keys from config to keyring
-nanofolks security migrate-to-keyring
-
-
-# Remove a key from keyring
-nanofolks security remove openrouter
-```
-
-### Benefits
-
-- **API keys never in config file**: Stored in OS keyring instead of plain JSON
-- **LLM never sees keys**: Only symbolic references like `{{openrouter_key}}`
-- **Memory protection**: Keys locked in memory and wiped after use
-- **Safe logging**: Audit logs contain only references, never actual keys
-- **Anomaly detection**: Monitors for suspicious usage patterns
-
-> [!NOTE]
-> The legacy Secret Sanitizer (regex-based masking) still works as a secondary layer of defense.
-
-### Skills Security & Verification
-
-Skills extend Nanofolks' capabilities. Before any skill is used, it goes through security verification.
-
-#### Security Scanning Process
-
-```
-┌─────────────────┐
-│ 1. Auto-Detect │
-│   New skills   │
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│ 2. Risk Scoring │
-│   Analyze code │
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│ 3. Approval     │
-│   Block if risk │
-└────────┬────────┘
-         ↓
-┌─────────────────┐
-│ 4. Runtime      │
-│   Verification  │
-└─────────────────┘
-```
-
-#### Risk Levels
-
-| Level | Icon | Examples |
-|-------|------|----------|
-| **Critical** | 🚫 | Credential theft, malware |
-| **High** | ⚠️ | Shell injection, system mods |
-| **Medium** | ⚡ | Obfuscation, suspicious downloads |
-| **Low** | ℹ️ | Binary execution, external URLs |
-
-### Contextual Protections
-
-#### HEARTBEAT.md Security
-
-When heartbeat tasks read `HEARTBEAT.md`:
-
-1. **Automatic scanning** - Credentials detected when file is read
-2. **Warning system** - Users alerted if secrets found
-3. **Automatic conversion** - Keys converted to `{{symbolic_ref}}` before LLM
-4. **Chat remediation** - "Please secure the keys in HEARTBEAT.md" → agent fixes it
-
-Example workflow:
-```
-You: "Please secure the keys in HEARTBEAT.md"
-Agent: Uses secure_remediate tool → Stores keys → Updates file with {{symbolic_ref}}
-```
-
-#### MCP Server Security
-
-MCP servers support symbolic references in environment variables:
-
-```yaml
-
-# config.yaml
-mcp_servers:
-  my_server:
-    command: "npx"
-    args: ["-y", "@modelcontextprotocol/server-filesystem", "/path"]
-    env:
-      OPENAI_API_KEY: "{{openai_key}}"  # Resolved from KeyVault
-```
-
-#### Chat-Based Remediation
-
-The `secure_remediate` tool helps users fix security issues directly in chat:
-
-```bash
-
-# Agent can use these tools:
-- secure_remediate(file_path="HEARTBEAT.md", action="scan")     # Scan for credentials
-- secure_remediate(file_path="HEARTBEAT.md", action="store_and_fix", key_type="github_token", api_key="...")
-```
-
-Users can simply say: "Please secure the keys in HEARTBEAT.md" and the agent will help fix it.
-
----
-
-
-# Every morning at 9am
-nanofolks cron add --name "morning" --message "What's on my calendar?" --cron "0 9 * * *"
-
-
-# Hourly health checks
-nanofolks cron add --name "hourly" --message "Check system status" --every 3600
-```
-
-### Proactive Wake-Up
-
-The heartbeat system:
-- Wakes Nanofolks at scheduled times
-- Runs background tasks
-- Can message you proactively
-- Maintains state between runs
-
-### Activity Tracking
-
-Monitors when you're active to:
-- Determine when to run background processing
-- Avoid interrupting conversations
-- Optimize memory extraction timing
-
----
-
-
-# Build
-docker build -t nanofolks .
-
-
-# Initialize config
-docker run -v ~/.nanofolks:/root/.nanofolks --rm nanofolks onboard
-
-
-# Run gateway
-docker run -v ~/.nanofolks:/root/.nanofolks -p 18790:18790 nanofolks gateway
-```

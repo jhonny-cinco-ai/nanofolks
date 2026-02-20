@@ -879,24 +879,6 @@ nanofolks routing analytics  # Show cost savings
 
 ## Skills
 
-```bash
-nanofolks skills list        # List all skills
-nanofolks skills scan ./skill  # Security scan
-nanofolks skills approve name # Approve skill
-```
-
-Skills extend Nanofolks' capabilities with specialized tools and knowledge.
-
-```bash
-nanofolks memory status       # Show memory statistics
-nanofolks memory search "query"  # Search memories
-nanofolks session status     # Show context usage
-nanofolks session compact    # Manual compaction
-```
-
-
-## Skills
-
 ### How Skills Work
 
 Nanofolks uses **progressive loading** to keep responses fast:
@@ -940,6 +922,15 @@ nanofolks cron remove <id>
 ## Basic Usage
 
 ```bash
+# Build
+docker build -t nanofolks .
+
+# Initialize config
+docker run -v ~/.nanofolks:/root/.nanofolks --rm nanofolks onboard
+
+# Run gateway
+docker run -v ~/.nanofolks:/root/.nanofolks -p 18790:18790 nanofolks gateway
+```
 
 ## Persisting Data
 

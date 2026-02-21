@@ -814,6 +814,12 @@ class AgentLoop:
             self.tools.register(tool)
         logger.info(f"Registered {len(security_tools)} security tools")
 
+        # Heartbeat control tool (for coordinator/leader to manage specialist heartbeats)
+        if self.bot_name == "leader":
+            from nanofolks.agent.tools.heartbeat import HeartbeatControlTool
+            self.tools.register(HeartbeatControlTool())
+            logger.info("Registered heartbeat control tool for coordinator")
+
         # Apply tool permissions based on bot's SOUL.md/AGENTS.md
         self._apply_tool_permissions()
 

@@ -53,7 +53,7 @@ RESEARCHER_CONFIG = HeartbeatConfig(
     bot_name="researcher",
     interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
     max_execution_time_s=300,
-    enabled=True,
+    enabled=False,  # Disabled by default - user must explicitly activate
     checks=[
         _create_check(
             "monitor_data_sources",
@@ -108,7 +108,7 @@ CODER_CONFIG = HeartbeatConfig(
     bot_name="coder",
     interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
     max_execution_time_s=300,
-    enabled=True,
+    enabled=False,  # Disabled by default - user must explicitly activate
     checks=[
         _create_check(
             "check_github_issues",
@@ -164,7 +164,7 @@ SOCIAL_CONFIG = HeartbeatConfig(
     bot_name="social",
     interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
     max_execution_time_s=300,
-    enabled=True,
+    enabled=False,  # Disabled by default - user must explicitly activate
     checks=[
         _create_check(
             "publish_scheduled_posts",
@@ -216,7 +216,7 @@ AUDITOR_CONFIG = HeartbeatConfig(
     bot_name="auditor",
     interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
     max_execution_time_s=600,  # 10 minutes for comprehensive checks
-    enabled=True,
+    enabled=False,  # Disabled by default - user must explicitly activate
     checks=[
         # Code/Technical Audits
         _create_check(
@@ -329,7 +329,7 @@ CREATIVE_CONFIG = HeartbeatConfig(
     bot_name="creative",
     interval_s=DEFAULT_SPECIALIST_INTERVAL_S,
     max_execution_time_s=300,
-    enabled=True,
+    enabled=False,  # Disabled by default - user must explicitly activate
     checks=[
         _create_check(
             "check_design_asset_status",

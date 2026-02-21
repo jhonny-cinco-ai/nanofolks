@@ -40,6 +40,14 @@ def _get_manager():
     return _manager
 
 
+def get_heartbeat_manager():
+    """Get the heartbeat manager (non-raising version for tool use).
+    
+    Returns None if manager is not initialized rather than raising an error.
+    """
+    return _manager
+
+
 @heartbeat_app.command("start")
 def heartbeat_start(
     bot: Optional[str] = typer.Option(None, "--bot", "-b", help="Start specific bot (default: all)"),

@@ -422,24 +422,22 @@ class RoomManager:
                     })
         return mappings
 
-    def auto_join_to_general(self, channel: str, chat_id: str) -> str:
-        """Auto-join a channel to the general room if not mapped.
-
-        Args:
-            channel: Channel type
-            chat_id: Chat identifier
+    def get_mapped_channels(self) -> list[dict]:
+        """Return all channel→room mappings as a flat list.
 
         Returns:
-            Room ID (general or existing mapping)
+            List of {channel, chat_id, room_id} dicts, sorted by room then channel.
         """
-        existing = self.get_room_for_channel(channel, chat_id)
-        if existing:
-            return existing
-
-        # Auto-join to general
-        self.join_channel_to_room(channel, chat_id, self.DEFAULT_ROOM_ID)
-        logger.info(f"Auto-joined {channel}:{chat_id} to room:general")
-        return self.DEFAULT_ROOM_ID
+        mappings = []
+        for channel_key, room_id in self._channel_mappings.items():
+            parts = channel_key.split(":", 1)
+            if len(parts) == 2:
+                mappings.append({
+                    "channel": parts[0],
+                    "chat_id": parts[1],
+                    "room_id": room_id,
+                })
+        return sorted(mappings, key=lambda m: (m["room_id"], m["channel"]))
 
 
 # Global instance

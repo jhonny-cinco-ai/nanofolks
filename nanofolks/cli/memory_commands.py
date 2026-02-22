@@ -12,7 +12,12 @@ console = Console()
 
 
 def _get_memory_store() -> Optional[Any]:
-    """Get memory store with error handling."""
+    """Get memory store with error handling.
+
+    The caller is responsible for calling store.close() after use (or using
+    `with _get_memory_store() as store:` if TurboMemoryStore supports it).
+    This function does NOT leave the connection open.
+    """
     try:
         from nanofolks.config.loader import load_config
         from nanofolks.memory.store import TurboMemoryStore
@@ -98,6 +103,10 @@ def memory_status():
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+    finally:
+        # Always close to release the SQLite connection immediately.
+        # Leaving it open risks WAL contention with a running gateway process.
+        memory_store.close()
 
 
 @memory_app.command("search")
@@ -124,6 +133,8 @@ def memory_search(query: str, limit: int = typer.Option(10, "--limit", "-l")):
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+    finally:
+        memory_store.close()
 
 
 @memory_app.command("entities")
@@ -163,6 +174,8 @@ def memory_entities(limit: int = typer.Option(20, "--limit", "-l")):
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+    finally:
+        memory_store.close()
 
 
 @memory_app.command("entity")
@@ -197,6 +210,7 @@ def memory_forget(name: str, confirm: bool = typer.Option(False, "--confirm", "-
     if not confirm:
         if not typer.confirm(f"Remove '{name}' from memory?"):
             console.print("[yellow]Cancelled[/yellow]")
+            memory_store.close()
             return
 
     try:
@@ -211,6 +225,8 @@ def memory_forget(name: str, confirm: bool = typer.Option(False, "--confirm", "-
             console.print(f"[red]Failed to remove '{name}'[/red]")
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+    finally:
+        memory_store.close()
 
 
 @memory_app.command("doctor")
@@ -238,6 +254,8 @@ def memory_doctor():
 
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
+    finally:
+        memory_store.close()
 
 
 # Session Commands App

@@ -89,6 +89,9 @@ class BackgroundProcessor:
 
         self.running = False
         self._task: Optional[asyncio.Task] = None
+        # Lock acquired during extraction/summary refresh so that the agent's
+        # _memory_flush_hook() can safely wait before writing to the store.
+        self.processing_lock = asyncio.Lock()
 
         logger.info(f"BackgroundProcessor initialized (interval: {interval_seconds}s)")
 
@@ -130,27 +133,31 @@ class BackgroundProcessor:
         Process one cycle of background tasks.
 
         Current tasks:
-        1. Extract entities from pending events
-        2. Refresh stale summaries (every 5 cycles)
-        3. Apply learning decay (every 60 cycles ~ 1 hour)
+        1. Extract entities from pending events  (under processing_lock)
+        2. Refresh stale summaries (every 5 min) (under processing_lock)
+        3. Apply learning decay (every hour)     (no lock needed – read + update)
+
+        processing_lock is used for tasks that write to the memory store so that
+        the agent's _memory_flush_hook() can safely wait before its own writes.
         """
-        # Track which tasks ran
+        import time
         tasks_ran = []
 
-        # Task 1: Extract entities from pending events
-        pending = await self._extract_pending_events()
-        if pending > 0:
-            tasks_ran.append(f"extracted {pending} events")
+        # Tasks 1 & 2 share the processing_lock so flush hook can interleave safely
+        async with self.processing_lock:
+            # Task 1: Extract entities from pending events
+            pending = await self._extract_pending_events()
+            if pending > 0:
+                tasks_ran.append(f"extracted {pending} events")
 
-        # Task 2: Refresh stale summaries (every 5th cycle = every 5 min)
-        # Use time-based check instead of cycle counter
-        import time
-        if int(time.time()) % 300 < self.interval_seconds:
-            refreshed = await self._refresh_summaries()
-            if refreshed > 0:
-                tasks_ran.append(f"refreshed {refreshed} summaries")
+            # Task 2: Refresh stale summaries (every 5th cycle = every 5 min)
+            if int(time.time()) % 300 < self.interval_seconds:
+                refreshed = await self._refresh_summaries()
+                if refreshed > 0:
+                    tasks_ran.append(f"refreshed {refreshed} summaries")
 
-        # Task 3: Apply learning decay (every hour)
+        # Task 3: Learning decay – reads then updates individual rows, SQLite WAL
+        # handles this safely without the shared lock.
         if int(time.time()) % 3600 < self.interval_seconds:
             decayed = await self._decay_learnings()
             if decayed > 0:

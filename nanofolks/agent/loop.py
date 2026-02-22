@@ -313,7 +313,9 @@ class AgentLoop:
                         content_str = str(content)[:200]  # Truncate long content
                     formatted.append(f"{role}: {content_str}")
 
-                prompt = SUMMARY_PROMPT.format(messages="\n".join(formatted[-10:]))  # Last 10 msgs
+                # Use all formatted messages, not just the last 10, so that the
+                # summary accurately covers the full compaction window.
+                prompt = SUMMARY_PROMPT.format(messages="\n".join(formatted))
 
                 try:
                     response = await self.provider.chat(
@@ -560,12 +562,22 @@ class AgentLoop:
             Dispatch info dict if multi-bot mode, None otherwise
         """
         from nanofolks.bots.dispatch import BotDispatch, DispatchTarget
+        from nanofolks.bots.room_manager import get_room_manager
 
-        message.lower()
+        # Pass room_manager so BotDispatch can restrict suggested bots to actual
+        # room participants instead of falling back to keyword matching only.
+        try:
+            room_mgr = get_room_manager()
+        except Exception:
+            room_mgr = None
 
-        # Check for @all / @crew / multiple mentions
-        dispatch = BotDispatch()
-        result = dispatch.dispatch_message(message, room=None, is_dm=False)
+        # Retrieve current room object for participant-aware routing
+        current_room = None
+        if room_mgr and self._current_room_id:
+            current_room = room_mgr.get_room(self._current_room_id)
+
+        dispatch = BotDispatch(room_manager=room_mgr)
+        result = dispatch.dispatch_message(message, room=current_room, is_dm=False)
 
         # Only handle MULTI_BOT and CREW_CONTEXT modes
         if result.target in [DispatchTarget.MULTI_BOT, DispatchTarget.CREW_CONTEXT]:
@@ -635,6 +647,24 @@ class AgentLoop:
         except Exception:
             pass
 
+        # Gather conversation history and memory context to inject into sub-bots
+        conversation_history: list = []
+        memory_context: str | None = None
+        try:
+            conversation_history = session.get_history(max_messages=10)
+        except Exception as e:
+            logger.warning(f"Could not retrieve session history for multi-bot: {e}")
+
+        try:
+            if self.context_assembler:
+                room_id = msg.room_id or self._current_room_id or "general"
+                memory_context = self.context_assembler.assemble_context(room_id=room_id)
+        except Exception as e:
+            logger.warning(f"Could not assemble memory context for multi-bot: {e}")
+
+        # Determine room context name for display
+        room_context_dict = {'name': msg.room_id or self._current_room_id or 'general'}
+
         # Generate responses in parallel
         generator = MultiBotResponseGenerator(
             provider=self.provider,
@@ -650,7 +680,9 @@ class AgentLoop:
                 user_message=msg.content,
                 bot_names=bots,
                 mode=mode,
-                room_context={'name': 'general'},
+                room_context=room_context_dict,
+                conversation_history=conversation_history,
+                memory_context=memory_context,
             )
 
             # Format combined response
@@ -668,6 +700,13 @@ class AgentLoop:
                         'response_time_ms': response.response_time_ms,
                     }
                 )
+
+            # Persist this exchange to the session so subsequent messages have context
+            sanitized_user_msg = self.sanitizer.sanitize(msg.content)
+            session.add_message("user", sanitized_user_msg)
+            session.add_message("assistant", combined_content)
+            self.sessions.save(session)
+            logger.debug("Multi-bot exchange saved to session")
 
             return OutboundMessage(
                 channel=msg.channel,
@@ -882,6 +921,28 @@ class AgentLoop:
             except asyncio.TimeoutError:
                 continue
 
+    async def process_inbound(self, msg: InboundMessage) -> None:
+        """Public entry-point for per-room broker message delivery.
+
+        Called by RoomBrokerManager for each dequeued message instead of
+        the flat bus.consume_inbound() loop. Processes the message and
+        publishes the response to the outbound bus.
+
+        Args:
+            msg: The inbound message to process.
+        """
+        try:
+            response = await self._process_message(msg)
+            if response:
+                await self.bus.publish_outbound(response)
+        except Exception as e:
+            logger.error(f"[broker] Error processing message in room {msg.room_id}: {e}")
+            await self.bus.publish_outbound(OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content=f"Sorry, I encountered an error: {str(e)}",
+            ))
+
     async def stop(self) -> None:
         """Stop the agent loop."""
         self._running = False
@@ -892,6 +953,7 @@ class AgentLoop:
 
         await self.close_mcp()
         logger.info("Agent loop stopping")
+
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
@@ -1828,19 +1890,15 @@ class AgentLoop:
         if not self.memory_store or not self.learning_manager:
             return
 
-        try:
-            logger.debug("Running pre-compaction memory flush hook")
-
+        async def _do_flush():
+            """Inner flush logic, called with or without the background lock."""
             # Detect any learnings from recent conversation
             if session.messages:
-                # Get last few messages to check for feedback
                 recent_msgs = session.messages[-10:]
                 for message in recent_msgs:
                     if message.get("role") == "user":
                         content = message.get("content", "")
-                        # Check for feedback patterns
                         if self.learning_manager.feedback_detector.detect_feedback(content):
-                            # Process and store learning
                             learnings = self.learning_manager.feedback_detector.extract_learning(content)
                             for learning_data in learnings:
                                 await self.learning_manager.create_learning(
@@ -1854,6 +1912,18 @@ class AgentLoop:
             # Refresh preferences summary if needed
             if self.preferences_aggregator:
                 await self.preferences_aggregator.refresh_if_needed()
+
+        try:
+            logger.debug("Running pre-compaction memory flush hook")
+
+            # Acquire the background processor's lock so we don't race with
+            # _extract_pending_events() / _refresh_summaries() writing to the
+            # same SQLite rows at the same time.
+            if self.background_processor and hasattr(self.background_processor, 'processing_lock'):
+                async with self.background_processor.processing_lock:
+                    await _do_flush()
+            else:
+                await _do_flush()
 
             logger.debug("Memory flush hook complete")
 

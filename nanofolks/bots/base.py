@@ -60,6 +60,11 @@ class SpecialistBot(ABC):
             "heartbeat_history": [],  # History of heartbeat executions
         }
 
+        # Persistent learning manager — injected by gateway via set_learning_manager().
+        # When set, record_learning() writes to TurboMemoryStore in addition to
+        # private_memory, making observations visible to ContextAssembler.
+        self._learning_manager: Optional[Any] = None
+
         # Apply theme if available
         if theme_manager and theme_manager.current_theme:
             self._apply_theme_to_role_card()
@@ -204,18 +209,84 @@ class SpecialistBot(ABC):
         """
         return self.role_card.greeting
 
+    def set_learning_manager(self, manager: Any) -> None:
+        """Inject a shared LearningManager for persistent storage.
+
+        When set, every call to record_learning() will also write the
+        observation to TurboMemoryStore via the manager, making it
+        visible to ContextAssembler.assemble_context().
+
+        Args:
+            manager: LearningManager instance (from nanofolks.memory.learning)
+        """
+        self._learning_manager = manager
+        logger.debug(
+            f"[{self.role_card.bot_name}] LearningManager injected for persistent storage"
+        )
+
     def record_learning(self, lesson: str, confidence: float = 0.7) -> None:
-        """Record a private learning.
+        """Record a private learning — in-memory and, if a manager is
+        available, also persist to TurboMemoryStore.
 
         Args:
             lesson: What was learned
             confidence: How confident in this learning (0.0-1.0)
         """
-        self.private_memory["learnings"].append({
+        entry = {
             "lesson": lesson,
             "confidence": confidence,
             "timestamp": datetime.now().isoformat(),
-        })
+        }
+        self.private_memory["learnings"].append(entry)
+
+        # Persist to the shared store when a LearningManager has been injected.
+        # We schedule this as a fire-and-forget task so we never block the
+        # heartbeat tick that called us.
+        if self._learning_manager is not None:
+            try:
+                import asyncio
+                from datetime import datetime as _dt
+                from uuid import uuid4 as _uuid4
+
+                from nanofolks.memory.models import Learning
+
+                now = _dt.now()
+                learning_obj = Learning(
+                    id=str(_uuid4()),
+                    content=lesson,
+                    source=f"heartbeat:{self.role_card.bot_name}",
+                    sentiment="neutral",
+                    confidence=confidence,
+                    recommendation=None,
+                    superseded_by=None,
+                    content_embedding=None,
+                    created_at=now,
+                    updated_at=now,
+                    relevance_score=1.0,
+                    times_accessed=0,
+                    last_accessed=None,
+                )
+
+                async def _flush(manager, obj, bot_name):
+                    try:
+                        # store.create_learning() is synchronous (SQLite)
+                        manager.store.create_learning(obj)
+                    except Exception as exc:
+                        logger.debug(
+                            f"[{bot_name}] Learning persistence skipped: {exc}"
+                        )
+
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(
+                        _flush(
+                            self._learning_manager,
+                            learning_obj,
+                            self.role_card.bot_name,
+                        )
+                    )
+            except Exception:
+                pass  # Never block heartbeat
 
     def record_mistake(self, error: str, recovery: str, lesson: Optional[str] = None) -> None:
         """Record a mistake and how it was recovered.

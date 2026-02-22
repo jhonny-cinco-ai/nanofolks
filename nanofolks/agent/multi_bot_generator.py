@@ -10,6 +10,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# Maximum number of prior messages to include in multi-bot context
+_HISTORY_WINDOW = 10
+
 from loguru import logger
 
 from nanofolks.bots.dispatch import DispatchTarget
@@ -100,6 +103,8 @@ class MultiBotResponseGenerator:
         bot_names: List[str],
         mode: DispatchTarget,
         room_context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        memory_context: Optional[str] = None,
     ) -> List[BotResponse]:
         """Generate responses from multiple bots in parallel.
 
@@ -108,11 +113,16 @@ class MultiBotResponseGenerator:
             bot_names: List of bot names to generate responses from
             mode: Dispatch mode (MULTI_BOT or CREW_CONTEXT)
             room_context: Optional room context information
+            conversation_history: Recent messages from the active session (LLM format)
+            memory_context: Pre-assembled memory context string from ContextAssembler
 
         Returns:
             List of BotResponse objects
         """
         logger.info(f"Generating multi-bot responses from: {', '.join(bot_names)} (mode: {mode.value})")
+
+        # Trim history to window to avoid blowing token budget
+        trimmed_history = (conversation_history or [])[-_HISTORY_WINDOW:]
 
         # Create tasks for each bot
         tasks = []
@@ -123,6 +133,8 @@ class MultiBotResponseGenerator:
                 other_bots=[b for b in bot_names if b != bot_name],
                 mode=mode,
                 room_context=room_context,
+                conversation_history=trimmed_history,
+                memory_context=memory_context,
             )
             tasks.append(task)
 
@@ -162,6 +174,8 @@ class MultiBotResponseGenerator:
         other_bots: List[str],
         mode: DispatchTarget,
         room_context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        memory_context: Optional[str] = None,
     ) -> BotResponse:
         """Generate response for a single bot.
 
@@ -171,6 +185,8 @@ class MultiBotResponseGenerator:
             other_bots: List of other bots participating
             mode: Dispatch mode
             room_context: Optional room context
+            conversation_history: Recent session messages in LLM format
+            memory_context: Memory context string from ContextAssembler
 
         Returns:
             BotResponse object
@@ -178,22 +194,26 @@ class MultiBotResponseGenerator:
         start_time = time.time()
 
         try:
-            # Build context with communal awareness
+            # Build context with communal awareness and optional memory
             context = self._build_communal_context(
                 bot_name=bot_name,
                 user_message=user_message,
                 other_bots=other_bots,
                 mode=mode,
                 room_context=room_context,
+                memory_context=memory_context,
             )
+
+            # Build message list: system + prior history + current user turn
+            messages: List[Dict[str, Any]] = [{"role": "system", "content": context}]
+            if conversation_history:
+                messages.extend(conversation_history)
+            messages.append({"role": "user", "content": user_message})
 
             # Generate response using LLM
             response = await self.provider.chat(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": context},
-                    {"role": "user", "content": user_message}
-                ],
+                messages=messages,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
             )
@@ -222,6 +242,7 @@ class MultiBotResponseGenerator:
         other_bots: List[str],
         mode: DispatchTarget,
         room_context: Optional[Dict[str, Any]] = None,
+        memory_context: Optional[str] = None,
     ) -> str:
         """Build context that includes communal awareness.
 
@@ -231,6 +252,7 @@ class MultiBotResponseGenerator:
             other_bots: List of other participating bots
             mode: Dispatch mode
             room_context: Optional room context
+            memory_context: Pre-assembled memory context string
 
         Returns:
             System prompt for the bot
@@ -244,9 +266,20 @@ class MultiBotResponseGenerator:
             "",
             "## Your Identity",
             identity or f"You are {bot_name}, a specialist bot.",
+        ]
+
+        # Inject memory context if available
+        if memory_context:
+            context_parts.extend([
+                "",
+                "## Long-term Memory",
+                memory_context,
+            ])
+
+        context_parts.extend([
             "",
             "## Current Situation",
-        ]
+        ])
 
         # Add room context if available
         if room_context:

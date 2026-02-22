@@ -136,7 +136,18 @@ class ChannelManager:
                 logger.error(f"Error stopping {name}: {e}")
 
     async def _dispatch_outbound(self) -> None:
-        """Dispatch outbound messages to the appropriate channel."""
+        """Dispatch outbound messages to the appropriate channel.
+
+        After sending to the primary (originating) channel, this also fans out
+        to every other channel that is mapped to the same room via the
+        RoomManager.  This implements the cross-channel broadcast that was
+        previously stubbed in MessageBus.set_room_manager().
+
+        Fan-out is skipped when:
+          - msg.room_id is None (no room context on the message)
+          - Only one channel mapping exists for that room
+          - A sibling channel driver is not loaded / enabled
+        """
         logger.info("Outbound dispatcher started")
 
         while True:
@@ -146,19 +157,62 @@ class ChannelManager:
                     timeout=1.0
                 )
 
-                channel = self.channels.get(msg.channel)
-                if channel:
+                # ── Primary delivery ──────────────────────────────────────────
+                primary_channel = self.channels.get(msg.channel)
+                if primary_channel:
                     try:
-                        await channel.send(msg)
+                        await primary_channel.send(msg)
                     except Exception as e:
                         logger.error(f"Error sending to {msg.channel}: {e}")
                 else:
                     logger.warning(f"Unknown channel: {msg.channel}")
 
+                # ── Cross-channel broadcast ───────────────────────────────────
+                # Only attempt when the message carries a room_id and we have a
+                # room manager to look up sibling channels.
+                room_mgr = getattr(self.bus, "_room_manager", None)
+                if msg.room_id and room_mgr:
+                    try:
+                        sibling_mappings = room_mgr.get_channel_mappings_for_room(
+                            msg.room_id
+                        )
+                        for mapping in sibling_mappings:
+                            sib_channel = mapping.get("channel")
+                            sib_chat_id = mapping.get("chat_id")
+                            # Skip the originating channel (already sent above)
+                            if sib_channel == msg.channel and sib_chat_id == msg.chat_id:
+                                continue
+                            driver = self.channels.get(sib_channel)
+                            if not driver:
+                                continue
+                            # Build a copy of the message aimed at the sibling
+                            import dataclasses
+                            broadcast_msg = dataclasses.replace(
+                                msg,
+                                channel=sib_channel,
+                                chat_id=sib_chat_id,
+                            )
+                            asyncio.create_task(
+                                self._send_broadcast(driver, broadcast_msg)
+                            )
+                    except Exception as e:
+                        logger.warning(f"Cross-channel broadcast error: {e}")
+
             except asyncio.TimeoutError:
                 continue
             except asyncio.CancelledError:
                 break
+
+    async def _send_broadcast(self, channel, msg) -> None:
+        """Send a broadcast copy to a sibling channel (fire-and-forget helper)."""
+        try:
+            await channel.send(msg)
+            logger.debug(
+                f"Broadcast delivered to {msg.channel}:{msg.chat_id} "
+                f"(room:{msg.room_id})"
+            )
+        except Exception as e:
+            logger.warning(f"Broadcast to {msg.channel} failed: {e}")
 
     def get_channel(self, name: str) -> BaseChannel | None:
         """Get a channel by name."""

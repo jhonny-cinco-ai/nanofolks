@@ -12,12 +12,17 @@ class MessageBus:
 
     Channels push messages to the inbound queue, and the agent processes
     them and pushes responses to the outbound queue.
+
+    When a RoomBrokerManager is attached via set_broker(), inbound messages
+    are routed through the broker for per-room FIFO ordering instead of
+    the flat asyncio.Queue fallback.
     """
 
     def __init__(self):
         self.inbound: asyncio.Queue[InboundMessage] = asyncio.Queue()
         self.outbound: asyncio.Queue[OutboundMessage] = asyncio.Queue()
         self._room_manager: Optional[Any] = None  # Set via set_room_manager()
+        self._broker: Optional[Any] = None        # Set via set_broker()
 
     def set_room_manager(self, room_manager) -> None:
         """Set the room manager for cross-channel broadcast.
@@ -27,9 +32,28 @@ class MessageBus:
         """
         self._room_manager = room_manager
 
+    def set_broker(self, broker) -> None:
+        """Attach a RoomBrokerManager for per-room FIFO inbound routing.
+
+        When set, publish_inbound() routes through the broker instead of
+        the flat asyncio.Queue. The broker creates per-room queues on-demand
+        and guarantees FIFO ordering within each room.
+
+        Args:
+            broker: RoomBrokerManager instance
+        """
+        self._broker = broker
+
     async def publish_inbound(self, msg: InboundMessage) -> None:
-        """Publish a message from a channel to the agent."""
-        await self.inbound.put(msg)
+        """Publish a message from a channel to the agent.
+
+        Routes through the per-room broker if one is attached, otherwise
+        falls back to the flat inbound queue consumed by AgentLoop.run().
+        """
+        if self._broker is not None:
+            await self._broker.route_message(msg)
+        else:
+            await self.inbound.put(msg)
 
     async def consume_inbound(self) -> InboundMessage:
         """Consume the next inbound message (blocks until available)."""
@@ -52,3 +76,4 @@ class MessageBus:
     def outbound_size(self) -> int:
         """Number of pending outbound messages."""
         return self.outbound.qsize()
+

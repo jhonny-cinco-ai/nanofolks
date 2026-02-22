@@ -757,6 +757,12 @@ def gateway(
         mcp_servers=config.tools.mcp_servers,
     )
 
+    # Wire per-room FIFO broker (Phase 1: single AgentLoop, per-room queues)
+    from nanofolks.broker.room_broker import RoomBrokerManager
+    broker_manager = RoomBrokerManager(agent_loop_factory=lambda: agent)
+    bus.set_broker(broker_manager)
+    console.print("[green]✓[/green] Broker: per-room FIFO routing active")
+
     # Set cron callback (needs agent)
     async def on_cron_job(job: CronJob) -> str | None:
         """Execute a cron job through the agent or handle system jobs."""
@@ -864,6 +870,36 @@ def gateway(
         multi_manager.register_bot(creative)
         multi_manager.register_bot(leader)
 
+        # Wire CoordinatorBot into the manager so it participates in heartbeat
+        # cycles and is visible to CLI introspection.  Scoped fix: it joins the
+        # heartbeat pipeline only; full routing-takeover is a separate effort.
+        try:
+            from nanofolks.coordinator.bus import InterBotBus
+            from nanofolks.coordinator.coordinator_bot import CoordinatorBot
+            from nanofolks.memory.bot_memory import BotExpertise
+            from nanofolks.models.role_card import RoleCard, RoleCardDomain
+
+            _coordinator_role_card = RoleCard(
+                bot_name="coordinator",
+                domain=RoleCardDomain.COORDINATION,
+                title="Coordinator",
+                domain_description=(
+                    "Orchestrates team collaboration, delegates tasks, resolves "
+                    "disagreements, and tracks task status across specialist bots."
+                ),
+            )
+            _inter_bot_bus = InterBotBus()
+            _bot_expertise = BotExpertise()
+            coordinator_bot = CoordinatorBot(
+                role_card=_coordinator_role_card,
+                bus=_inter_bot_bus,
+                expertise=_bot_expertise,
+            )
+            multi_manager.register_bot(coordinator_bot)
+            console.print("[green]✓[/green] CoordinatorBot registered in heartbeat manager")
+        except Exception as _coord_err:
+            logger.warning(f"CoordinatorBot init skipped: {_coord_err}")
+
         # Re-initialize heartbeats with provider, routing, and reasoning config
         # This enables HEARTBEAT.md execution with smart model selection
         from nanofolks.agent.work_log_manager import get_work_log_manager
@@ -891,11 +927,27 @@ def gateway(
                 tool_registry=tool_registry,
             )
 
+        # Inject the agent's shared LearningManager into each specialist bot so
+        # that heartbeat-generated learnings are persisted to TurboMemoryStore
+        # and become visible to ContextAssembler.assemble_context().
+        lm = getattr(agent, "learning_manager", None)
+        if lm:
+            for bot in bots_list:
+                try:
+                    bot.set_learning_manager(lm)
+                except Exception as _lm_err:
+                    logger.debug(f"Could not inject LearningManager into {bot.name}: {_lm_err}")
+            console.print("[green]✓[/green] LearningManager injected into specialist bots")
+        else:
+            logger.debug("Agent has no learning_manager; heartbeat learnings will be in-memory only")
+
         # Wire manager into CLI commands
         from nanofolks.cli.heartbeat_commands import set_heartbeat_manager
         set_heartbeat_manager(multi_manager)
 
         console.print("[green]✓[/green] Multi-heartbeat manager initialized with 6 bots")
+
+
     except Exception as e:
         logger.warning(f"Failed to initialize multi-heartbeat manager: {e}")
         multi_manager = None
@@ -966,6 +1018,7 @@ def gateway(
             cron.stop()
             await agent.stop()
             await channels.stop_all()
+            await broker_manager.stop_all()
 
     asyncio.run(run())
 
@@ -1713,9 +1766,11 @@ def chat(
                             console.print(f"\n[red]❌ Room '{new_room_id}' not found[/red]\n")
                             continue
 
-                        # Switch context
+                        # Switch room context — also migrate the session key so
+                        # AgentLoop loads the new room's history and memory.
                         room = new_room_id
                         current_room = new_room
+                        session_id = f"room:{new_room_id}"
 
                         console.print(f"\n✅ Switched to [bold cyan]#{new_room_id}[/bold cyan]\n")
 
@@ -1834,6 +1889,7 @@ def chat(
                                 if switched:
                                     room = new_room.id
                                     current_room = new_room
+                                    session_id = f"room:{new_room.id}"  # migrate session key
                                     console.print(f"\n🔀 Switched to [bold cyan]#{room}[/bold cyan]\n")
                             # After handling room creation (or cancellation),
                             # either continue to agent or ask user what to do next
@@ -3619,6 +3675,100 @@ def room_show(
         console.print(f"   • {bot}")
 
     console.print(f"\n[dim]Use 'nanofolks room invite {room_id} <bot>' to add bots[/dim]")
+
+
+
+@room_app.command("map")
+def room_map(
+    channel: str = typer.Argument(..., help="Channel type (telegram, discord, slack, whatsapp, email)"),
+    chat_id: str = typer.Argument(..., help="Chat / channel identifier from the platform"),
+    room_id: str = typer.Argument(..., help="Room ID to map this channel to"),
+):
+    """Map an external channel to a room.
+
+    After mapping, messages arriving from this channel will be routed to
+    the specified room's session, memory, and bot participants.
+
+    Examples:
+
+      nanofolks room map telegram 123456789 general
+
+      nanofolks room map discord 987654321 abc12-project
+    """
+    from nanofolks.bots.room_manager import get_room_manager
+
+    manager = get_room_manager()
+
+    # Verify room exists first
+    if not manager.get_room(room_id):
+        console.print(f"[red]❌ Room '{room_id}' not found.[/red]")
+        console.print("[dim]Run 'nanofolks room list' to see available rooms.[/dim]")
+        raise typer.Exit(1)
+
+    success = manager.join_channel_to_room(channel, chat_id, room_id)
+
+    if success:
+        console.print(f"\n✅ [green]Mapped[/green] {channel}:{chat_id} → room:[cyan]{room_id}[/cyan]")
+        console.print("[dim]Messages from this channel will now route to that room.[/dim]")
+    else:
+        console.print(f"[yellow]⚠ Mapping already exists or room not found[/yellow]")
+
+
+@room_app.command("unmap")
+def room_unmap(
+    channel: str = typer.Argument(..., help="Channel type (telegram, discord, slack, whatsapp, email)"),
+    chat_id: str = typer.Argument(..., help="Chat / channel identifier from the platform"),
+):
+    """Remove a channel→room mapping.
+
+    After unmapping, incoming messages from this channel will be dropped
+    until a new mapping is created with 'nanofolks room map'.
+    """
+    from nanofolks.bots.room_manager import get_room_manager
+
+    manager = get_room_manager()
+    success = manager.leave_channel_from_room(channel, chat_id)
+
+    if success:
+        console.print(f"\n✅ [green]Unmapped[/green] {channel}:{chat_id}")
+        console.print("[dim]Messages from this channel will be dropped until remapped.[/dim]")
+    else:
+        console.print(f"[yellow]⚠ No mapping found for {channel}:{chat_id}[/yellow]")
+
+
+@room_app.command("channels")
+def room_channels(
+    room_id: Optional[str] = typer.Argument(None, help="Filter by room ID (shows all if omitted)"),
+):
+    """List all channel→room mappings.
+
+    Shows which external channels (Telegram, Discord, etc.) are wired to
+    which rooms. Channels not listed here will have their messages dropped.
+    """
+    from nanofolks.bots.room_manager import get_room_manager
+
+    manager = get_room_manager()
+    mappings = manager.get_mapped_channels()
+
+    if room_id:
+        mappings = [m for m in mappings if m["room_id"] == room_id]
+
+    if not mappings:
+        msg = f"No channel mappings found for room '{room_id}'." if room_id else "No channel mappings found."
+        console.print(f"[yellow]{msg}[/yellow]")
+        console.print("[dim]Use 'nanofolks room map <channel> <chat_id> <room_id>' to add one.[/dim]")
+        return
+
+    table = Table(title="Channel → Room Mappings")
+    table.add_column("Channel", style="cyan")
+    table.add_column("Chat ID", style="blue")
+    table.add_column("Room", style="green")
+
+    for m in mappings:
+        table.add_row(m["channel"], m["chat_id"], m["room_id"])
+
+    console.print(table)
+    console.print(f"\n[dim]{len(mappings)} mapping(s) total[/dim]")
 
 
 # ============================================================================

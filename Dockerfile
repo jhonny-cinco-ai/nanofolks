@@ -63,6 +63,8 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates \
+        gnome-keyring \
+        libdbus-glib-1-2 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create config directory

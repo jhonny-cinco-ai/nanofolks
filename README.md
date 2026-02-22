@@ -69,6 +69,17 @@ Nanofolks provides a flexible architecture for:
 
 ## Installation
 
+### System Dependencies (Optional - for secure keyring)
+
+For secure API key storage on headless Linux servers:
+
+```bash
+# Ubuntu/Debian
+apt install gnome-keyring libdbus-glib-1-2
+```
+
+This enables the OS Keychain/Keyring to store API keys securely instead of in config files.
+
 ### From Source (Recommended)
 
 ```bash

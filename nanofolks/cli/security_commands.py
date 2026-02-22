@@ -9,11 +9,42 @@ from rich.table import Table
 from nanofolks.config.loader import KEYRING_MARKER, load_config, save_config
 from nanofolks.security.keyring_manager import (
     get_keyring_manager,
+    init_gnome_keyring,
     is_keyring_available,
 )
 
 app = typer.Typer(help="Security commands for key management")
 console = Console()
+
+
+@app.command("init-keyring")
+def init_keyring(
+    password: Optional[str] = typer.Option(None, "--password", "-p", help="Keyring password (will prompt if not provided)"),
+):
+    """Initialize GNOME keyring on headless Linux servers.
+
+    This command starts the GNOME keyring daemon to enable secure storage
+    of API keys on headless servers.
+
+    Example:
+        nanofolks security init-keyring --password mypassword
+    """
+    console.print("\n[bold]Initializing GNOME Keyring[/bold]\n")
+
+    if password:
+        success = init_gnome_keyring(password)
+    else:
+        console.print("[dim]Enter a password to unlock the keyring:[/dim]")
+        success = init_gnome_keyring()
+
+    if success:
+        console.print("[green]✓[/green] GNOME Keyring initialized successfully!")
+        console.print("[dim]You can now store API keys securely[/dim]")
+    else:
+        console.print("[red]✗[/red] Failed to initialize GNOME Keyring")
+        console.print("[dim]Make sure gnome-keyring and dbus-run-session are installed:[/dim]")
+        console.print("  apt install gnome-keyring libdbus-glib-1-2")
+        raise typer.Exit(1)
 
 
 @app.command("status")

@@ -417,18 +417,34 @@ Then restart nanofolks for secure access.
         # Simplified - in production would query provider schema
         defaults = {
             "openrouter": [
-                "openrouter/anthropic/claude-3-5-sonnet",
+                # Anthropic
+                "openrouter/anthropic/claude-3.5-haiku",
+                "openrouter/anthropic/claude-3.5-sonnet",
                 "openrouter/anthropic/claude-opus-4-5",
+                # OpenAI
                 "openrouter/openai/gpt-4o",
                 "openrouter/openai/gpt-4o-mini",
+                "openrouter/openai/o1",
+                "openrouter/openai/o1-mini",
+                # DeepSeek
                 "openrouter/deepseek/deepseek-chat",
                 "openrouter/deepseek/deepseek-chat-v3-0324",
+                # Google
                 "openrouter/google/gemini-pro-1.5",
+                "openrouter/google/gemini-flash-1.5",
+                # Meta
                 "openrouter/meta-llama/llama-3.3-70b-instruct",
+                "openrouter/meta-llama/llama-3.1-8b-instruct",
+                # Qwen
                 "openrouter/qwen/qwen-2.5-72b-instruct",
+                "openrouter/qwen/qwen-2.5-32b-instruct",
+                # Mistral
+                "openrouter/mistralai/mistral-small-3.1",
+                # Cohere
+                "openrouter/cohere/command-a",
             ],
-            "anthropic": ["anthropic/claude-3-5-sonnet-20241022", "anthropic/claude-3-opus-20240229"],
-            "openai": ["openai/gpt-4o", "openai/gpt-4o-mini", "openai/o1-mini"],
+            "anthropic": ["anthropic/claude-3.5-sonnet-20241022", "anthropic/claude-3-opus-20240229", "anthropic/claude-3-haiku-20240307"],
+            "openai": ["openai/gpt-4o", "openai/gpt-4o-mini", "openai/o1", "openai/o1-mini"],
             "groq": ["groq/llama-3.3-70b", "groq/mixtral-8x7b-32768"],
             "deepseek": ["deepseek/deepseek-chat", "deepseek/deepseek-chat-v3-0324"],
             "moonshot": ["moonshot/kimi-k2.5"],

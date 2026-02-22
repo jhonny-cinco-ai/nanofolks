@@ -65,6 +65,7 @@ RUN apt-get update && \
         ca-certificates \
         gnome-keyring \
         libdbus-glib-1-2 \
+        dbus-x11 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create config directory

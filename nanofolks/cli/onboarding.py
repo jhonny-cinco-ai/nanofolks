@@ -155,19 +155,20 @@ class OnboardingWizard:
             import time
             start_time = time.time()
             msg_index = 0
+            min_duration = 2.5  # Minimum time to show spinner
 
             while True:
                 # Check if get_keyring_info is done (we can't easily check that synchronously)
                 # So we'll just run for a reasonable time and rotate messages
                 elapsed = time.time() - start_time
-                new_index = int(elapsed / 0.8) % len(loading_messages)
+                new_index = min(int(elapsed / 0.8), len(loading_messages) - 1)
 
                 if new_index != msg_index:
                     msg_index = new_index
                     progress.update(task, description=loading_messages[msg_index])
 
-                # Simulate check completion after reasonable time
-                if elapsed > 2.0:
+                # Run for minimum duration OR until we showed all messages
+                if elapsed > min_duration and msg_index >= len(loading_messages) - 1:
                     break
 
                 time.sleep(0.1)

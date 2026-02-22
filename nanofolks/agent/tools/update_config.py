@@ -433,13 +433,15 @@ Examples:
         try:
             if field_type == 'string':
                 str_value = str(value)
-                # Check pattern if specified
-                if 'pattern' in schema:
-                    import re
-                    if not re.match(schema['pattern'], str_value):
-                        raise ConfigUpdateError(
-                            f"Value does not match required pattern. {schema.get('help', '')}"
-                        )
+                # Skip pattern validation for empty strings (used as keyring markers)
+                if str_value or 'pattern' not in schema:
+                    # Check pattern if specified
+                    if 'pattern' in schema and str_value:
+                        import re
+                        if not re.match(schema['pattern'], str_value):
+                            raise ConfigUpdateError(
+                                f"Value does not match required pattern. {schema.get('help', '')}"
+                            )
                 return str_value
 
             elif field_type == 'boolean':

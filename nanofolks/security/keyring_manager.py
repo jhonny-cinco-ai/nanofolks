@@ -213,6 +213,7 @@ def init_gnome_keyring(password: str) -> bool:
             from keyring.backends import SecretService
             keyring.set_keyring(SecretService.Keyring())
             logger.info("GNOME keyring initialized successfully")
+            logger.info("For persistent keyring on servers, run: dbus-run-session -- gnome-keyring-daemon --unlock --components=secrets &")
             return True
         else:
             logger.warning(f"Failed to initialize GNOME keyring: {stderr}")

@@ -195,28 +195,44 @@ def init_gnome_keyring(password: str) -> bool:
             logger.warning("dbus-run-session not installed")
             return False
 
-        # Initialize the keyring - pipe password to stdin
-        cmd = ["dbus-run-session", "--", "gnome-keyring-daemon", "--unlock"]
+        # Initialize the keyring - run as background process that persists
+        cmd = ["dbus-run-session", "--", "gnome-keyring-daemon", "--unlock", "--components=secrets"]
         
         proc = subprocess.Popen(
             cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            start_new_session=True  # Run in own session so it persists
         )
-        stdout, stderr = proc.communicate(input=password + "\n", timeout=10)
+        
+        # Give the daemon time to start
+        import time
+        time.sleep(1)
+        
+        # Try to communicate without waiting for exit (daemon should keep running)
+        try:
+            stdout, stderr = proc.communicate(input=password + "\n", timeout=5)
+        except subprocess.TimeoutExpired:
+            # Timeout is expected for a daemon - that's fine
+            pass
 
-        if proc.returncode == 0:
-            # Set the keyring backend to SecretService
-            import keyring
-            from keyring.backends import SecretService
-            keyring.set_keyring(SecretService.Keyring())
+        # Check if daemon is running by testing the keyring
+        import keyring
+        from keyring.backends import SecretService
+        test_keyring = SecretService.Keyring()
+        test_keyring.set_keyring(test_keyring)
+        
+        try:
+            test_keyring.set_password("nanofolks", "__test__", "test")
+            test_keyring.delete_password("nanofolks", "__test__")
+            keyring.set_keyring(test_keyring)
             logger.info("GNOME keyring initialized successfully")
-            logger.info("For persistent keyring on servers, run: dbus-run-session -- gnome-keyring-daemon --unlock --components=secrets &")
+            logger.info("Keyring daemon is running in background")
             return True
-        else:
-            logger.warning(f"Failed to initialize GNOME keyring: {stderr}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize GNOME keyring: {e}")
             return False
 
     except FileNotFoundError as e:

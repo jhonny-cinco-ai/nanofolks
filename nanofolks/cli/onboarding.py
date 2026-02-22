@@ -212,13 +212,17 @@ class OnboardingWizard:
         for i, model in enumerate(models[:5], 1):
             console.print(f"  [{i}] {model}")
         console.print("  [c] Custom model")
+        console.print("  [b] Back")
 
         model_choice = Prompt.ask(
             "\nSelect model",
-            choices=[str(i) for i in range(1, min(6, len(models) + 1))] + ["c"],
+            choices=[str(i) for i in range(1, min(6, len(models) + 1))] + ["c", "b"],
             default="1",
         )
 
+        if model_choice == "b":
+            return self._configure_provider()
+        
         if model_choice == "c":
             primary_model = Prompt.ask("Enter custom model name")
         else:

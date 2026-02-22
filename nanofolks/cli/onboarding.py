@@ -100,18 +100,20 @@ class OnboardingWizard:
 
     def _show_welcome(self) -> None:
         """Display welcome panel."""
-        console.print(Panel.fit(
-            "[bold cyan]🚀 Welcome to nanofolks![/bold cyan]\n\n"
-            "Let's set up your multi-agent team in just a few steps.\n"
-            "This wizard will guide you through:\n"
-            "  1. [bold]AI Provider[/bold] + Model (with Smart Routing)\n"
-            "  2. [bold]Evolutionary Mode[/bold] (optional)\n"
-            "  3. [bold]Network Security[/bold] (Tailscale + secure ports)\n"
-            "  4. [bold]Team Theme[/bold] - Choose your crew's personality\n"
-            "  5. [bold]Launch[/bold] - Create your workspace and crew",
-            title="🎉",
-            border_style="cyan"
-        ))
+        console.print(
+            Panel.fit(
+                "[bold cyan]🚀 Welcome to nanofolks![/bold cyan]\n\n"
+                "Let's set up your multi-agent team in just a few steps.\n"
+                "This wizard will guide you through:\n"
+                "  1. [bold]AI Provider[/bold] + Model (with Smart Routing)\n"
+                "  2. [bold]Evolutionary Mode[/bold] (optional)\n"
+                "  3. [bold]Network Security[/bold] (Tailscale + secure ports)\n"
+                "  4. [bold]Team Theme[/bold] - Choose your crew's personality\n"
+                "  5. [bold]Launch[/bold] - Create your workspace and crew",
+                title="🎉",
+                border_style="cyan",
+            )
+        )
         console.print()
 
     def _configure_provider(self) -> None:
@@ -123,18 +125,19 @@ class OnboardingWizard:
             console.print(f"  [{key}] {desc}")
 
         provider_choice = Prompt.ask(
-            "\nSelect provider",
-            choices=list(self.PROVIDERS.keys()),
-            default="1"
+            "\nSelect provider", choices=list(self.PROVIDERS.keys()), default="1"
         )
         provider_name, provider_desc = self.PROVIDERS[provider_choice]
 
-        # Get API key
+        # Get API key - allow pasting by default
         console.print(f"\n[dim]{provider_desc}[/dim]")
-        api_key = Prompt.ask(f"Enter your {provider_name.title()} API key", password=True)
+        console.print("[dim]Tip: You can paste your API key (Ctrl+V or Cmd+V)[/dim]")
+        api_key = Prompt.ask(f"Enter your {provider_name.title()} API key", password=False)
 
         if not api_key:
-            console.print("[yellow]⚠ No API key provided. You can configure this later with: nanofolks configure[/yellow]\n")
+            console.print(
+                "[yellow]⚠ No API key provided. You can configure this later with: nanofolks configure[/yellow]\n"
+            )
             self.config_result["provider"] = None
             self.config_result["api_key"] = None
         else:
@@ -158,8 +161,8 @@ class OnboardingWizard:
 
         model_choice = Prompt.ask(
             "\nSelect model",
-            choices=[str(i) for i in range(1, min(6, len(models)+1))] + ["c"],
-            default="1"
+            choices=[str(i) for i in range(1, min(6, len(models) + 1))] + ["c"],
+            default="1",
         )
 
         if model_choice == "c":
@@ -205,7 +208,9 @@ class OnboardingWizard:
             console.print("[dim]Models auto-configured for your provider.[/dim]")
             console.print("[dim]Customize later: nanofolks configure[/dim]\n")
         else:
-            console.print("[dim]Smart routing disabled. Will use primary model for all queries.[/dim]\n")
+            console.print(
+                "[dim]Smart routing disabled. Will use primary model for all queries.[/dim]\n"
+            )
 
     def _configure_evolutionary_mode(self) -> None:
         """Step 1c: Configure Evolutionary Mode."""
@@ -225,7 +230,9 @@ class OnboardingWizard:
             asyncio.run(self._save_evolutionary_config(True))
             console.print("[green]✓ Evolutionary mode enabled![/green]\n")
         else:
-            console.print("[dim]Evolutionary mode disabled. Bots restricted to workspace only.[/dim]\n")
+            console.print(
+                "[dim]Evolutionary mode disabled. Bots restricted to workspace only.[/dim]\n"
+            )
 
     def _configure_network_security(self) -> None:
         """Step 1d: Configure Network & Security."""
@@ -268,16 +275,16 @@ class OnboardingWizard:
         console.print()
         if not tailscale_ip:
             install_tailscale = Confirm.ask(
-                "Install Tailscale for private network access?",
-                default=False
+                "Install Tailscale for private network access?", default=False
             )
             if install_tailscale:
                 self._install_tailscale_guide()
 
     def _install_tailscale_guide(self) -> None:
         """Show guide for installing Tailscale."""
-        console.print(Panel.fit(
-            """
+        console.print(
+            Panel.fit(
+                """
 [bold cyan]Install Tailscale:[/bold cyan]
 
 [bold]macOS:[/bold]
@@ -294,9 +301,10 @@ class OnboardingWizard:
 After install, run: [bold]tailscale up[/bold]
 Then restart nanofolks for secure access.
             """,
-            title="Tailscale Setup Guide",
-            border_style="cyan"
-        ))
+                title="Tailscale Setup Guide",
+                border_style="cyan",
+            )
+        )
 
     async def _save_routing_config(self, enabled: bool, provider: str = "openrouter") -> None:
         """Save routing configuration with provider-specific tiers.
@@ -319,19 +327,30 @@ Then restart nanofolks for secure access.
 
             # Save each tier's model
             await tool.execute(path="routing.tiers.simple.model", value=tiers.simple.model)
-            await tool.execute(path="routing.tiers.simple.secondary_model", value=tiers.simple.secondary_model)
+            await tool.execute(
+                path="routing.tiers.simple.secondary_model", value=tiers.simple.secondary_model
+            )
 
             await tool.execute(path="routing.tiers.medium.model", value=tiers.medium.model)
-            await tool.execute(path="routing.tiers.medium.secondary_model", value=tiers.medium.secondary_model)
+            await tool.execute(
+                path="routing.tiers.medium.secondary_model", value=tiers.medium.secondary_model
+            )
 
             await tool.execute(path="routing.tiers.complex.model", value=tiers.complex.model)
-            await tool.execute(path="routing.tiers.complex.secondary_model", value=tiers.complex.secondary_model)
+            await tool.execute(
+                path="routing.tiers.complex.secondary_model", value=tiers.complex.secondary_model
+            )
 
             await tool.execute(path="routing.tiers.reasoning.model", value=tiers.reasoning.model)
-            await tool.execute(path="routing.tiers.reasoning.secondary_model", value=tiers.reasoning.secondary_model)
+            await tool.execute(
+                path="routing.tiers.reasoning.secondary_model",
+                value=tiers.reasoning.secondary_model,
+            )
 
             await tool.execute(path="routing.tiers.coding.model", value=tiers.coding.model)
-            await tool.execute(path="routing.tiers.coding.secondary_model", value=tiers.coding.secondary_model)
+            await tool.execute(
+                path="routing.tiers.coding.secondary_model", value=tiers.coding.secondary_model
+            )
 
         except Exception as e:
             console.print(f"[yellow]⚠ Could not save routing config: {e}[/yellow]")
@@ -340,10 +359,13 @@ Then restart nanofolks for secure access.
         """Save evolutionary mode configuration."""
         try:
             from nanofolks.agent.tools.update_config import UpdateConfigTool
+
             tool = UpdateConfigTool()
             await tool.execute(path="tools.evolutionary", value=enabled)
             if enabled:
-                await tool.execute(path="tools.allowedPaths", value=["/projects/nanobot-turbo", "~/.nanofolks"])
+                await tool.execute(
+                    path="tools.allowedPaths", value=["/projects/nanobot-turbo", "~/.nanofolks"]
+                )
         except Exception as e:
             console.print(f"[yellow]⚠ Could not save evolutionary config: {e}[/yellow]")
 
@@ -361,16 +383,22 @@ Then restart nanofolks for secure access.
 
                 # Save empty marker to config (key loaded from keyring)
                 from nanofolks.agent.tools.update_config import UpdateConfigTool
+
                 tool = UpdateConfigTool()
                 await tool.execute(path=f"providers.{provider}.apiKey", value="")
 
-                console.print("[dim]API key saved to OS Keychain/Keyring (not in config file)[/dim]")
+                console.print(
+                    "[dim]API key saved to OS Keychain/Keyring (not in config file)[/dim]"
+                )
             else:
                 # Fallback: store in config file
                 from nanofolks.agent.tools.update_config import UpdateConfigTool
+
                 tool = UpdateConfigTool()
                 await tool.execute(path=f"providers.{provider}.apiKey", value=api_key)
-                console.print("[yellow]⚠ OS Keyring unavailable, key stored in config file[/yellow]")
+                console.print(
+                    "[yellow]⚠ OS Keyring unavailable, key stored in config file[/yellow]"
+                )
         except Exception as e:
             console.print(f"[yellow]⚠ Could not save API key: {e}[/yellow]")
 
@@ -378,6 +406,7 @@ Then restart nanofolks for secure access.
         """Save default model to config."""
         try:
             from nanofolks.agent.tools.update_config import UpdateConfigTool
+
             tool = UpdateConfigTool()
             await tool.execute(path="agents.defaults.model", value=model)
         except Exception as e:
@@ -466,7 +495,7 @@ Then restart nanofolks for secure access.
                 team_table.add_row(
                     f"{bot_theming['emoji']} {bot_theming['bot_title']}",
                     f"@{bot_name}",
-                    bot_theming['personality']
+                    bot_theming["personality"],
                 )
 
         console.print(team_table)
@@ -523,7 +552,7 @@ Then restart nanofolks for secure access.
             metadata={
                 "name": "General",
                 "description": "General discussion and coordination room",
-            }
+            },
         )
         return general_room
 
@@ -587,9 +616,7 @@ Then restart nanofolks for secure access.
 
                 # Apply SOUL.md, IDENTITY.md, and ROLE.md themes
                 soul_results = soul_manager.apply_theme_to_team(
-                    self.selected_theme,
-                    crew,
-                    force=True
+                    self.selected_theme, crew, force=True
                 )
 
                 # Show results
@@ -599,12 +626,11 @@ Then restart nanofolks for secure access.
                     console.print(
                         f"[green]✓ Initialized {soul_successful}/{len(crew)} bot personality files[/green]"
                     )
-                    console.print(
-                        "[dim]  (SOUL.md, IDENTITY.md, ROLE.md, AGENTS.md)[/dim]"
-                    )
+                    console.print("[dim]  (SOUL.md, IDENTITY.md, ROLE.md, AGENTS.md)[/dim]")
 
                 # Show team personalities
                 from nanofolks.templates import get_bot_theming
+
                 console.print("\n[bold]Crew personalities configured:[/bold]")
                 for bot_name in crew:
                     theming = get_bot_theming(bot_name, self.selected_theme)
@@ -640,9 +666,7 @@ Then restart nanofolks for secure access.
 
             # Create IDENTITY.md for each bot from selected theme
             identity_results = soul_manager.apply_identity_to_team(
-                team,
-                theme=self.selected_theme,
-                force=True
+                team, theme=self.selected_theme, force=True
             )
             identity_count = sum(1 for v in identity_results.values() if v)
 
@@ -688,7 +712,9 @@ Use markdown with checkboxes:
 
             console.print("\n[green]✓ Bot configuration files ready![/green]")
             console.print("[dim]  - AGENTS.md: Role-specific instructions for each bot[/dim]")
-            console.print("[dim]  - IDENTITY.md: Character definition and relationships (from theme)[/dim]")
+            console.print(
+                "[dim]  - IDENTITY.md: Character definition and relationships (from theme)[/dim]"
+            )
             console.print("[dim]  - HEARTBEAT.md: Periodic tasks (leave empty if not needed)[/dim]")
 
         except Exception as e:

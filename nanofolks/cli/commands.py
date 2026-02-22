@@ -755,6 +755,7 @@ def gateway(
         allowed_paths=config.tools.allowed_paths,
         protected_paths=config.tools.protected_paths,
         mcp_servers=config.tools.mcp_servers,
+        bot_mcp_servers=config.tools.bot_mcp_servers,
     )
 
     # Wire per-room FIFO broker (Phase 1: single AgentLoop, per-room queues)
@@ -1419,6 +1420,7 @@ def chat(
         allowed_paths=config.tools.allowed_paths,
         protected_paths=config.tools.protected_paths,
         mcp_servers=config.tools.mcp_servers,
+        bot_mcp_servers=config.tools.bot_mcp_servers,
     )
 
     # Show spinner when logs are off (no output to miss); skip when logs are on
@@ -2647,6 +2649,7 @@ def cron_run(
         exec_config=config.tools.exec,
         restrict_to_workspace=config.tools.restrict_to_workspace,
         mcp_servers=config.tools.mcp_servers,
+        bot_mcp_servers=config.tools.bot_mcp_servers,
     )
 
     store_path = get_data_dir() / "cron" / "jobs.json"

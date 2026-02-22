@@ -73,6 +73,7 @@ class AgentLoop:
         memory_config: MemoryConfig | None = None,
         bot_name: str = "leader",
         mcp_servers: dict | None = None,
+        bot_mcp_servers: dict | None = None,
     ):
         from nanofolks.config.schema import ExecToolConfig
         self.bus = bus
@@ -105,6 +106,13 @@ class AgentLoop:
         self.evolutionary = evolutionary
         self.allowed_paths = allowed_paths or []
         self.protected_paths = protected_paths or []
+        
+        # MCP servers - global and per-bot
+        self._mcp_servers = mcp_servers or {}
+        self._bot_mcp_servers = bot_mcp_servers or {}
+        self._mcp_connected = False
+        self._mcp_connecting = False
+        self._mcp_stack = None
 
         # Initialize secret sanitizer for security
         self.sanitizer = SecretSanitizer()
@@ -955,9 +963,26 @@ class AgentLoop:
         logger.info("Agent loop stopping")
 
 
-    async def _connect_mcp(self) -> None:
-        """Connect to configured MCP servers (one-time, lazy)."""
-        if self._mcp_connected or not self._mcp_servers:
+    async def _connect_mcp(self, bot_name: str = None) -> None:
+        """Connect to configured MCP servers (one-time, lazy).
+        
+        Args:
+            bot_name: Optional bot name to load bot-specific MCP servers.
+                     Defaults to self.bot_name if not provided.
+        """
+        # Use instance bot_name if not explicitly provided
+        if bot_name is None:
+            bot_name = self.bot_name
+            
+        # Merge global + bot-specific MCP servers
+        servers = self._mcp_servers.copy()
+        
+        # Add bot-specific servers if bot_name provided and configured
+        if bot_name and bot_name in self._bot_mcp_servers:
+            servers.update(self._bot_mcp_servers[bot_name])
+            logger.debug(f"MCP: loading {len(self._bot_mcp_servers[bot_name])} bot-specific servers for {bot_name}")
+        
+        if self._mcp_connected or not servers:
             return
         if getattr(self, '_mcp_connecting', False):
             return
@@ -966,8 +991,9 @@ class AgentLoop:
             from nanofolks.agent.tools.mcp import connect_mcp_servers
             self._mcp_stack = AsyncExitStack()
             await self._mcp_stack.__aenter__()
-            await connect_mcp_servers(self._mcp_servers, self.tools, self._mcp_stack)
+            await connect_mcp_servers(servers, self.tools, self._mcp_stack)
             self._mcp_connected = True
+            logger.info(f"MCP: connected {len(servers)} server(s) for bot {bot_name or 'default'}")
         finally:
             self._mcp_connecting = False
 

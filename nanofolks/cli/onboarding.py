@@ -416,13 +416,23 @@ Then restart nanofolks for secure access.
         """Get available models for a provider."""
         # Simplified - in production would query provider schema
         defaults = {
-            "openrouter": ["openrouter/anthropic/claude-3-5-sonnet", "openrouter/openai/gpt-4o"],
-            "anthropic": ["anthropic/claude-3-5-sonnet-20241022"],
-            "openai": ["openai/gpt-4o"],
-            "groq": ["groq/llama-3.3-70b"],
-            "deepseek": ["deepseek/deepseek-chat"],
+            "openrouter": [
+                "openrouter/anthropic/claude-3-5-sonnet",
+                "openrouter/anthropic/claude-opus-4-5",
+                "openrouter/openai/gpt-4o",
+                "openrouter/openai/gpt-4o-mini",
+                "openrouter/deepseek/deepseek-chat",
+                "openrouter/deepseek/deepseek-chat-v3-0324",
+                "openrouter/google/gemini-pro-1.5",
+                "openrouter/meta-llama/llama-3.3-70b-instruct",
+                "openrouter/qwen/qwen-2.5-72b-instruct",
+            ],
+            "anthropic": ["anthropic/claude-3-5-sonnet-20241022", "anthropic/claude-3-opus-20240229"],
+            "openai": ["openai/gpt-4o", "openai/gpt-4o-mini", "openai/o1-mini"],
+            "groq": ["groq/llama-3.3-70b", "groq/mixtral-8x7b-32768"],
+            "deepseek": ["deepseek/deepseek-chat", "deepseek/deepseek-chat-v3-0324"],
             "moonshot": ["moonshot/kimi-k2.5"],
-            "gemini": ["gemini-2.0-flash-exp"],
+            "gemini": ["gemini-2.0-flash-exp", "gemini-1.5-pro"],
         }
         return defaults.get(provider, ["default-model"])
 

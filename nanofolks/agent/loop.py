@@ -940,6 +940,9 @@ class AgentLoop:
             msg: The inbound message to process.
         """
         try:
+            # Ensure MCP servers are connected
+            await self._connect_mcp()
+
             response = await self._process_message(msg)
             if response:
                 await self.bus.publish_outbound(response)

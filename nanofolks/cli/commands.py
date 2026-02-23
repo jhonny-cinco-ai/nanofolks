@@ -707,9 +707,9 @@ def gateway(
     from nanofolks.heartbeat.dashboard_server import DashboardHTTPServer
     from nanofolks.heartbeat.multi_manager import MultiHeartbeatManager
 
+    from nanofolks.utils.logging import configure_logging
     if verbose:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
+        configure_logging(verbose=True)
 
     console.print(f"{__logo__} Starting nanofolks gateway on port {port}...")
 
@@ -1394,10 +1394,13 @@ def chat(
     bus.set_room_manager(room_manager)  # Enable cross-channel broadcast
     provider = _make_provider(config)
 
+    from nanofolks.utils.logging import configure_logging
     if logs:
-        logger.enable("nanofolks")
+        configure_logging(verbose=True)
     else:
-        logger.disable("nanofolks")
+        # Default is already configured in main.py, but we can re-ensure here
+        # specifically if we want to be sure it's at the SUCCESS level for chat.
+        configure_logging(verbose=False)
 
     # Get user's timezone from USER.md (or default to UTC)
     from nanofolks.utils.user_profile import get_user_timezone

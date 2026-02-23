@@ -28,6 +28,10 @@ from rich.console import Console
 from rich.table import Table
 
 from nanofolks import __logo__
+from nanofolks.utils.logging import configure_logging
+
+# Initialize logging (SUCCESS level for console by default)
+configure_logging()
 
 # Initialize rich console
 console = Console()

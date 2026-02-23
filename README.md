@@ -86,8 +86,31 @@ cd nanofolks
 pip install -e .
 ```
 
-### With uv
+### With uv (Recommended for Mac/Local Dev)
 
+`uv` is a modern, ultra-fast Python manager. It automatically manages virtual environments and Python versions for you without touching your system Python.
+
+**1. Install Nanofolks locally:**
+```bash
+git clone https://github.com/nanofolks/nanofolks.git
+cd nanofolks
+uv pip install -e .
+```
+
+*This creates a `.venv` directory instantly and installs Nanofolks in "editable" mode.*
+
+**2. Run with isolation:**
+You don't need to "activate" anything. Just use `uv run`:
+```bash
+uv run nanofolks onboard
+```
+
+**Why use uv?**
+- **Speed**: Installing is nearly instant.
+- **Safety**: Everything stays in your project's `.venv` folder.
+- **Python Management**: If a specific Python version is needed, `uv` downloads it for you automatically.
+
+*Global installation alternative:*
 ```bash
 uv tool install nanofolks
 ```

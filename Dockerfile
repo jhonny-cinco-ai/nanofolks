@@ -13,8 +13,8 @@ WORKDIR /build
 # Install build dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        build-essential \
-        gcc \
+    build-essential \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy source code
@@ -24,11 +24,8 @@ COPY nanofolks/ nanofolks/
 # Create empty bridge directory (referenced in pyproject.toml but built separately)
 RUN mkdir -p bridge && touch bridge/.gitkeep
 
-# Build wheel
-RUN pip install --no-cache-dir build && \
-    python -m build --wheel && \
-    mkdir -p /wheels && \
-    cp dist/*.whl /wheels/
+# Build wheels for the package and all dependencies
+RUN pip wheel . --wheel-dir /wheels
 
 # =============================================================================
 # Stage 2: WhatsApp Bridge Builder
@@ -62,10 +59,10 @@ WORKDIR /app
 # Install runtime dependencies (minimal)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        ca-certificates \
-        gnome-keyring \
-        libdbus-glib-1-2 \
-        dbus-x11 \
+    ca-certificates \
+    gnome-keyring \
+    libdbus-glib-1-2 \
+    dbus-x11 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create config directory

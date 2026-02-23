@@ -9,6 +9,16 @@ if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
     export DBUS_SESSION_BUS_PID
 fi
 
+# Auto-initialize and unlock keyring for Docker environment
+# We use a default internal password 'nanofolks' for the container's keyring
+if [ "$1" != "bridge" ] && [ "$1" != "shell" ]; then
+    echo "Initializing container keyring..."
+    # Start gnome-keyring-daemon, unlock it, and export session variables
+    eval $(echo "nanofolks" | gnome-keyring-daemon --unlock --components=secrets --daemonize)
+    export GNOME_KEYRING_CONTROL
+    export GNOME_KEYRING_PID
+fi
+
 # Ensure config directory exists
 mkdir -p /root/.nanofolks
 

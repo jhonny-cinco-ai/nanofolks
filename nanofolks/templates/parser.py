@@ -169,7 +169,7 @@ def get_bot_metadata(bot_name: str, theme: str) -> Optional[BotMetadata]:
 
 
 def parse_theme_description(theme: str) -> str:
-    """Parse theme description from any bot's SOUL.md file.
+    """Parse theme description from TEAM.md or any bot's SOUL.md file.
     
     Args:
         theme: Theme name
@@ -177,7 +177,12 @@ def parse_theme_description(theme: str) -> str:
     Returns:
         Theme description or empty string
     """
-    # Try to get description from leader's SOUL.md
+    # Priority 1: Check for dedicated TEAM.md file (team-oriented description)
+    team_file = SOUL_TEMPLATES_DIR / theme / "TEAM.md"
+    if team_file.exists():
+        return team_file.read_text(encoding='utf-8').strip()
+
+    # Priority 2: Fallback to leader's SOUL.md (legacy/default)
     soul_file = SOUL_TEMPLATES_DIR / theme / "leader_SOUL.md"
     if soul_file.exists():
         content = soul_file.read_text(encoding='utf-8')

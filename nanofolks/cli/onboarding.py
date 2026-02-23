@@ -78,17 +78,25 @@ class OnboardingWizard:
         """
         self._show_welcome()
 
-        # Step 1: Keyring Configuration
-        self._check_keyring_status()
-
-        # Step 2: Provider & API Key
-        self._configure_provider()
-
-        # Step 3: Theme/Team Selection
-        self._select_theme()
-
-        # Step 4: Summary & Create
-        self._confirm_and_create()
+        steps = [
+            self._check_keyring_status,
+            self._configure_provider,
+            self._select_theme,
+            self._confirm_and_create
+        ]
+        
+        step_idx = 0
+        while step_idx < len(steps):
+            result = steps[step_idx]()
+            
+            if result == "back":
+                # Go back one step, but don't go below 0
+                step_idx = max(0, step_idx - 1)
+                # If we went back to the very beginning, show welcome again
+                if step_idx == 0:
+                    self._show_welcome()
+            else:
+                step_idx += 1
 
         # Create the #general room
         general_room = self.create_general_room()
@@ -228,10 +236,15 @@ class OnboardingWizard:
 
         for key, (name, desc) in self.PROVIDERS.items():
             console.print(f"  [{key}] {desc}")
+        console.print("  [b] Back to welcome")
 
         provider_choice = Prompt.ask(
-            "\nSelect provider", choices=list(self.PROVIDERS.keys()), default="1"
+            "\nSelect provider", choices=list(self.PROVIDERS.keys()) + ["b"], default="1"
         )
+        
+        if provider_choice == "b":
+            return "back"
+            
         provider_name, provider_desc = self.PROVIDERS[provider_choice]
 
         # Get API key - allow pasting by default
@@ -575,7 +588,7 @@ Then restart nanofolks for secure access.
         """Interactive team/theme selection."""
         console.print("[bold cyan]Step 3: Choose Your Crew Theme[/bold cyan]\n")
 
-        themes = list_teams()
+        themes = list_themes()
         [t["name"] for t in themes]
 
         # First show just the team theme options
@@ -593,9 +606,7 @@ Then restart nanofolks for secure access.
         )
 
         if choice == "b":
-            # Go back to provider configuration
-            self._configure_provider()
-            return
+            return "back"
 
         selected_theme = themes[int(choice) - 1]
         self.selected_theme = selected_theme["name"]
@@ -612,7 +623,7 @@ Then restart nanofolks for secure access.
             console.print()
         else:
             # Let them choose again
-            self._select_theme()
+            return self._select_theme()
 
     def _show_team_for_theme(self, theme_name: str) -> None:
         """Show the full team composition for a theme."""
@@ -626,9 +637,10 @@ Then restart nanofolks for secure access.
         console.print(f"[dim]{theme['description']}[/dim]\n")
 
         # Create a table showing each team member
-        team_table = Table(title="Your Crew Members", box=box.ROUNDED)
-        team_table.add_column("Role", style="cyan", width=15)
-        team_table.add_column("Bot", style="green", width=12)
+        team_table = Table(title="Your Crew Members", box=box.ROUNDED, show_lines=True)
+        team_table.add_column("Name", style="green", width=12)
+        team_table.add_column("Title", style="cyan", width=15)
+        team_table.add_column("Role", style="magenta", width=12)
         team_table.add_column("Description", style="white")
 
         # Add each bot
@@ -638,6 +650,7 @@ Then restart nanofolks for secure access.
             bot_theming = get_bot_theming(bot_name, theme_name)
             if bot_theming:
                 team_table.add_row(
+                    bot_theming["bot_name"],
                     f"{bot_theming['emoji']} {bot_theming['bot_title']}",
                     f"@{bot_name}",
                     bot_theming["personality"],

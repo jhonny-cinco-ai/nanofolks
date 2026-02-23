@@ -244,16 +244,16 @@ def init_gnome_keyring(password: str) -> bool:
             pass
 
         # Check if daemon is running by testing the keyring
-        import keyring
-        from keyring.backends import SecretService
-
-        test_keyring = SecretService.Keyring()
-        test_keyring.set_keyring(test_keyring)
-
         try:
-            test_keyring.set_password("nanofolks", "__test__", "test")
-            test_keyring.delete_password("nanofolks", "__test__")
-            keyring.set_keyring(test_keyring)
+            from keyring.backends import SecretService
+            backend = SecretService.Keyring()
+
+            # Test if we can actually use it
+            backend.set_password("nanofolks", "__test__", "test")
+            backend.delete_password("nanofolks", "__test__")
+
+            # Set it as the global backend
+            keyring.set_keyring(backend)
             logger.info("GNOME keyring initialized successfully")
             logger.info("Keyring daemon is running in background")
             return True

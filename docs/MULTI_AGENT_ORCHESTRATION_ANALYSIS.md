@@ -23,7 +23,7 @@
 1. **Workspace Model** - Contextual conversations (not one-size-fits-all)
 2. **Personality Teams** - Pirate crew, Rock band, SWAT team (accessible UX)
 3. **Hybrid Memory** - Private learnings + shared knowledge
-4. **Tagging System** - @botname, #workspace (familiar UX)
+4. **Tagging System** - @botname (direct bot mentions)
 5. **Coordinator Mode** - nanofolks manages when you're away
 
 ---
@@ -673,7 +673,7 @@ echo "{"hard_bans": ["no_direct_posting"]}" | nanofolks role-card edit social --
 
 ### Phase 1: Foundation (Week 1-2)
 - [ ] Workspace data model
-- [ ] Tagging system (@bot, #workspace)
+- [ ] Tagging system (@bot mentions)
 - [ ] Role card structure
 - [ ] Basic specialist bots (researcher, coder, social)
 

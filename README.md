@@ -378,6 +378,18 @@ Not ready for a full crew? Nanofolks works perfectly as a single assistant:
 | **Collaboration** | Bots discuss and debate |
 | **Reliability** | Backup if one is unavailable |
 
+### Unified Orchestrator Pipeline
+
+Nanofolks runs every message through a single, consistent pipeline:
+
+1. **Tag** — Parse explicit @bot mentions and action words.
+2. **Intent** — Detect what the user wants (rule-based with LLM fallback when unsure).
+3. **Dispatch** — Decide which bots should handle it (Leader-first by default).
+4. **Collect** — Gather responses from assigned bots.
+5. **Final** — Produce one clear response for the user.
+
+This keeps multi-bot teamwork predictable and easy to debug, while still letting the Leader coordinate the crew.
+
 
 ## 🧠 Memory System
 

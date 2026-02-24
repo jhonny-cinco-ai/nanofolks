@@ -129,12 +129,10 @@ class IntentDetector:
 
         entities = self._extract_entities(message, best_intent)
 
-        return Intent(
+        return self.make_intent(
             intent_type=best_intent,
             confidence=confidence,
             entities=entities,
-            suggested_bots=self.SUGGESTED_BOTS[best_intent],
-            flow_type=self.FLOW_MAPPING[best_intent]
         )
 
     def _calculate_intent_score(self, message_lower: str, patterns: List[str]) -> float:
@@ -149,12 +147,10 @@ class IntentDetector:
 
     def _default_intent(self) -> Intent:
         """Return default CHAT intent when no pattern matches."""
-        return Intent(
+        return self.make_intent(
             intent_type=IntentType.CHAT,
             confidence=0.5,
             entities={},
-            suggested_bots=self.SUGGESTED_BOTS[IntentType.CHAT],
-            flow_type=FlowType.SIMULTANEOUS
         )
 
     def _extract_entities(self, message: str, intent_type: IntentType) -> Dict[str, Any]:
@@ -194,6 +190,21 @@ class IntentDetector:
         if intent.flow_type == FlowType.SIMULTANEOUS:
             return self.ALL_BOTS
         return intent.suggested_bots
+
+    def make_intent(
+        self,
+        intent_type: IntentType,
+        confidence: float,
+        entities: Dict[str, Any] | None = None,
+    ) -> Intent:
+        """Build a normalized Intent object."""
+        return Intent(
+            intent_type=intent_type,
+            confidence=confidence,
+            entities=entities or {},
+            suggested_bots=self.SUGGESTED_BOTS[intent_type],
+            flow_type=self.FLOW_MAPPING[intent_type],
+        )
 
 
 def get_intent_detector() -> IntentDetector:

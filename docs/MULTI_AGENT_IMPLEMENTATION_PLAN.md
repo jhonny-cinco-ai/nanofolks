@@ -182,7 +182,6 @@ from typing import List, Dict, Optional
 @dataclass
 class ParsedTags:
     bots: List[str]  # ["researcher", "coder"]
-    workspaces: List[str]  # ["project-refactor"]
     actions: List[str]  # ["create", "analyze"]
     raw_message: str
     mentions: Dict[str, str]  # "@researcher" -> full mention context
@@ -191,7 +190,6 @@ class TagHandler:
     """Parse Discord/Slack style tags from messages."""
     
     BOT_PATTERN = r'@([\w\-]+)'
-    WORKSPACE_PATTERN = r'#([\w\-]+)'
     ACTION_PATTERN = r'^(create|join|leave|analyze|research|coordinate)\s'
     
     def parse_tags(self, message: str) -> ParsedTags:
@@ -199,17 +197,13 @@ class TagHandler:
         Extract all tags from message.
         
         Examples:
-            "@researcher analyze #project-alpha market data"
-            -> bots=["researcher"], workspaces=["project-alpha"], actions=["analyze"]
+            "@researcher analyze project-alpha market data"
+            -> bots=["researcher"], actions=["analyze"]
         
-            "create #new-workspace for Q2 planning"
-            -> workspaces=["new-workspace"], actions=["create"]
-            
-            "#general what's the status?"
-            -> workspaces=["general"]
+            "create new project for Q2 planning"
+            -> actions=["create"]
         """
         bots = [m.group(1) for m in re.finditer(self.BOT_PATTERN, message)]
-        workspaces = [m.group(1) for m in re.finditer(self.WORKSPACE_PATTERN, message)]
         actions = []
         
         action_match = re.match(self.ACTION_PATTERN, message, re.IGNORECASE)
@@ -218,7 +212,6 @@ class TagHandler:
         
         return ParsedTags(
             bots=list(set(bots)),
-            workspaces=list(set(workspaces)),
             actions=actions,
             raw_message=message,
             mentions=self._extract_mentions(message)
@@ -232,32 +225,26 @@ class TagHandler:
             mentions[f"@{bot}"] = message
         return mentions
     
-    def validate_tags(self, parsed: ParsedTags, valid_bots: List[str], 
-                      valid_workspaces: List[str]) -> tuple[bool, List[str]]:
-        """Validate parsed tags against available bots and workspaces."""
+    def validate_tags(self, parsed: ParsedTags, valid_bots: List[str]) -> tuple[bool, List[str]]:
+        """Validate parsed tags against available bots."""
         errors = []
         
         for bot in parsed.bots:
             if bot not in valid_bots:
                 errors.append(f"Unknown bot: @{bot}")
         
-        for ws in parsed.workspaces:
-            if ws not in valid_workspaces:
-                errors.append(f"Unknown workspace: #{ws}")
-        
         return len(errors) == 0, errors
 ```
 
 **Testing:** Create `tests/test_tag_handler.py`
 - Test @bot tag parsing
-- Test #workspace tag parsing
 - Test action detection
 - Test validation with valid/invalid tags
 - Test multiple tags in one message
 - Test edge cases (nested tags, special chars)
 
 **Acceptance Criteria:**
-- Tag parser identifies all @bots and #workspaces correctly
+- Tag parser identifies all @bots and action keywords correctly
 - Actions detected reliably
 - Validation catches invalid tags
 - Handles edge cases gracefully

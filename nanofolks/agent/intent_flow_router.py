@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any, List, Optional
 
 from loguru import logger
@@ -30,6 +31,8 @@ class IntentFlowRouter:
         'abort', 'quit', 'exit', 'never',
     ]
 
+    LLM_INTENT_FALLBACK_THRESHOLD = 0.45
+
     def __init__(self, agent_loop: "AgentLoop"):
         """Initialize the router.
 
@@ -50,7 +53,7 @@ class IntentFlowRouter:
         Returns:
             MessageEnvelope with appropriate response
         """
-        intent = self.intent_detector.detect(msg.content)
+        intent = await self.detect_intent(msg.content)
 
         logger.info(
             f"Intent detected: {intent.intent_type.value} "
@@ -66,6 +69,65 @@ class IntentFlowRouter:
             return await self._handle_quick(msg, intent, session)
         else:  # FULL
             return await self._handle_full(msg, intent, session)
+
+    async def detect_intent(self, content: str) -> Intent:
+        """Detect intent with LLM fallback for low-confidence cases."""
+        intent = self.intent_detector.detect(content)
+
+        if intent.confidence >= self.LLM_INTENT_FALLBACK_THRESHOLD:
+            return intent
+
+        if not getattr(self.agent, "provider", None):
+            return intent
+
+        llm_intent = await self._classify_intent_llm(content)
+        return llm_intent or intent
+
+    async def _classify_intent_llm(self, content: str) -> Optional[Intent]:
+        """Use LLM to classify intent when rule-based confidence is low."""
+        prompt = (
+            "Classify the user's intent into one of: "
+            "build, explore, advice, research, chat, task.\n"
+            "Return JSON only with keys: intent_type, confidence.\n"
+            "Example: {\"intent_type\": \"research\", \"confidence\": 0.72}\n\n"
+            f"User message: {content}"
+        )
+
+        try:
+            response = await self.agent.provider.chat(
+                messages=[{"role": "user", "content": prompt}],
+                model=self.agent.model,
+                temperature=0.0,
+                max_tokens=120,
+            )
+            raw = (response.content or "").strip()
+            data = self._parse_llm_json(raw)
+            if not data:
+                return None
+            intent_type = data.get("intent_type")
+            confidence = float(data.get("confidence", 0.5))
+            intent_enum = IntentType(intent_type)
+            return self.intent_detector.make_intent(
+                intent_type=intent_enum,
+                confidence=confidence,
+                entities={},
+            )
+        except Exception as e:
+            logger.warning(f"LLM intent classification failed: {e}")
+            return None
+
+    def _parse_llm_json(self, text: str) -> Optional[dict]:
+        """Parse JSON from LLM response, handling fenced blocks."""
+        if not text:
+            return None
+        cleaned = text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.strip("`")
+            cleaned = cleaned.replace("json", "", 1).strip()
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            return None
 
     def _is_cancellation(self, content: str) -> bool:
         """Check if user wants to cancel current flow."""

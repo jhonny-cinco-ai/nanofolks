@@ -6,6 +6,7 @@ from nanofolks.utils.ids import (
     room_to_session_id,
     session_to_room_id,
     session_key_for_message,
+    new_trace_id,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "room_to_session_id",
     "session_to_room_id",
     "session_key_for_message",
+    "new_trace_id",
 ]

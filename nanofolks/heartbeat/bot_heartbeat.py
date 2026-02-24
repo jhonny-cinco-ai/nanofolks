@@ -27,6 +27,7 @@ from nanofolks.heartbeat.models import (
     HeartbeatTick,
 )
 from nanofolks.security.credential_detector import CredentialDetector
+from nanofolks.metrics import get_metrics
 
 # The prompt sent to agent during heartbeat (from legacy service)
 HEARTBEAT_PROMPT = """Read HEARTBEAT.md in your workspace (if it exists).
@@ -131,6 +132,7 @@ class BotHeartbeatService:
 
         # History
         self.history = HeartbeatHistory(bot_name=config.bot_name)
+        self._metrics = get_metrics()
 
         # Circuit breaker for resilience (optional)
         self.circuit_breaker = None
@@ -673,6 +675,10 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
             triggered_by=triggered_by
         )
         self._current_tick = tick
+        self._metrics.incr(
+            "heartbeat.tick.started",
+            tags={"bot": self.config.bot_name, "trigger": trigger_type},
+        )
 
         logger.info(
             f"[{self.config.bot_name}] Tick {tick_id} started "
@@ -690,6 +696,10 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
                         f"skipping tick"
                     )
                     tick.status = "skipped"
+                    self._metrics.incr(
+                        "heartbeat.tick.skipped",
+                        tags={"bot": self.config.bot_name},
+                    )
                     return tick
 
             # First: Check HEARTBEAT.md (OpenClaw-style)
@@ -732,10 +742,24 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
                 f"[{self.config.bot_name}] Tick {tick_id} completed: "
                 f"{len(results)} checks, {success_rate:.0%} success"
             )
+            if tick.status == "completed":
+                self._metrics.incr(
+                    "heartbeat.tick.completed",
+                    tags={"bot": self.config.bot_name},
+                )
+            else:
+                self._metrics.incr(
+                    "heartbeat.tick.completed_with_failures",
+                    tags={"bot": self.config.bot_name},
+                )
 
         except Exception as e:
             tick.status = "failed"
             logger.error(f"[{self.config.bot_name}] Tick {tick_id} failed: {e}")
+            self._metrics.incr(
+                "heartbeat.tick.failed",
+                tags={"bot": self.config.bot_name},
+            )
 
             # Record circuit breaker failure
             if self.circuit_breaker:
@@ -780,6 +804,10 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
         tick: HeartbeatTick
     ) -> CheckResult:
         """Execute a single check with retry logic."""
+        self._metrics.incr(
+            "heartbeat.check.started",
+            tags={"bot": self.config.bot_name, "check": check_def.name},
+        )
 
         for attempt in range(self.config.retry_attempts):
             # Use circuit breaker if enabled
@@ -817,6 +845,10 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
 
             # Check result
             if result.success:
+                self._metrics.incr(
+                    "heartbeat.check.completed",
+                    tags={"bot": self.config.bot_name, "check": check_def.name},
+                )
                 return result
 
 
@@ -830,6 +862,10 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
                 await asyncio.sleep(delay)
 
         # All retries exhausted
+        self._metrics.incr(
+            "heartbeat.check.failed",
+            tags={"bot": self.config.bot_name, "check": check_def.name},
+        )
         return result
 
     def get_status(self) -> Dict[str, Any]:

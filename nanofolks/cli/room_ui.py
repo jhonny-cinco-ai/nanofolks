@@ -8,6 +8,7 @@ Provides:
 """
 
 import json
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from rich.console import Console
@@ -19,19 +20,44 @@ console = Console()
 class TeamRoster:
     """Manages team member display."""
 
-    # All available bots with emoji and role
-    ALL_BOTS = [
-        ("🧠", "researcher", "Research", "Navigator"),
-        ("💻", "coder", "Code", "Gunner"),
-        ("🎨", "creative", "Design", "Artist"),
-        ("🤝", "social", "Community", "Lookout"),
-        ("✅", "auditor", "Quality", "Quartermaster"),
-        ("👑", "leader", "Leader", "Coordinator"),
+    BOT_ROLES = [
+        ("leader", "Leader"),
+        ("researcher", "Research"),
+        ("coder", "Code"),
+        ("creative", "Design"),
+        ("social", "Community"),
+        ("auditor", "Quality"),
     ]
 
-    def __init__(self):
+    def __init__(self, workspace_path: Optional[Path] = None, team_name: Optional[str] = None):
         """Initialize team roster."""
-        self.bots_dict = {name: (emoji, role, title) for emoji, name, role, title in self.ALL_BOTS}
+        self.workspace_path = Path(workspace_path) if workspace_path else None
+        self.team_name = team_name or self._load_team_name()
+
+    def _load_team_name(self) -> str:
+        try:
+            from nanofolks.bots.appearance_config import get_appearance_config
+
+            appearance = get_appearance_config()
+            team_manager = appearance.team_manager
+            if team_manager and team_manager.get_current_team_name():
+                return team_manager.get_current_team_name() or "pirate_crew"
+        except Exception:
+            pass
+
+        return "pirate_crew"
+
+    def _get_profile(self, bot_role: str):
+        try:
+            from nanofolks.teams import get_bot_team_profile
+
+            return get_bot_team_profile(
+                bot_role,
+                self.team_name,
+                workspace_path=self.workspace_path,
+            )
+        except Exception:
+            return None
 
     def render(self, current_room_participants: List[str], compact: bool = False) -> str:
         """
@@ -46,18 +72,24 @@ class TeamRoster:
         """
         output = "[bold cyan]TEAM[/bold cyan]\n"
 
-        if compact:
-            # Show only bots in current room
-            for emoji, name, role, title in self.ALL_BOTS:
-                if name in current_room_participants:
-                    output += f"  {emoji} [green]{name:12}[/green] {role}\n"
-        else:
-            # Show all bots with indicator if in room
-            for emoji, name, role, title in self.ALL_BOTS:
-                if name in current_room_participants:
-                    output += f"→ {emoji} [green]{name:12}[/green] {role}\n"
-                else:
-                    output += f"  {emoji} {name:12} {role}\n"
+        for bot_role, role_label in self.BOT_ROLES:
+            profile = self._get_profile(bot_role)
+            bot_name = profile.bot_name if profile else bot_role
+            bot_title = profile.bot_title if profile else role_label
+            emoji = profile.emoji if profile else "•"
+            in_room = bot_role in current_room_participants
+
+            if compact and not in_room:
+                continue
+
+            marker = "→ " if in_room and not compact else "  "
+            name_style = "[green]" if in_room else ""
+            end_style = "[/green]" if in_room else ""
+
+            output += (
+                f"{marker}{emoji} {name_style}{bot_name:12}{end_style} "
+                f"({bot_title}) [dim]@{bot_role}[/dim]\n"
+            )
 
         return output
 
@@ -72,9 +104,10 @@ class TeamRoster:
             Inline team display (emoji + count)
         """
         emojis = []
-        for emoji, name, _, _ in self.ALL_BOTS:
-            if name in participants:
-                emojis.append(emoji)
+        for bot_role, _ in self.BOT_ROLES:
+            if bot_role in participants:
+                profile = self._get_profile(bot_role)
+                emojis.append(profile.emoji if profile else "•")
 
         return " ".join(emojis)
 
@@ -87,15 +120,18 @@ class TeamRoster:
         Returns:
             Dict with emoji, role, title or None
         """
-        if bot_name in self.bots_dict:
-            emoji, role, title = self.bots_dict[bot_name]
-            return {
-                "emoji": emoji,
-                "name": bot_name,
-                "role": role,
-                "title": title
-            }
-        return None
+        profile = self._get_profile(bot_name)
+        if not profile:
+            return None
+
+        role_label = dict(self.BOT_ROLES).get(bot_name, bot_name.title())
+
+        return {
+            "emoji": profile.emoji,
+            "name": profile.bot_name,
+            "role": role_label,
+            "title": profile.bot_title,
+        }
 
 
 class RoomList:

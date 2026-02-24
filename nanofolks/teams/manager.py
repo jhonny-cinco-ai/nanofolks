@@ -1,27 +1,33 @@
 """Team manager for applying and switching teams using template-based discovery."""
 
+from pathlib import Path
 from typing import Optional, Dict, List
 
 from nanofolks.templates import (
     discover_teams,
     get_team,
     list_teams,
-    get_bot_team_profile,
-    get_all_bot_team_profiles,
+)
+from nanofolks.teams.profiles import (
+    TeamProfile,
+    get_bot_team_profile as build_team_profile,
+    get_all_bot_team_profiles as build_team_profiles,
 )
 
 
 class TeamManager:
     """Manage team selection and application using template-based discovery."""
 
-    def __init__(self, default_team: str = "pirate_crew"):
+    def __init__(self, default_team: str = "pirate_crew", workspace_path: Optional[Path] = None):
         """Initialize team manager.
 
         Args:
             default_team: Default team name (pirate_crew, rock_band, swat_team, feral_clowder, executive_suite, space_crew)
+            workspace_path: Optional workspace path for overrides
         """
         self.current_team: Optional[str] = default_team
         self._team_data: Optional[Dict] = None
+        self.workspace_path = Path(workspace_path) if workspace_path else None
 
         # Load the default team
         self._load_team(default_team)
@@ -79,30 +85,35 @@ class TeamManager:
         """
         return self.current_team
 
-    def get_bot_team_profile(self, bot_role: str) -> Dict:
-        """Get team profile for a specific bot in current team.
+    def get_bot_team_profile(
+        self, bot_role: str, workspace_path: Optional[Path] = None
+    ) -> Optional[TeamProfile]:
+        """Get aggregated team profile for a specific bot in current team.
 
         Args:
             bot_role: Role identifier (leader, researcher, coder, social, creative, auditor)
+            workspace_path: Optional workspace path override
 
         Returns:
-            Dictionary with bot team profile info (bot_title, bot_name, personality, greeting, voice, emoji)
+            TeamProfile with aggregated team info
+        """
+        if not self.current_team:
+            return None
+
+        path = workspace_path or self.workspace_path
+        return build_team_profile(bot_role, self.current_team, path)
+
+    def get_all_bot_team_profiles(self, workspace_path: Optional[Path] = None) -> Dict[str, TeamProfile]:
+        """Get aggregated team profiles for all bots in current team.
+
+        Returns:
+            Dictionary mapping bot roles to TeamProfile objects
         """
         if not self.current_team:
             return {}
 
-        return get_bot_team_profile(bot_role, self.current_team) or {}
-
-    def get_all_bot_team_profiles(self) -> Dict[str, Dict]:
-        """Get team profiles for all bots in current team.
-
-        Returns:
-            Dictionary mapping bot roles to their team profiles
-        """
-        if not self.current_team:
-            return {}
-
-        return get_all_bot_team_profiles(self.current_team)
+        path = workspace_path or self.workspace_path
+        return build_team_profiles(self.current_team, path)
 
     def to_dict(self) -> Dict:
         """Convert current team to dictionary.

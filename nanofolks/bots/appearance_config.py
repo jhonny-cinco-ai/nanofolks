@@ -96,12 +96,12 @@ class BotAppearanceConfig:
         if self._team_manager and self._team_manager.current_team:
             profile = self._team_manager.get_bot_team_profile(bot_name)
             if profile:
-                result["title"] = profile.get("title")
-                result["greeting"] = profile.get("greeting")
-                result["voice"] = profile.get("voice")
-                result["emoji"] = profile.get("emoji")
+                result["title"] = profile.bot_title
+                result["greeting"] = profile.greeting
+                result["voice"] = profile.voice
+                result["emoji"] = profile.emoji
                 # Default display name is the title
-                result["display_name"] = profile.get("title")
+                result["display_name"] = profile.bot_title
 
         # Override with custom name if set
         custom_name = self.get_custom_name(bot_name)

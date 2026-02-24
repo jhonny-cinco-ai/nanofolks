@@ -140,11 +140,13 @@ This will guide you through:
 
 | Step | Description |
 |------|-------------|
-| **1. Provider Setup** | Select your AI provider and API key |
-| **2. Model Selection** | Choose default model |
-| **3. Smart Routing** | Enable automatic model tier selection |
-| **4. Evolutionary Mode** | Optional self-improvement features |
-| **5. Team** | Choose your crew's personality |
+| **1. Security** | Keyring check for secure API key storage |
+| **2. Provider + Model** | Select your AI provider and default model |
+| **3. Network Security** | Tailscale + secure ports info |
+| **4. Team** | Choose your crew's personality |
+| **5. Launch** | Create your workspace and crew |
+
+Smart routing and evolutionary mode are enabled by default and can be changed anytime with `nanofolks configure`.
 
 ### Your Team
 
@@ -950,6 +952,7 @@ Nanofolks also respects these env vars:
 | `nanofolks agent -m "msg"` | Send a message |
 | `nanofolks chat` | Interactive chat mode |
 | `nanofolks gateway` | Start multi-channel gateway |
+| `nanofolks metrics` | Show live broker/cron/heartbeat metrics |
 
 ## Memory & Session
 

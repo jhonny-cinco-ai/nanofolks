@@ -82,8 +82,7 @@ class GroupCommitBuffer:
             async with self._lock:
                 if not self._buffer:
                     continue
-                
- self._buffer:
+
                 elapsed = datetime.now() - self._last_commit
                 
                 should_commit = (

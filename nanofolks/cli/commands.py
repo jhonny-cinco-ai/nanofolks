@@ -1066,20 +1066,21 @@ def _render_team_roster(current_participants: list, team_manager) -> str:
     for bot_role, role in all_bots:
         team_profile = team_manager.get_bot_team_profile(bot_role)
 
-        if team_profile and isinstance(team_profile, dict):
-            bot_name = team_profile.get('bot_name') or team_profile.get('bot_title', bot_role)
-            emoji = team_profile.get('emoji', '•')
-            bot_title = team_profile.get('bot_title', role)
+        if team_profile:
+            bot_name = team_profile.bot_name or team_profile.bot_title or bot_role
+            emoji = team_profile.emoji or "•"
+            bot_title = team_profile.bot_title or role
         else:
             bot_name = bot_role
             emoji = "•"
             bot_title = role
 
         # Check if in current room
+        role_label = f"@{bot_role}"
         if bot_role in current_participants:
-            output += f"→ {emoji} [green]{bot_name:12}[/green] ({bot_title})\n"
+            output += f"→ {emoji} [green]{bot_name:12}[/green] ({bot_title}) [dim]{role_label}[/dim]\n"
         else:
-            output += f"  {emoji} {bot_name:12} ({bot_title})\n"
+            output += f"  {emoji} {bot_name:12} ({bot_title}) [dim]{role_label}[/dim]\n"
 
     return output
 
@@ -1140,8 +1141,8 @@ def _render_status_bar(room_id: str, participants: list, team_manager) -> str:
     if participants and isinstance(participants, list):
         for bot in participants:
             team_profile = team_manager.get_bot_team_profile(bot)
-            if team_profile and isinstance(team_profile, dict):
-                emojis.append(team_profile.get('emoji', '•'))
+            if team_profile:
+                emojis.append(team_profile.emoji or "•")
 
     emoji_str = " ".join(emojis) if emojis else ""
     count = len(participants) if isinstance(participants, list) else 0
@@ -1293,12 +1294,11 @@ async def _handle_room_creation_intent(
         bot_role = bot.get("name", "")
         reason = bot.get("reason", "")
 
-        # Get team-styled info (returns dict, not object)
         team_profile = team_manager.get_bot_team_profile(bot_role)
-        if team_profile and isinstance(team_profile, dict):
-            display_name = team_profile.get('bot_name') or team_profile.get('bot_title', bot_role)
-            emoji = team_profile.get('emoji', '•')
-            bot_title = team_profile.get('bot_title', '')
+        if team_profile:
+            display_name = team_profile.bot_name or team_profile.bot_title or bot_role
+            emoji = team_profile.emoji or "•"
+            bot_title = team_profile.bot_title or ""
             console.print(f"  {emoji} @{display_name:12} ({bot_title} - {reason})")
         else:
             # Fallback to roster
@@ -1341,11 +1341,10 @@ async def _handle_room_creation_intent(
                 invite_success = room_manager.invite_bot(new_room.id, bot_role)
 
             if invite_success:
-                # Get team-styled info (returns dict)
                 team_profile = team_manager.get_bot_team_profile(bot_role)
-                if team_profile and isinstance(team_profile, dict):
-                    display_name = team_profile.get('bot_name') or team_profile.get('bot_title', bot_role)
-                    emoji = team_profile.get('emoji', '•')
+                if team_profile:
+                    display_name = team_profile.bot_name or team_profile.bot_title or bot_role
+                    emoji = team_profile.emoji or "•"
                     console.print(f"  {emoji} Invited @{display_name}")
                     invited.append(display_name)
                 else:
@@ -1857,6 +1856,9 @@ def chat(
                         console.print("  [bold]/status or /info[/bold]")
                         console.print("    Show current room details and team roster")
                         console.print()
+                        console.print("  [bold]/metrics[/bold]")
+                        console.print("    Show live broker/cron/heartbeat metrics")
+                        console.print()
                         console.print("  [bold]/help[/bold]")
                         console.print("    Show this help message")
                         console.print()
@@ -1886,6 +1888,11 @@ def chat(
                         roster_ui = TeamRoster()
                         roster_display = roster_ui.render(current_room.participants, compact=False)
                         console.print(roster_display)
+                        console.print()
+                        continue
+
+                    if command in ["/metrics"]:
+                        _print_metrics()
                         console.print()
                         continue
 
@@ -3056,6 +3063,59 @@ def status():
             console.print("Smart Routing: [dim]disabled[/dim]")
 
 
+@app.command()
+def metrics(
+    kind: str = typer.Option("all", "--kind", "-k", help="counters, gauges, or all"),
+    prefix: str = typer.Option("", "--prefix", "-p", help="Filter by metric name prefix"),
+    as_json: bool = typer.Option(False, "--json", help="Output as JSON"),
+):
+    """Show live metrics from broker, cron, and heartbeat."""
+    _print_metrics(kind=kind, prefix=prefix, as_json=as_json)
+
+
+def _print_metrics(kind: str = "all", prefix: str = "", as_json: bool = False) -> None:
+    import json as _json
+    from nanofolks.metrics import get_metrics
+
+    snapshot = get_metrics().snapshot()
+    counters = snapshot.get("counters", {})
+    gauges = snapshot.get("gauges", {})
+
+    if prefix:
+        counters = {k: v for k, v in counters.items() if k.startswith(prefix)}
+        gauges = {k: v for k, v in gauges.items() if k.startswith(prefix)}
+
+    if as_json:
+        console.print(_json.dumps({"counters": counters, "gauges": gauges}, indent=2))
+        return
+
+    kind_lower = kind.lower()
+    show_counters = kind_lower in ("all", "counters", "counter")
+    show_gauges = kind_lower in ("all", "gauges", "gauge")
+
+    if show_counters:
+        table = Table(title="Metrics: Counters")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="yellow", justify="right")
+        if counters:
+            for name, value in sorted(counters.items()):
+                table.add_row(name, str(value))
+        else:
+            table.add_row("[dim]No counters[/dim]", "")
+        console.print(table)
+
+    if show_gauges:
+        table = Table(title="Metrics: Gauges")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="yellow", justify="right")
+        if gauges:
+            for name, value in sorted(gauges.items()):
+                table.add_row(name, str(value))
+        else:
+            table.add_row("[dim]No gauges[/dim]", "")
+        console.print(table)
+
+
 # Add memory and session subcommands if available
 if memory_app is not None:
     app.add_typer(memory_app, name="memory")
@@ -3319,7 +3379,8 @@ def team_set(
     """Set the crew team."""
     import json
 
-    from nanofolks.templates import get_team, get_bot_team_profile
+    from nanofolks.templates import get_team
+    from nanofolks.teams import get_bot_team_profile
 
     # Validate team
     team = get_team(team_name)
@@ -3350,8 +3411,9 @@ def team_set(
 
     # Show bot personalities in this team
     table = Table(title="Your Crew")
-    table.add_column("Bot", style="cyan")
-    table.add_column("Role")
+    table.add_column("Role", style="cyan")
+    table.add_column("Name")
+    table.add_column("Title")
     table.add_column("Personality")
     table.add_column("Emoji", justify="center")
 
@@ -3367,12 +3429,13 @@ def team_set(
     for bot_name, role in bot_mappings:
         profile = get_bot_team_profile(bot_name, team_name)
         if profile:
-            personality = profile.get("personality", "")
+            personality = profile.personality
             table.add_row(
                 role,
-                profile.get("bot_title", role),
+                profile.bot_name or role,
+                profile.bot_title or role,
                 personality[:40] + "..." if len(personality) > 40 else personality,
-                profile.get("emoji", "•")
+                profile.emoji or "•"
             )
 
     console.print(table)
@@ -3412,8 +3475,9 @@ def team_show():
     console.print(f"[dim]{team.get('description', '') if team else ''}[/dim]\n")
 
     table = Table(title="Current Crew")
-    table.add_column("Bot", style="cyan")
-    table.add_column("Display Name")
+    table.add_column("Role", style="cyan")
+    table.add_column("Name")
+    table.add_column("Title")
     table.add_column("Greeting")
 
     bot_roles = [
@@ -3428,11 +3492,12 @@ def team_show():
     for bot_name, role in bot_roles:
         profile = team_manager.get_bot_team_profile(bot_name)
         if profile:
-            greeting = profile.get("greeting", "")
+            greeting = profile.greeting or ""
             greeting = greeting[:50] + "..." if len(greeting) > 50 else greeting
             table.add_row(
-                f"{profile.get('emoji', '•')} {role}",
-                profile.get("bot_title", role),
+                f"{profile.emoji or '•'} {role}",
+                profile.bot_name or role,
+                profile.bot_title or role,
                 f"[dim]'{greeting}'[/dim]"
             )
 

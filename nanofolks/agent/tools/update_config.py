@@ -229,7 +229,7 @@ class UpdateConfigTool(Tool):
             'required_for_startup': False,
             'fields': {
                 'restrictToWorkspace': {'type': 'boolean', 'default': False, 'help': 'Sandbox: restrict file access to workspace only'},
-                'evolutionary': {'type': 'boolean', 'default': False, 'help': 'Allow bot to self-improve (see docs)'},
+                'evolutionary': {'type': 'boolean', 'default': True, 'help': 'Allow bot to self-improve (see docs)'},
                 'allowedPaths': {'type': 'array', 'item_type': 'path', 'help': 'Paths bot can access when evolutionary=true'},
                 'protectedPaths': {'type': 'array', 'item_type': 'path', 'default': ['~/.nanofolks/config.json']},
                 'exec.timeout': {'type': 'integer', 'default': 60, 'min': 1, 'max': 3600},

@@ -305,10 +305,11 @@ Need more details on any particular crew member? Just ask!"""
         """Build a team-styled table of all bots."""
         table = Table(show_header=True, header_style="bold magenta")
 
-        # Add columns: Name, Title, Role
+        # Add columns: Name, Title, Role, Focus
         table.add_column("Name", style="cyan", width=20)
-        table.add_column("Title", style="yellow", width=15)
-        table.add_column("Role", style="green", width=50)
+        table.add_column("Title", style="yellow", width=18)
+        table.add_column("Role", style="magenta", width=12)
+        table.add_column("Focus", style="green", width=45)
 
         # Ensure team is loaded
         self.team_manager.get_current_team()
@@ -318,11 +319,16 @@ Need more details on any particular crew member? Just ask!"""
 
         for bot_role in bot_order:
             # Get team profile info
-            team_profile = self.team_manager.get_bot_team_profile(bot_role)
+            team_profile = self.team_manager.get_bot_team_profile(
+                bot_role, workspace_path=self.workspace_path
+            )
 
-            bot_name = team_profile.get("bot_name", team_profile.get("bot_title", bot_role))
-            bot_title = team_profile.get("bot_title", bot_role)
-            emoji = team_profile.get("emoji", "")
+            if not team_profile:
+                continue
+
+            bot_name = team_profile.bot_name or team_profile.bot_title or bot_role
+            bot_title = team_profile.bot_title or bot_role
+            emoji = team_profile.emoji or ""
 
             # Get role description from domain
             role_card = BUILTIN_ROLES.get(bot_role)
@@ -335,7 +341,7 @@ Need more details on any particular crew member? Just ask!"""
             # Add emoji to name
             display_name = f"{emoji} {bot_name}" if emoji else bot_name
 
-            table.add_row(display_name, bot_title, role_desc)
+            table.add_row(display_name, bot_title, f"@{bot_role}", role_desc)
 
         return table
 
@@ -347,13 +353,22 @@ Need more details on any particular crew member? Just ask!"""
     def introduce_bot(self, bot_role: str) -> str:
         """Introduce a specific bot in detail."""
         # Get team profile info
-        team_profile = self.team_manager.get_bot_team_profile(bot_role)
+        team_profile = self.team_manager.get_bot_team_profile(
+            bot_role, workspace_path=self.workspace_path
+        )
 
-        bot_name = team_profile.get("bot_name", team_profile.get("bot_title", bot_role))
-        bot_title = team_profile.get("bot_title", bot_role)
-        emoji = team_profile.get("emoji", "")
-        personality = team_profile.get("personality", "")
-        greeting = team_profile.get("greeting", "")
+        if not team_profile:
+            bot_name = bot_role
+            bot_title = bot_role
+            emoji = ""
+            personality = ""
+            greeting = ""
+        else:
+            bot_name = team_profile.bot_name or team_profile.bot_title or bot_role
+            bot_title = team_profile.bot_title or bot_role
+            emoji = team_profile.emoji or ""
+            personality = team_profile.personality or ""
+            greeting = team_profile.greeting or ""
 
         # Get role description
         role_card = BUILTIN_ROLES.get(bot_role)

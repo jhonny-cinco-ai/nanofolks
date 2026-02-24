@@ -496,8 +496,12 @@ class AgentLoop:
             first_question = onboarding.get_next_question()
 
             # Get leader greeting from team profile
-            profile = self._team_manager.get_bot_team_profile("leader") if self._team_manager else None
-            greeting = profile.get("greeting") if profile else "Ahoy there!"
+            profile = (
+                self._team_manager.get_bot_team_profile("leader", workspace_path=self.workspace)
+                if self._team_manager
+                else None
+            )
+            greeting = profile.greeting if profile else "Ahoy there!"
 
             response = f"{greeting} 🎉\n\nI'm excited to get to know you! "
             if first_question:
@@ -1285,7 +1289,10 @@ class AgentLoop:
             # Check for set_context method (invoke tool has it)
             set_context = getattr(invoke_tool, "set_context", None)
             if set_context and callable(set_context):
-                set_context(msg.channel, msg.chat_id)
+                try:
+                    set_context(msg.channel, msg.chat_id, msg.room_id)
+                except TypeError:
+                    set_context(msg.channel, msg.chat_id)
 
         cron_tool = self.tools.get("cron")
         if isinstance(cron_tool, CronTool):
@@ -1774,7 +1781,10 @@ class AgentLoop:
         if invoke_tool:
             set_context = getattr(invoke_tool, "set_context", None)
             if set_context and callable(set_context):
-                set_context(origin_channel, origin_chat_id)
+                try:
+                    set_context(origin_channel, origin_chat_id, msg.room_id)
+                except TypeError:
+                    set_context(origin_channel, origin_chat_id)
 
         cron_tool = self.tools.get("cron")
         if isinstance(cron_tool, CronTool):
@@ -1906,6 +1916,7 @@ class AgentLoop:
                 content=content,
                 room_id=room_id
             )
+            msg.apply_defaults("user")
 
             # Store stream callback for use in _process_message
             self._stream_callback = stream_callback

@@ -163,6 +163,7 @@ class BaseChannel(ABC):
                 metadata=metadata or {},
             )
             msg.set_room(room_id)
+            msg.apply_defaults("user")
             logger.debug(f"Routed {self.name}:{chat_id} → room:{room_id}")
             await self.bus.publish_inbound(msg)
 
@@ -203,7 +204,9 @@ class BaseChannel(ABC):
                     f"You are still in '{current_room_id}'."
                 ),
                 direction="outbound",
+                room_id=current_room_id,
             )
+            reply.apply_defaults("system")
             await self.send(reply)
             return
 
@@ -222,7 +225,9 @@ class BaseChannel(ABC):
                 f"Send *!rooms* to list all rooms."
             ),
             direction="outbound",
+            room_id=target_room_id,
         )
+        reply.apply_defaults("system")
         await self.send(reply)
 
     async def _reply_rooms(
@@ -250,7 +255,9 @@ class BaseChannel(ABC):
             chat_id=chat_id,
             content="\n".join(lines),
             direction="outbound",
+            room_id=current_room_id,
         )
+        reply.apply_defaults("system")
         await self.send(reply)
 
     @property

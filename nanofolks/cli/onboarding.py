@@ -1,11 +1,11 @@
 """Unified onboarding wizard for multi-agent orchestration setup.
 
 This module provides a unified CLI wizard that guides new users through:
-1. Provider selection (API key)
-2. Model selection
-3. Team selection (with team description)
-4. #general room creation with all bots
-5. SOUL.md personality file generation
+1. Keyring security check (optional setup)
+2. Provider selection + model selection
+3. Network & security info (ports, Tailscale)
+4. Team selection (with team description)
+5. #general room creation + SOUL/IDENTITY/ROLE generation
 
 Uses typer and rich for interactive prompts and rich terminal output.
 """
@@ -38,11 +38,11 @@ class OnboardingWizard:
     """Unified onboarding wizard for multi-agent team setup.
 
     Complete wizard that guides users through:
-    1. Provider selection and API key
-    2. Model selection
-    3. Team selection with full team description
-    4. Room creation
-    5. SOUL.md personality file generation
+    1. Keyring security check (optional setup)
+    2. Provider selection + model selection
+    3. Network & security info
+    4. Team selection with full team description
+    5. Room creation + SOUL/IDENTITY/ROLE generation
     """
 
     PROVIDERS = {
@@ -123,11 +123,10 @@ class OnboardingWizard:
                 "Let's set up your multi-agent team in just a few steps.\n"
                 "This wizard will guide you through:\n"
                 "  1. [bold]Security[/bold] - Keyring setup for secure API key storage\n"
-                "  2. [bold]AI Provider[/bold] + Model (with Smart Routing)\n"
-                "  3. [bold]Evolutionary Mode[/bold] (optional)\n"
-                "  4. [bold]Network Security[/bold] (Tailscale + secure ports)\n"
-                "  5. [bold]Team[/bold] - Choose your crew's personality\n"
-                "  6. [bold]Launch[/bold] - Create your workspace and crew",
+                "  2. [bold]AI Provider[/bold] + Model\n"
+                "  3. [bold]Network Security[/bold] (Tailscale + secure ports)\n"
+                "  4. [bold]Team[/bold] - Choose your crew's personality\n"
+                "  5. [bold]Launch[/bold] - Create your workspace and crew",
                 title="🎉",
                 border_style="cyan",
             )
@@ -303,66 +302,19 @@ class OnboardingWizard:
             asyncio.run(self._save_model_config(primary_model))
             console.print(f"[green]✓ Primary model set to {primary_model}[/green]\n")
 
-        # Smart Routing configuration
-        self._configure_smart_routing(provider_name, primary_model)
-
-        # Evolutionary Mode configuration
-        self._configure_evolutionary_mode()
+        # Smart routing is enabled by default; apply provider-specific tiers.
+        if provider_name:
+            asyncio.run(self._save_routing_config(True, provider_name))
+            console.print(
+                "[dim]Smart routing enabled by default (edit anytime: nanofolks configure)[/dim]\n"
+            )
 
         # Network & Security configuration
         self._configure_network_security()
 
-    def _configure_smart_routing(self, provider: str, primary_model: str) -> None:
-        """Step 1b: Configure Smart Routing."""
-        console.print("[bold cyan]Step 2b: Smart Routing[/bold cyan]\n")
-        console.print("""
-[dim]Smart routing automatically selects the best model based on query complexity:[/dim]
-  • Simple queries → Cheaper, faster models
-  • Complex tasks → Stronger, more capable models
-  • Coding → Specialized coding models
-  • Reasoning → Advanced reasoning models
-
-[dim]This saves costs while maintaining quality.[/dim]
-        """)
-
-        enable_routing = Confirm.ask("Enable smart routing?", default=True)
-
-        if enable_routing:
-            provider = self.config_result.get("provider", "openrouter")
-            asyncio.run(self._save_routing_config(True, provider))
-            console.print("[green]✓ Smart routing enabled![/green]\n")
-            console.print("[dim]Models auto-configured for your provider.[/dim]")
-            console.print("[dim]Customize later: nanofolks configure[/dim]\n")
-        else:
-            console.print(
-                "[dim]Smart routing disabled. Will use primary model for all queries.[/dim]\n"
-            )
-
-    def _configure_evolutionary_mode(self) -> None:
-        """Step 1c: Configure Evolutionary Mode."""
-        console.print("[bold cyan]Step 2c: Evolutionary Mode (Optional)[/bold cyan]\n")
-        console.print("""
-[dim]Evolutionary mode allows bots to:[/dim]
-  • Modify their own source code
-  • Access paths outside the workspace
-  • Self-improve and adapt
-
-[yellow]⚠ Security Warning:[/yellow] Only enable if you understand the risks.
-        """)
-
-        enable_evo = Confirm.ask("Enable evolutionary mode?", default=False)
-
-        if enable_evo:
-            asyncio.run(self._save_evolutionary_config(True))
-            console.print("[green]✓ Evolutionary mode enabled![/green]\n")
-        else:
-            console.print(
-                "[dim]Evolutionary mode disabled. Bots restricted to workspace only.[/dim]\n"
-            )
-
     def _configure_network_security(self) -> None:
-        """Step 1d: Configure Network & Security."""
-        console.print("[bold cyan]Step 2d: Network & Security[/bold cyan]\n")
+        """Step 3: Configure Network & Security."""
+        console.print("[bold cyan]Step 3: Network & Security[/bold cyan]\n")
         console.print("""
 [dim]Configure how nanofolks services are accessed:[/dim]
   • Dashboard & bridge will use secure defaults
@@ -481,20 +433,6 @@ Then restart nanofolks for secure access.
         except Exception as e:
             console.print(f"[yellow]⚠ Could not save routing config: {e}[/yellow]")
 
-    async def _save_evolutionary_config(self, enabled: bool) -> None:
-        """Save evolutionary mode configuration."""
-        try:
-            from nanofolks.agent.tools.update_config import UpdateConfigTool
-
-            tool = UpdateConfigTool()
-            await tool.execute(path="tools.evolutionary", value=enabled)
-            if enabled:
-                await tool.execute(
-                    path="tools.allowedPaths", value=["/projects/nanobot-turbo", "~/.nanofolks"]
-                )
-        except Exception as e:
-            console.print(f"[yellow]⚠ Could not save evolutionary config: {e}[/yellow]")
-
     async def _save_provider_config(self, provider: str, api_key: str) -> None:
         """Save provider API key to config using the secret store (OS keyring)."""
         try:
@@ -587,7 +525,7 @@ Then restart nanofolks for secure access.
 
     def _select_team(self) -> None:
         """Interactive team selection."""
-        console.print("[bold cyan]Step 3: Choose Your Crew Team[/bold cyan]\n")
+        console.print("[bold cyan]Step 4: Choose Your Crew Team[/bold cyan]\n")
 
         teams = list_teams()
         [t["name"] for t in teams]
@@ -628,7 +566,8 @@ Then restart nanofolks for secure access.
 
     def _show_team_details(self, team_name: str) -> None:
         """Show the full team composition for a team."""
-        from nanofolks.templates import get_team, get_bot_team_profile
+        from nanofolks.templates import get_team
+        from nanofolks.teams import get_bot_team_profile
 
         team = get_team(team_name)
         if not team:
@@ -651,10 +590,10 @@ Then restart nanofolks for secure access.
             bot_profile = get_bot_team_profile(bot_name, team_name)
             if bot_profile:
                 team_table.add_row(
-                    bot_profile["bot_name"],
-                    f"{bot_profile['emoji']} {bot_profile['bot_title']}",
+                    bot_profile.bot_name,
+                    f"{bot_profile.emoji} {bot_profile.bot_title}",
                     f"@{bot_name}",
-                    bot_profile["personality"],
+                    bot_profile.personality,
                 )
 
         console.print(team_table)
@@ -663,7 +602,7 @@ Then restart nanofolks for secure access.
 
     def _confirm_and_create(self) -> None:
         """Final confirmation and room creation."""
-        console.print("[bold cyan]Step 4: Ready to Launch![/bold cyan]\n")
+        console.print("[bold cyan]Step 5: Ready to Launch![/bold cyan]\n")
 
         # Show summary table
         summary_table = Table(title="Your Setup Summary", box=box.ROUNDED)
@@ -788,13 +727,15 @@ Then restart nanofolks for secure access.
                     console.print("[dim]  (SOUL.md, IDENTITY.md, ROLE.md, AGENTS.md)[/dim]")
 
                 # Show team personalities
-                from nanofolks.templates import get_bot_team_profile
+                from nanofolks.teams import get_bot_team_profile
 
                 console.print("\n[bold]Crew personalities configured:[/bold]")
                 for bot_name in crew:
-                    profile = get_bot_team_profile(bot_name, self.selected_team)
+                    profile = get_bot_team_profile(
+                        bot_name, self.selected_team, workspace_path=workspace_path
+                    )
                     if profile:
-                        console.print(f"  {profile['emoji']} {profile['bot_title']} ({bot_name})")
+                        console.print(f"  {profile.emoji} {profile.bot_title} ({bot_name})")
 
             # Create per-bot files (AGENTS.md, IDENTITY.md if not already created, and HEARTBEAT.md)
             self._create_bot_files(workspace_path)

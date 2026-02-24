@@ -16,6 +16,7 @@ from typing import Optional
 from loguru import logger
 
 from nanofolks.memory.models import Entity
+from nanofolks.memory.policy import get_context_budget_overrides
 from nanofolks.memory.store import TurboMemoryStore
 from nanofolks.memory.summaries import SummaryTreeManager
 from nanofolks.utils.ids import room_to_session_id
@@ -101,46 +102,47 @@ class ContextAssembler:
         Returns:
             Assembled context string
         """
+        budget = self._budget_for_room(room_id)
         sections = []
-        remaining_budget = self.budget.total
+        remaining_budget = budget.total
 
         # Section 1: Identity (always include)
         identity_context = self._get_identity_context()
         if identity_context:
-            sections.append(("IDENTITY", identity_context, self.budget.identity))
-            remaining_budget -= self.budget.identity
+            sections.append(("IDENTITY", identity_context, budget.identity))
+            remaining_budget -= budget.identity
 
         # Section 2: Room Context (room-centric)
         room_context = self._get_room_context(room_id)
         if room_context:
-            sections.append(("ROOM", room_context, self.budget.channel))
-            remaining_budget -= self.budget.channel
+            sections.append(("ROOM", room_context, budget.channel))
+            remaining_budget -= budget.channel
 
         # Section 3: Entity Context (prioritized by relevance)
         if entity_ids:
             entity_context = self._get_entity_context(entity_ids[:5])  # Top 5
             if entity_context:
-                sections.append(("ENTITIES", entity_context, self.budget.entities))
-                remaining_budget -= self.budget.entities
+                sections.append(("ENTITIES", entity_context, budget.entities))
+                remaining_budget -= budget.entities
 
         # Section 4: User Preferences (if enabled)
         if include_preferences:
             prefs_context = self._get_preferences_context()
             if prefs_context:
-                sections.append(("PREFERENCES", prefs_context, self.budget.preferences))
-                remaining_budget -= self.budget.preferences
+                sections.append(("PREFERENCES", prefs_context, budget.preferences))
+                remaining_budget -= budget.preferences
 
         # Section 5: Recent Events
         if recent_event_ids:
             recent_context = self._get_recent_context(recent_event_ids[:10])  # Top 10
             if recent_context:
-                sections.append(("RECENT", recent_context, self.budget.recent))
-                remaining_budget -= self.budget.recent
+                sections.append(("RECENT", recent_context, budget.recent))
+                remaining_budget -= budget.recent
 
         # Section 6: Knowledge (general summaries)
         if remaining_budget > 0:
             knowledge_context = self._get_knowledge_context(
-                max_tokens=min(remaining_budget, self.budget.knowledge)
+                max_tokens=min(remaining_budget, budget.knowledge)
             )
             if knowledge_context:
                 sections.append(("KNOWLEDGE", knowledge_context, len(knowledge_context) // 4))
@@ -225,6 +227,17 @@ Use this context to provide personalized and informed responses."""
                 parts.append("")  # Empty line between sections
 
         return "\n".join(parts).strip()
+
+    def _budget_for_room(self, room_id: str) -> ContextBudget:
+        """Apply per-room budget overrides if available."""
+        overrides = get_context_budget_overrides(self.store.workspace, room_id)
+        if not overrides:
+            return self.budget
+        data = {**self.budget.__dict__}
+        data.update({k: v for k, v in overrides.items() if k in data})
+        budget = ContextBudget(**data)
+        budget.validate()
+        return budget
 
     def get_relevant_entities(
         self,

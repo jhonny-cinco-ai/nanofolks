@@ -34,11 +34,13 @@ class InvokeTool(Tool):
         self._context: str | None = None
         self._origin_channel: str = "cli"
         self._origin_chat_id: str = "direct"
+        self._origin_room_id: str | None = None
 
-    def set_context(self, channel: str, chat_id: str) -> None:
+    def set_context(self, channel: str, chat_id: str, room_id: str | None = None) -> None:
         """Set conversation context for invocations."""
         self._origin_channel = channel
         self._origin_chat_id = chat_id
+        self._origin_room_id = room_id
 
     @property
     def name(self) -> str:
@@ -88,6 +90,7 @@ class InvokeTool(Tool):
             context=self._context,
             origin_channel=self._origin_channel,
             origin_chat_id=self._origin_chat_id,
+            origin_room_id=self._origin_room_id,
         )
 
         return result

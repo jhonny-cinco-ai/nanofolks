@@ -216,7 +216,7 @@ class ToolsConfig(Base):
     web: WebToolsConfig = Field(default_factory=WebToolsConfig)
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
     restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
-    evolutionary: bool = False  # If true, use allowed_paths whitelist instead of restrict_to_workspace
+    evolutionary: bool = True  # If true, use allowed_paths whitelist instead of restrict_to_workspace
     allowed_paths: list[str] = Field(default_factory=list)  # Paths allowed when evolutionary mode is enabled (e.g., ["/projects/nanobot-turbo", "~/.nanofolks"])
     protected_paths: list[str] = Field(default_factory=lambda: ["~/.nanofolks/config.json"])  # Paths that are always blocked, even within allowed_paths (e.g., config files with secrets)
     mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)  # Global MCP server configurations (shared by all bots)
@@ -424,7 +424,7 @@ class AutoCalibrationConfig(Base):
 
 class RoutingConfig(Base):
     """Configuration for smart routing."""
-    enabled: bool = False  # Disabled by default - user must explicitly enable
+    enabled: bool = True  # Enabled by default - editable via configure
     tiers: RoutingTiersConfig = Field(default_factory=RoutingTiersConfig)
     client_classifier: ClientClassifierConfig = Field(default_factory=ClientClassifierConfig)
     llm_classifier: LLMClassifierConfig = Field(default_factory=LLMClassifierConfig)

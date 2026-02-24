@@ -121,10 +121,12 @@ class SpecialistBot(ABC):
             return
 
         try:
-            profile = self._team_manager.get_bot_team_profile(self.role_card.bot_name)
+            profile = self._team_manager.get_bot_team_profile(
+                self.role_card.bot_name, workspace_path=self._workspace_path
+            )
             if profile:
                 # Update display name from team profile (use title as default display name)
-                title = profile.get("bot_title")
+                title = profile.bot_title
                 if title:
                     self.role_card.set_display_name(title)
                     logger.debug(
@@ -132,12 +134,12 @@ class SpecialistBot(ABC):
                     )
 
                 # Update greeting if team profile provides one
-                if profile.get("greeting"):
-                    self.role_card.greeting = profile["greeting"]
+                if profile.greeting:
+                    self.role_card.greeting = profile.greeting
 
                 # Update voice if team profile provides one
-                if profile.get("voice"):
-                    self.role_card.voice = profile["voice"]
+                if profile.voice:
+                    self.role_card.voice = profile.voice
 
         except Exception as e:
             logger.warning(f"[{self.role_card.bot_name}] Failed to apply team styling: {e}")

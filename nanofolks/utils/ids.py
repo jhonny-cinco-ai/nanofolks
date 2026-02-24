@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 ROOM_PREFIX = "room:"
 
 
@@ -53,3 +55,7 @@ def session_key_for_message(room_id: str | None, channel: str, chat_id: str) -> 
         return room_to_session_id(normalized)
     return f"{ROOM_PREFIX}{channel}_{chat_id}"
 
+
+def new_trace_id() -> str:
+    """Generate a new trace id for message correlation."""
+    return uuid.uuid4().hex

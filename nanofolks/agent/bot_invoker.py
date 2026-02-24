@@ -98,6 +98,7 @@ class BotInvoker:
 
         # Active invocations (all async now)
         self._active_invocations: dict[str, asyncio.Task[None]] = {}
+        self._cached_team_name: str | None = None
 
     async def invoke(
         self,
@@ -107,6 +108,7 @@ class BotInvoker:
         session_id: str | None = None,
         origin_channel: str = "cli",
         origin_chat_id: str = "direct",
+        origin_room_id: str | None = None,
     ) -> str:
         """
         Invoke a specialist bot to handle a task.
@@ -121,6 +123,7 @@ class BotInvoker:
             session_id: Session ID for this invocation
             origin_channel: Channel to send notification when complete
             origin_chat_id: Chat ID to send notification when complete
+            origin_room_id: Room ID to associate with the result
 
         Returns:
             Confirmation message that the bot was invoked
@@ -143,6 +146,7 @@ class BotInvoker:
             session_id=session_id,
             origin_channel=origin_channel,
             origin_chat_id=origin_chat_id,
+            origin_room_id=origin_room_id,
         )
 
     async def _invoke_async(
@@ -154,6 +158,7 @@ class BotInvoker:
         session_id: str,
         origin_channel: str,
         origin_chat_id: str,
+        origin_room_id: str | None,
     ) -> str:
         """Asynchronous invocation - fires off task and notifies when complete."""
         logger.info(f"Invoking {bot_role} (id: {invocation_id}, async): {task[:50]}...")
@@ -231,6 +236,7 @@ class BotInvoker:
                 result=result,
                 origin_channel=origin_channel,
                 origin_chat_id=origin_chat_id,
+                origin_room_id=origin_room_id,
                 status=status,
             )
 
@@ -242,6 +248,7 @@ class BotInvoker:
         result: str,
         origin_channel: str,
         origin_chat_id: str,
+        origin_room_id: str | None,
         status: str,
     ) -> None:
         """Announce the bot result back to the main agent via system message."""
@@ -265,10 +272,41 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
             chat_id=f"{origin_channel}:{origin_chat_id}",
             content=announce_content,
             direction="inbound",
+            sender_role="system",
+            room_id=origin_room_id,
         )
 
         await self.bus.publish_inbound(msg)
         logger.debug(f"Invocation {invocation_id} announced result to {origin_channel}:{origin_chat_id}")
+
+    def _get_team_name(self) -> str:
+        """Get current team name from config (cached)."""
+        if self._cached_team_name:
+            return self._cached_team_name
+
+        try:
+            from nanofolks.bots.appearance_config import get_appearance_config
+
+            appearance = get_appearance_config()
+            team_manager = appearance.team_manager
+            if team_manager and team_manager.get_current_team_name():
+                self._cached_team_name = team_manager.get_current_team_name() or "pirate_crew"
+            else:
+                self._cached_team_name = "pirate_crew"
+        except Exception:
+            self._cached_team_name = "pirate_crew"
+
+        return self._cached_team_name
+
+    def _get_team_profile(self, bot_role: str):
+        """Get aggregated team profile for display purposes."""
+        try:
+            from nanofolks.teams import get_bot_team_profile
+
+            team_name = self._get_team_name()
+            return get_bot_team_profile(bot_role, team_name, workspace_path=self.workspace)
+        except Exception:
+            return None
 
     async def _build_bot_system_prompt(self, bot_role: str, task: str) -> str:
         """Build system prompt for the invoked bot."""
@@ -279,7 +317,7 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
         soul_content = soul_manager.get_bot_soul(bot_role)
 
         # Build system prompt
-        bot_info = AVAILABLE_BOTS[bot_role]
+        bot_info = self.get_bot_info(bot_role) or AVAILABLE_BOTS[bot_role]
 
         if soul_content:
             system_prompt = soul_content
@@ -421,7 +459,19 @@ Focus only on your domain expertise and provide a helpful response.
 
     def get_bot_info(self, bot_role: str) -> Optional[dict]:
         """Get information about a specific bot."""
-        return AVAILABLE_BOTS.get(bot_role)
+        base_info = AVAILABLE_BOTS.get(bot_role, {}).copy()
+
+        profile = self._get_team_profile(bot_role)
+        if profile:
+            display_name = profile.bot_name or profile.bot_title or bot_role
+            base_info.update({
+                "bot_name": profile.bot_name or display_name,
+                "bot_title": profile.bot_title,
+                "emoji": profile.emoji,
+                "team_name": profile.team_name,
+            })
+
+        return base_info or None
 
     def _log_invocation_request(
         self,

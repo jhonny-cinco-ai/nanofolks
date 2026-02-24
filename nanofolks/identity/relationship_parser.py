@@ -256,7 +256,7 @@ class RelationshipParser:
             List of inferred BotRelationship objects
         """
         from nanofolks.teams import TeamManager
-        from nanofolks.templates import get_bot_team_profile
+        from nanofolks.teams import get_bot_team_profile
 
         relationships = []
 
@@ -279,7 +279,7 @@ class RelationshipParser:
                     relationships.append(BotRelationship(
                         target_bot=other_bot,
                         affinity=inferred_affinity,
-                        description=f"Team member ({profile.get('bot_title', other_bot)})",
+                        description=f"Team member ({profile.bot_title or other_bot})",
                         interaction_style="neutral"
                     ))
 
@@ -304,7 +304,7 @@ class RelationshipParser:
         Returns:
             Inferred affinity score
         """
-        personality = profile.personality.lower()
+        personality = (profile.personality or "").lower()
 
         positive_indicators = ['agree', 'trust', 'close', 'friend', 'collaborate']
         negative_indicators = ['challenge', 'disagree', 'rival', 'compete']

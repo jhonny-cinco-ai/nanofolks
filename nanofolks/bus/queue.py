@@ -51,6 +51,7 @@ class MessageBus:
         falls back to the flat inbound queue consumed by AgentLoop.run().
         """
         msg.direction = "inbound"
+        msg.apply_defaults("user")
         if self._broker is not None:
             await self._broker.route_message(msg)
         else:
@@ -63,6 +64,7 @@ class MessageBus:
     async def publish_outbound(self, msg: MessageEnvelope) -> None:
         """Publish a response from the agent to channels."""
         msg.direction = "outbound"
+        msg.apply_defaults("bot")
         await self.outbound.put(msg)
 
     async def consume_outbound(self) -> MessageEnvelope:

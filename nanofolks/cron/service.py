@@ -11,6 +11,7 @@ from typing import Any, Callable, Coroutine
 from loguru import logger
 
 from nanofolks.cron.types import CronJob, CronJobState, CronPayload, CronSchedule, CronStore
+from nanofolks.metrics import get_metrics
 
 
 def _now_ms() -> int:
@@ -73,6 +74,7 @@ class CronService:
     ):
         self.store_path = store_path
         self.on_job = on_job  # Callback to execute job, returns response text
+        self._metrics = get_metrics()
         self._store: CronStore | None = None
         self._timer_task: asyncio.Task | None = None
         self._running = False
@@ -175,6 +177,8 @@ class CronService:
         self._recompute_next_runs()
         self._save_store()
         self._arm_timer()
+        if self._store:
+            self._metrics.set_gauge("cron.jobs.total", len(self._store.jobs))
         logger.info(f"Cron service started with {len(self._store.jobs if self._store else [])} jobs")
 
     def stop(self) -> None:
@@ -241,6 +245,7 @@ class CronService:
         """Execute a single job."""
         start_ms = _now_ms()
         logger.info(f"Cron: executing job '{job.name}' ({job.id})")
+        self._metrics.incr("cron.job.started", tags={"job": job.id})
 
         try:
             if self.on_job:
@@ -248,11 +253,13 @@ class CronService:
 
             job.state.last_status = "ok"
             job.state.last_error = None
+            self._metrics.incr("cron.job.completed", tags={"job": job.id})
             logger.info(f"Cron: job '{job.name}' completed")
 
         except Exception as e:
             job.state.last_status = "error"
             job.state.last_error = str(e)
+            self._metrics.incr("cron.job.failed", tags={"job": job.id})
             logger.error(f"Cron: job '{job.name}' failed: {e}")
 
         job.state.last_run_at_ms = start_ms
@@ -313,6 +320,7 @@ class CronService:
         store.jobs.append(job)
         self._save_store()
         self._arm_timer()
+        self._metrics.set_gauge("cron.jobs.total", len(store.jobs))
 
         logger.info(f"Cron: added job '{name}' ({job.id})")
         return job
@@ -327,6 +335,7 @@ class CronService:
         if removed:
             self._save_store()
             self._arm_timer()
+            self._metrics.set_gauge("cron.jobs.total", len(store.jobs))
             logger.info(f"Cron: removed job {job_id}")
 
         return removed

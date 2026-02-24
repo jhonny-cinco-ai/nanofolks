@@ -1,14 +1,14 @@
-"""Independent crew routines service for each bot (legacy heartbeat).
+"""Team routines execution service for each bot (legacy heartbeat).
 
-This module provides BotCrewRoutinesService which manages autonomous
-periodic checks for individual bots with full resilience features.
+This module provides BotTeamRoutinesService which executes per-bot
+checks when triggered by the unified routines scheduler.
 
 Supports two modes:
-1. CREW_ROUTINES.md mode (OpenClaw-style): Bot reads CREW_ROUTINES.md and executes tasks via LLM
+1. TEAM_ROUTINES.md mode (OpenClaw-style): Bot reads TEAM_ROUTINES.md and executes tasks via LLM
 2. Legacy check mode: Runs registered programmatic checks
 """
 
-# Note: Class name is legacy, but it is the crew routines engine.
+# Note: Class name is legacy, but it is the team routines engine.
 
 import asyncio
 import uuid
@@ -19,29 +19,29 @@ from typing import Any, Callable, Coroutine, Dict, List, Optional
 from loguru import logger
 
 from nanofolks.agent.work_log import LogLevel
-from nanofolks.routines.crew.check_registry import check_registry
-from nanofolks.routines.crew.crew_routines_models import (
+from nanofolks.routines.team.check_registry import check_registry
+from nanofolks.routines.team.team_routines_models import (
     CheckDefinition,
     CheckResult,
     CheckStatus,
-    CrewRoutinesConfig,
-    CrewRoutinesHistory,
-    CrewRoutinesTick,
+    TeamRoutinesConfig,
+    TeamRoutinesHistory,
+    TeamRoutinesTick,
 )
 from nanofolks.security.credential_detector import CredentialDetector
 from nanofolks.metrics import get_metrics
 
-# The prompt sent to agent during crew routines (from legacy service)
-CREW_ROUTINES_PROMPT = """Read CREW_ROUTINES.md in your workspace (if it exists).
+# The prompt sent to agent during team routines (from legacy service)
+TEAM_ROUTINES_PROMPT = """Read TEAM_ROUTINES.md in your workspace (if it exists).
 Follow any instructions or tasks listed there.
-If nothing needs attention, reply with just: CREW_ROUTINES_OK"""
+If nothing needs attention, reply with just: TEAM_ROUTINES_OK"""
 
 # Token that indicates "nothing to do"
-CREW_ROUTINES_OK_TOKEN = "CREW_ROUTINES_OK"
+TEAM_ROUTINES_OK_TOKEN = "TEAM_ROUTINES_OK"
 
 
-def _is_crew_routines_empty(content: str | None) -> bool:
-    """Check if CREW_ROUTINES.md has no actionable content."""
+def _is_team_routines_empty(content: str | None) -> bool:
+    """Check if TEAM_ROUTINES.md has no actionable content."""
     if not content:
         return True
 
@@ -56,20 +56,19 @@ def _is_crew_routines_empty(content: str | None) -> bool:
     return True
 
 
-class BotCrewRoutinesService:
-    """Independent crew routines service for a single bot (legacy heartbeat).
+class BotTeamRoutinesService:
+    """Team routines execution service for a single bot (legacy heartbeat).
 
-    Each bot runs its own crew routines with role-specific:
-    - Intervals (default: 60 minutes for specialists, 30 for coordinator)
+    Each bot runs its own routines with role-specific:
     - Checks (domain-specific periodic tasks)
     - Execution strategy (parallel/sequential, retries)
     - Resilience (circuit breaker, error handling)
 
     Example:
         # Create service for a bot
-        service = BotCrewRoutinesService(
+        service = BotTeamRoutinesService(
             bot_instance=researcher_bot,
-            config=CrewRoutinesConfig(
+            config=TeamRoutinesConfig(
                 bot_name="researcher",
                 interval_s=3600,  # 60 minutes
                 checks=[
@@ -79,41 +78,38 @@ class BotCrewRoutinesService:
             )
         )
 
-        # Start the crew routines
-        await service.start()
-
-        # Later, stop it
-        service.stop()
+        # Trigger a tick (normally scheduled by the routines engine)
+        await service.trigger_now()
     """
 
     def __init__(
         self,
         bot_instance: Any,
-        config: CrewRoutinesConfig,
+        config: TeamRoutinesConfig,
         workspace: Path | None = None,
         provider=None,
         routing_config=None,
         reasoning_config=None,
         work_log_manager=None,
-        on_crew_routines: Callable[[str], Coroutine[Any, Any, str]] | None = None,
-        on_tick_complete: Optional[Callable[[CrewRoutinesTick], None]] = None,
+        on_team_routines: Callable[[str], Coroutine[Any, Any, str]] | None = None,
+        on_tick_complete: Optional[Callable[[TeamRoutinesTick], None]] = None,
         on_check_complete: Optional[Callable[[CheckResult], None]] = None,
         tool_registry=None,
     ):
-        """Initialize crew routines service for a bot.
+        """Initialize team routines service for a bot.
 
         Args:
             bot_instance: The bot instance this service manages
-            config: CrewRoutines configuration
-            workspace: Path to bot's workspace (for CREW_ROUTINES.md)
-            provider: LLM provider for crew routines execution
+            config: TeamRoutines configuration
+            workspace: Path to bot's workspace (for TEAM_ROUTINES.md)
+            provider: LLM provider for team routines execution
             routing_config: Smart routing config for model selection
             reasoning_config: Reasoning/CoT settings for this bot
-            work_log_manager: Work log manager for logging crew routines events
-            on_crew_routines: Callback to execute crew routines tasks via LLM
+            work_log_manager: Work log manager for logging team routines events
+            on_team_routines: Callback to execute team routines tasks via LLM
             on_tick_complete: Optional callback when a tick completes
             on_check_complete: Optional callback when a check completes
-            tool_registry: Optional tool registry for tool execution during crew routines
+            tool_registry: Optional tool registry for tool execution during team routines
         """
         self.bot = bot_instance
         self.config = config
@@ -122,19 +118,18 @@ class BotCrewRoutinesService:
         self.routing_config = routing_config
         self.reasoning_config = reasoning_config
         self.work_log_manager = work_log_manager
-        self.on_crew_routines = on_crew_routines
+        self.on_team_routines = on_team_routines
         self.on_tick_complete = on_tick_complete
         self.on_check_complete = on_check_complete
         self.tool_registry = tool_registry
 
         # State
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._current_tick: Optional[CrewRoutinesTick] = None
+        self._current_tick: Optional[TeamRoutinesTick] = None
         self._external_scheduler = False
 
         # History
-        self.history = CrewRoutinesHistory(bot_name=config.bot_name)
+        self.history = TeamRoutinesHistory(bot_name=config.bot_name)
         self._metrics = get_metrics()
 
         # Circuit breaker for resilience (optional)
@@ -156,82 +151,70 @@ class BotCrewRoutinesService:
 
     @property
     def is_running(self) -> bool:
-        """Check if crew routines are currently running."""
+        """Check if team routines are currently running."""
         return self._running
 
     @property
-    def current_tick(self) -> Optional[CrewRoutinesTick]:
+    def current_tick(self) -> Optional[TeamRoutinesTick]:
         """Get the currently executing tick (if any)."""
         return self._current_tick
 
     async def start(self) -> None:
-        """Start the crew routines service."""
+        """Start the team routines service."""
         if self._running:
-            logger.warning(f"[{self.config.bot_name}] Crew routines already running")
+            logger.warning(f"[{self.config.bot_name}] team routines already running")
             return
 
         if not self.config.enabled:
-            logger.info(f"[{self.config.bot_name}] Crew routines disabled")
-            return
-
-        if self._external_scheduler:
-            self._running = True
-            logger.info(f"[{self.config.bot_name}] Crew routines marked running (external scheduler)")
+            logger.info(f"[{self.config.bot_name}] team routines disabled")
             return
 
         self._running = True
-        self._task = asyncio.create_task(self._run_loop())
-
-        interval_min = self.config.interval_s / 60
-        logger.info(
-            f"[{self.config.bot_name}] Crew routines started "
-            f"(every {interval_min:.0f}min, "
-            f"{len(self.config.checks)} checks)"
-        )
+        if self._external_scheduler:
+            logger.info(f"[{self.config.bot_name}] team routines scheduled by routines engine")
+        else:
+            logger.info(f"[{self.config.bot_name}] team routines enabled (no local scheduler)")
 
     def stop(self) -> None:
-        """Stop the crew routines service."""
+        """Stop the team routines service."""
         self._running = False
-        if self._task:
-            self._task.cancel()
-            self._task = None
-        logger.info(f"[{self.config.bot_name}] Crew routines stopped")
+        logger.info(f"[{self.config.bot_name}] team routines stopped")
 
     def set_external_scheduler(self, enabled: bool) -> None:
-        """Enable or disable external scheduling for crew routines."""
+        """Enable or disable external scheduling for team routines."""
         self._external_scheduler = enabled
         self._running = enabled
 
-    async def trigger_now(self, reason: str = "manual") -> CrewRoutinesTick:
-        """Manually trigger a crew routines tick.
+    async def trigger_now(self, reason: str = "manual") -> TeamRoutinesTick:
+        """Manually trigger a team routines tick.
 
         Args:
-            reason: Why crew routines are being triggered
+            reason: Why team routines are being triggered
 
         Returns:
-            CrewRoutinesTick result
+            TeamRoutinesTick result
         """
         return await self._execute_tick(trigger_type="manual", triggered_by=reason)
 
-    def _get_crew_routines_file_path(self) -> Path | None:
-        """Get path to bot's CREW_ROUTINES.md file."""
+    def _get_team_routines_file_path(self) -> Path | None:
+        """Get path to bot's TEAM_ROUTINES.md file."""
         if self.workspace:
-            # Option 1: workspace/bots/{bot_name}/CREW_ROUTINES.md
-            bot_crew_routines = self.workspace / "bots" / self.config.bot_name / "CREW_ROUTINES.md"
-            if bot_crew_routines.exists():
-                return bot_crew_routines
+            # Option 1: workspace/bots/{bot_name}/TEAM_ROUTINES.md
+            bot_team_routines = self.workspace / "bots" / self.config.bot_name / "TEAM_ROUTINES.md"
+            if bot_team_routines.exists():
+                return bot_team_routines
 
-            # Option 2: workspace/CREW_ROUTINES.md (for leader)
-            workspace_crew_routines = self.workspace / "CREW_ROUTINES.md"
-            if workspace_crew_routines.exists():
-                return workspace_crew_routines
+            # Option 2: workspace/TEAM_ROUTINES.md (for leader)
+            workspace_team_routines = self.workspace / "TEAM_ROUTINES.md"
+            if workspace_team_routines.exists():
+                return workspace_team_routines
 
         return None
 
-    _crew_routines_secret_warning_shown: set[str] = set()
+    _team_routines_secret_warning_shown: set[str] = set()
 
-    def _scan_crew_routines_for_secrets(self, content: str, file_path: Path) -> list[dict]:
-        """Scan CREW_ROUTINES.md content for credentials.
+    def _scan_team_routines_for_secrets(self, content: str, file_path: Path) -> list[dict]:
+        """Scan TEAM_ROUTINES.md content for credentials.
 
         Returns list of detected credentials with type and value (masked).
         """
@@ -252,16 +235,16 @@ class BotCrewRoutinesService:
 
         return []
 
-    def _warn_crew_routines_secrets(self, content: str, file_path: Path) -> None:
-        """Warn if CREW_ROUTINES.md contains potential secrets."""
+    def _warn_team_routines_secrets(self, content: str, file_path: Path) -> None:
+        """Warn if TEAM_ROUTINES.md contains potential secrets."""
         file_key = str(file_path)
-        if file_key in self._crew_routines_secret_warning_shown:
+        if file_key in self._team_routines_secret_warning_shown:
             return
 
-        detected = self._scan_crew_routines_for_secrets(content, file_path)
+        detected = self._scan_team_routines_for_secrets(content, file_path)
 
         if detected:
-            self._crew_routines_secret_warning_shown.add(file_key)
+            self._team_routines_secret_warning_shown.add(file_key)
             logger.warning(
                 f"[{self.config.bot_name}] ⚠️ SECURITY WARNING: Potential secrets detected in {file_path.name}"
             )
@@ -289,72 +272,72 @@ class BotCrewRoutinesService:
                 f"\n  Example: After adding the key, update {file_path.name} to use {{{{{key_type}}}}} instead of the actual key value."
             )
 
-    def _read_crew_routines_content(self) -> str | None:
-        """Read CREW_ROUTINES.md content if exists."""
-        crew_routines_file = self._get_crew_routines_file_path()
-        if crew_routines_file:
+    def _read_team_routines_content(self) -> str | None:
+        """Read TEAM_ROUTINES.md content if exists."""
+        team_routines_file = self._get_team_routines_file_path()
+        if team_routines_file:
             try:
-                content = crew_routines_file.read_text(encoding="utf-8")
-                self._warn_crew_routines_secrets(content, crew_routines_file)
+                content = team_routines_file.read_text(encoding="utf-8")
+                self._warn_team_routines_secrets(content, team_routines_file)
                 return content
             except Exception as e:
-                logger.warning(f"[{self.config.bot_name}] Failed to read CREW_ROUTINES.md: {e}")
+                logger.warning(f"[{self.config.bot_name}] Failed to read TEAM_ROUTINES.md: {e}")
         return None
 
-    async def _execute_crew_routines_md(self) -> CheckResult | None:
-        """Execute CREW_ROUTINES.md tasks (OpenClaw-style).
+    async def _execute_team_routines_md(self) -> CheckResult | None:
+        """Execute TEAM_ROUTINES.md tasks (OpenClaw-style).
 
-        Reads CREW_ROUTINES.md from the bot's workspace and executes
+        Reads TEAM_ROUTINES.md from the bot's workspace and executes
         tasks via:
-        1. on_crew_routines callback (if provided)
+        1. on_team_routines callback (if provided)
         2. Direct LLM call with routing + reasoning config (if provider available)
 
         Returns:
-            CheckResult if CREW_ROUTINES.md was processed, None if not present
+            CheckResult if TEAM_ROUTINES.md was processed, None if not present
         """
-        content = self._read_crew_routines_content()
+        content = self._read_team_routines_content()
 
-        # Check if CREW_ROUTINES.md exists and has content
-        if _is_crew_routines_empty(content):
-            logger.debug(f"[{self.config.bot_name}] CREW_ROUTINES.md empty or not found")
+        # Check if TEAM_ROUTINES.md exists and has content
+        if _is_team_routines_empty(content):
+            logger.debug(f"[{self.config.bot_name}] TEAM_ROUTINES.md empty or not found")
             return None
 
         # Convert any credentials to symbolic references before sending to LLM
         from nanofolks.security.symbolic_converter import get_symbolic_converter
         converter = get_symbolic_converter()
-        conversion_result = converter.convert(content, f"crew_routines:{self.config.bot_name}")
+        conversion_result = converter.convert(content, f"team_routines:{self.config.bot_name}")
         safe_content = conversion_result.text
 
         if conversion_result.credentials:
             logger.info(
                 f"🔐 [{self.config.bot_name}] Converted {len(conversion_result.credentials)} "
-                f"credential(s) to symbolic references in CREW_ROUTINES.md"
+                f"credential(s) to symbolic references in TEAM_ROUTINES.md"
             )
 
-        # Log crew routines start
-        self._log_crew_routines_start(content)
+        # Log team routines start
+        self._log_team_routines_start(content)
 
-        logger.info(f"[{self.config.bot_name}] Executing CREW_ROUTINES.md tasks...")
+        logger.info(f"[{self.config.bot_name}] Executing TEAM_ROUTINES.md tasks...")
 
         try:
             # Option 1: Use callback if provided
-            if self.on_crew_routines:
+            if self.on_team_routines:
                 response = await self._execute_via_callback()
             # Option 2: Use direct LLM with routing (use safe_content with refs resolved)
             elif self.provider:
                 response = await self._execute_via_provider(safe_content)
             # No way to execute
             else:
-                logger.warning(f"[{self.config.bot_name}] No way to execute CREW_ROUTINES.md")
-                self._log_crew_routines_error("No execution path available")
+                logger.warning(f"[{self.config.bot_name}] No way to execute TEAM_ROUTINES.md")
+                self._log_team_routines_error("No execution path available")
                 return None
 
             # Check if agent said "nothing to do"
-            if CREW_ROUTINES_OK_TOKEN.replace("_", "") in response.upper().replace("_", ""):
-                logger.info(f"[{self.config.bot_name}] CREW_ROUTINES_OK (no action needed)")
-                self._log_crew_routines_ok()
+            if TEAM_ROUTINES_OK_TOKEN.replace("_", "") in response.upper().replace("_", ""):
+                logger.info(f"[{self.config.bot_name}] TEAM_ROUTINES_OK (no action needed)")
+                self._log_team_routines_ok()
                 return CheckResult(
-                    check_name="CREW_ROUTINES.md",
+                    check_name="TEAM_ROUTINES.md",
                     status=CheckStatus.SUCCESS,
                     started_at=datetime.now(),
                     completed_at=datetime.now(),
@@ -362,10 +345,10 @@ class BotCrewRoutinesService:
                     message="No action needed"
                 )
             else:
-                logger.info(f"[{self.config.bot_name}] CREW_ROUTINES.md: action taken")
-                self._log_crew_routines_action(response)
+                logger.info(f"[{self.config.bot_name}] TEAM_ROUTINES.md: action taken")
+                self._log_team_routines_action(response)
                 return CheckResult(
-                    check_name="CREW_ROUTINES.md",
+                    check_name="TEAM_ROUTINES.md",
                     status=CheckStatus.SUCCESS,
                     started_at=datetime.now(),
                     completed_at=datetime.now(),
@@ -374,10 +357,10 @@ class BotCrewRoutinesService:
                 )
 
         except Exception as e:
-            logger.error(f"[{self.config.bot_name}] CREW_ROUTINES.md execution failed: {e}")
-            self._log_crew_routines_error(str(e))
+            logger.error(f"[{self.config.bot_name}] TEAM_ROUTINES.md execution failed: {e}")
+            self._log_team_routines_error(str(e))
             return CheckResult(
-                check_name="CREW_ROUTINES.md",
+                check_name="TEAM_ROUTINES.md",
                 status=CheckStatus.FAILED,
                 started_at=datetime.now(),
                 completed_at=datetime.now(),
@@ -386,15 +369,15 @@ class BotCrewRoutinesService:
                 message="Execution failed"
             )
 
-    def _log_crew_routines_start(self, content: str) -> None:
-        """Log crew routines tick start."""
+    def _log_team_routines_start(self, content: str) -> None:
+        """Log team routines tick start."""
         if not self.work_log_manager:
             return
         try:
             self.work_log_manager.log(
                 level=LogLevel.INFO,
-                category="crew_routines",
-                message=f"Crew routines tick started for @{self.config.bot_name}",
+                category="team_routines",
+                message=f"team routines tick started for @{self.config.bot_name}",
                 details={
                     "bot_name": self.config.bot_name,
                     "tasks": content[:1000] if content else "",
@@ -404,33 +387,33 @@ class BotCrewRoutinesService:
                 bot_name=self.config.bot_name,
             )
         except Exception as e:
-            logger.warning(f"[{self.config.bot_name}] Failed to log crew routines start: {e}")
+            logger.warning(f"[{self.config.bot_name}] Failed to log team routines start: {e}")
 
-    def _log_crew_routines_ok(self) -> None:
-        """Log crew routines with no action needed."""
+    def _log_team_routines_ok(self) -> None:
+        """Log team routines with no action needed."""
         if not self.work_log_manager:
             return
         try:
             self.work_log_manager.log(
                 level=LogLevel.INFO,
-                category="crew_routines",
-                message=f"CREW_ROUTINES_OK - No action needed for @{self.config.bot_name}",
+                category="team_routines",
+                message=f"TEAM_ROUTINES_OK - No action needed for @{self.config.bot_name}",
                 details={"bot_name": self.config.bot_name, "action": "none"},
                 triggered_by=self.config.bot_name,
                 bot_name=self.config.bot_name,
             )
         except Exception as e:
-            logger.warning(f"[{self.config.bot_name}] Failed to log CREW_ROUTINES_OK: {e}")
+            logger.warning(f"[{self.config.bot_name}] Failed to log TEAM_ROUTINES_OK: {e}")
 
-    def _log_crew_routines_action(self, response: str) -> None:
-        """Log crew routines action taken."""
+    def _log_team_routines_action(self, response: str) -> None:
+        """Log team routines action taken."""
         if not self.work_log_manager:
             return
         try:
             self.work_log_manager.log(
                 level=LogLevel.ACTION,
-                category="crew_routines",
-                message=f"Crew routines action taken by @{self.config.bot_name}",
+                category="team_routines",
+                message=f"team routines action taken by @{self.config.bot_name}",
                 details={
                     "bot_name": self.config.bot_name,
                     "response": response[:2000],
@@ -440,17 +423,17 @@ class BotCrewRoutinesService:
                 bot_name=self.config.bot_name,
             )
         except Exception as e:
-            logger.warning(f"[{self.config.bot_name}] Failed to log crew routines action: {e}")
+            logger.warning(f"[{self.config.bot_name}] Failed to log team routines action: {e}")
 
-    def _log_crew_routines_error(self, error: str) -> None:
-        """Log crew routines error."""
+    def _log_team_routines_error(self, error: str) -> None:
+        """Log team routines error."""
         if not self.work_log_manager:
             return
         try:
             self.work_log_manager.log(
                 level=LogLevel.ERROR,
-                category="crew_routines",
-                message=f"Crew routines error for @{self.config.bot_name}: {error}",
+                category="team_routines",
+                message=f"team routines error for @{self.config.bot_name}: {error}",
                 details={
                     "bot_name": self.config.bot_name,
                     "error": error,
@@ -459,14 +442,14 @@ class BotCrewRoutinesService:
                 bot_name=self.config.bot_name,
             )
         except Exception as e:
-            logger.warning(f"[{self.config.bot_name}] Failed to log crew routines error: {e}")
+            logger.warning(f"[{self.config.bot_name}] Failed to log team routines error: {e}")
 
     async def _execute_via_callback(self) -> str:
-        """Execute crew routines via callback."""
-        return await self.on_crew_routines(CREW_ROUTINES_PROMPT)
+        """Execute team routines via callback."""
+        return await self.on_team_routines(TEAM_ROUTINES_PROMPT)
 
     async def _execute_via_provider(self, content: str) -> str:
-        """Execute crew routines directly via provider with routing and optional tools.
+        """Execute team routines directly via provider with routing and optional tools.
 
         Uses smart model selection and bot's reasoning config.
         If tool_registry is provided, executes tools as needed.
@@ -475,7 +458,7 @@ class BotCrewRoutinesService:
         model = await self._select_model()
 
         # Build messages
-        messages = self._build_crew_routines_messages(content)
+        messages = self._build_team_routines_messages(content)
 
         # Apply reasoning config (temperature, etc.)
         extra_kwargs = {}
@@ -489,7 +472,7 @@ class BotCrewRoutinesService:
             tool_definitions = self.tool_registry.get_definitions()
 
         logger.info(
-            f"[{self.config.bot_name}] CrewRoutines using model: {model}"
+            f"[{self.config.bot_name}] TeamRoutines using model: {model}"
             + (f" with {len(tool_definitions)} tools" if tool_definitions else "")
         )
 
@@ -516,7 +499,7 @@ class BotCrewRoutinesService:
         model: str,
         extra_kwargs: dict,
     ) -> str:
-        """Execute crew routines with tool support.
+        """Execute team routines with tool support.
 
         Args:
             messages: Message list for LLM
@@ -556,7 +539,7 @@ class BotCrewRoutinesService:
                     except json.JSONDecodeError:
                         tool_args = {}
 
-                logger.debug(f"[{self.config.bot_name}] CrewRoutines executing: {tool_name}")
+                logger.debug(f"[{self.config.bot_name}] TeamRoutines executing: {tool_name}")
                 result = await self.tool_registry.execute(tool_name, tool_args)
 
                 messages.append({
@@ -583,7 +566,7 @@ class BotCrewRoutinesService:
                 ],
             })
 
-        logger.warning(f"[{self.config.bot_name}] CrewRoutines max iterations reached")
+        logger.warning(f"[{self.config.bot_name}] TeamRoutines max iterations reached")
         return content
 
     async def _select_model(self) -> str:
@@ -603,9 +586,9 @@ class BotCrewRoutinesService:
             # Create routing stage
             routing_stage = RoutingStage(config=self.routing_config)
 
-            # Create minimal context for crew routines (no session history)
+            # Create minimal context for team routines (no session history)
             routing_ctx = RoutingContext(
-                message=None,  # CrewRoutines has no user message
+                message=None,  # TeamRoutines has no user message
                 session=None,
                 config=self.routing_config
             )
@@ -621,65 +604,45 @@ class BotCrewRoutinesService:
 
         return default_model
 
-    def _build_crew_routines_messages(self, content: str) -> list[dict]:
-        """Build messages for crew routines with reasoning config."""
+    def _build_team_routines_messages(self, content: str) -> list[dict]:
+        """Build messages for team routines with reasoning config."""
         # Build system prompt with reasoning guidance
-        system_prompt = CREW_ROUTINES_PROMPT
+        system_prompt = TEAM_ROUTINES_PROMPT
 
         if self.reasoning_config:
             # Add reasoning guidance based on CoT level
-            cot_prompt = self.reasoning_config.get_crew_routines_prompt()
+            cot_prompt = self.reasoning_config.get_team_routines_prompt()
             if cot_prompt:
                 system_prompt = f"{system_prompt}\n\n{cot_prompt}"
 
-        # Add CREW_ROUTINES.md content
-        user_message = f"""Checklist from CREW_ROUTINES.md:
+        # Add TEAM_ROUTINES.md content
+        user_message = f"""Checklist from TEAM_ROUTINES.md:
 
 {content}
 
-Evaluate each item and take any necessary actions. If nothing needs attention, respond with just: CREW_ROUTINES_OK"""
+Evaluate each item and take any necessary actions. If nothing needs attention, respond with just: TEAM_ROUTINES_OK"""
 
         return [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message},
         ]
 
-    async def _run_loop(self) -> None:
-        """Main crew routines loop."""
-        while self._running:
-            try:
-                # Wait for interval
-                await asyncio.sleep(self.config.interval_s)
-
-                if not self._running:
-                    break
-
-                # Execute tick
-                await self._execute_tick(trigger_type="scheduled")
-
-            except asyncio.CancelledError:
-                logger.debug(f"[{self.config.bot_name}] CrewRoutines loop cancelled")
-                break
-            except Exception as e:
-                logger.error(f"[{self.config.bot_name}] CrewRoutines error: {e}")
-                # Continue loop even on error
-
     async def _execute_tick(
         self,
         trigger_type: str = "scheduled",
         triggered_by: Optional[str] = None
-    ) -> CrewRoutinesTick:
-        """Execute a single crew routines tick.
+    ) -> TeamRoutinesTick:
+        """Execute a single team routines tick.
 
         Args:
             trigger_type: Type of trigger (scheduled, manual, event)
             triggered_by: What triggered this tick
 
         Returns:
-            CrewRoutinesTick with results
+            TeamRoutinesTick with results
         """
         tick_id = str(uuid.uuid4())[:8]
-        tick = CrewRoutinesTick(
+        tick = TeamRoutinesTick(
             tick_id=tick_id,
             bot_name=self.config.bot_name,
             started_at=datetime.now(),
@@ -689,7 +652,7 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
         )
         self._current_tick = tick
         self._metrics.incr(
-            "crew_routines.tick.started",
+            "team_routines.tick.started",
             tags={"bot": self.config.bot_name, "trigger": trigger_type},
         )
 
@@ -710,13 +673,13 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
                     )
                     tick.status = "skipped"
                     self._metrics.incr(
-                        "crew_routines.tick.skipped",
+                        "team_routines.tick.skipped",
                         tags={"bot": self.config.bot_name},
                     )
                     return tick
 
-            # First: Check CREW_ROUTINES.md (OpenClaw-style)
-            crew_routines_result = await self._execute_crew_routines_md()
+            # First: Check TEAM_ROUTINES.md (OpenClaw-style)
+            team_routines_result = await self._execute_team_routines_md()
 
             # Then: Execute registered checks (legacy mode)
             if self.config.parallel_checks:
@@ -724,9 +687,9 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
             else:
                 results = await self._execute_checks_sequential(tick)
 
-            # Include CREW_ROUTINES.md result if it was executed
-            if crew_routines_result:
-                results = [crew_routines_result] + results
+            # Include TEAM_ROUTINES.md result if it was executed
+            if team_routines_result:
+                results = [team_routines_result] + results
 
             tick.results = results
 
@@ -757,12 +720,12 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
             )
             if tick.status == "completed":
                 self._metrics.incr(
-                    "crew_routines.tick.completed",
+                    "team_routines.tick.completed",
                     tags={"bot": self.config.bot_name},
                 )
             else:
                 self._metrics.incr(
-                    "crew_routines.tick.completed_with_failures",
+                    "team_routines.tick.completed_with_failures",
                     tags={"bot": self.config.bot_name},
                 )
 
@@ -770,7 +733,7 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
             tick.status = "failed"
             logger.error(f"[{self.config.bot_name}] Tick {tick_id} failed: {e}")
             self._metrics.incr(
-                "crew_routines.tick.failed",
+                "team_routines.tick.failed",
                 tags={"bot": self.config.bot_name},
             )
 
@@ -783,7 +746,7 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
 
         return tick
 
-    async def _execute_checks_parallel(self, tick: CrewRoutinesTick) -> List[CheckResult]:
+    async def _execute_checks_parallel(self, tick: TeamRoutinesTick) -> List[CheckResult]:
         """Execute checks in parallel with concurrency limit."""
         semaphore = asyncio.Semaphore(self.config.max_concurrent_checks)
 
@@ -794,7 +757,7 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
         tasks = [run_with_limit(check) for check in self.config.checks if check.enabled]
         return await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def _execute_checks_sequential(self, tick: CrewRoutinesTick) -> List[CheckResult]:
+    async def _execute_checks_sequential(self, tick: TeamRoutinesTick) -> List[CheckResult]:
         """Execute checks one at a time."""
         results = []
 
@@ -814,11 +777,11 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
     async def _execute_single_check(
         self,
         check_def: CheckDefinition,
-        tick: CrewRoutinesTick
+        tick: TeamRoutinesTick
     ) -> CheckResult:
         """Execute a single check with retry logic."""
         self._metrics.incr(
-            "crew_routines.check.started",
+            "team_routines.check.started",
             tags={"bot": self.config.bot_name, "check": check_def.name},
         )
 
@@ -859,7 +822,7 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
             # Check result
             if result.success:
                 self._metrics.incr(
-                    "crew_routines.check.completed",
+                    "team_routines.check.completed",
                     tags={"bot": self.config.bot_name, "check": check_def.name},
                 )
                 return result
@@ -876,13 +839,13 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
 
         # All retries exhausted
         self._metrics.incr(
-            "crew_routines.check.failed",
+            "team_routines.check.failed",
             tags={"bot": self.config.bot_name, "check": check_def.name},
         )
         return result
 
     def get_status(self) -> Dict[str, Any]:
-        """Get current crew routines status.
+        """Get current team routines status.
 
         Returns:
             Status dictionary with metrics
@@ -926,4 +889,4 @@ Evaluate each item and take any necessary actions. If nothing needs attention, r
         return True
 
 
-__all__ = ["BotCrewRoutinesService"]
+__all__ = ["BotTeamRoutinesService"]

@@ -862,7 +862,7 @@ Nanofolks doesn't just wait for you to message it. It can proactively act.
 Nanofolks supports routines (scheduled tasks). There are two kinds:
 
 - **Your Routines**: reminders or recurring tasks you create
-- **Crew Routines**: background check-ins that keep the crew “alive”
+- **Team Routines**: background check-ins that keep the crew “alive”
 
 You can control both from the CLI, without needing to know what a cron job is.
 

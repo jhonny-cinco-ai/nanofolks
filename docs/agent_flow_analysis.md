@@ -194,7 +194,7 @@ researcher = ResearcherBus(
 # ... similar for coder, social, auditor, creative, nanofolks
 
 # Initialize team manager
-multi_manager = MultiCrewRoutinesManager()
+multi_manager = MultiTeamRoutinesManager()
 multi_manager.register_bot(researcher)
 multi_manager.register_bot(coder)
 multi_manager.register_bot(social)
@@ -501,7 +501,7 @@ Steps:
 
 ## 5. BOT ACTIVITY & STATUS DISPLAY
 
-### Dashboard (`nanofolks/routines/crew/dashboard.py`)
+### Dashboard (`nanofolks/routines/team/dashboard.py`)
 
 **Real-time monitoring at http://localhost:9090**
 
@@ -509,7 +509,7 @@ Steps:
 class DashboardService:
     """Service for providing real-time dashboard metrics."""
     
-    def __init__(self, manager: MultiCrewRoutinesManager = None, 
+    def __init__(self, manager: MultiTeamRoutinesManager = None, 
                  port: int = 9090, update_interval: float = 5.0):
         """Initialize dashboard service."""
         self.manager = manager
@@ -657,7 +657,7 @@ async def invoke(bot_name: str, task: str) -> str:
 | WorkLog Manager | `nanofolks/agent/work_log_manager.py` |
 | Bot Dispatch | `nanofolks/bots/dispatch.py` |
 | Bot Implementations | `nanofolks/bots/implementations.py` |
-| Dashboard | `nanofolks/routines/crew/dashboard.py` |
+| Dashboard | `nanofolks/routines/team/dashboard.py` |
 | MessageBus | `nanofolks/bus/queue.py` |
 | ContextBuilder | `nanofolks/agent/context.py` |
 

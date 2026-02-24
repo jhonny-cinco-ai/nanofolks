@@ -892,7 +892,7 @@ class AgentLoop:
             self.tools.register(tool)
         logger.info(f"Registered {len(security_tools)} security tools")
 
-        # Team routines are handled via the routines tool; no crew_routines control tool.
+        # Team routines are handled via the routines tool; no team_routines control tool.
 
         # Apply tool permissions based on bot's SOUL.md/AGENTS.md
         self._apply_tool_permissions()

@@ -1,1 +1,1 @@
-"""Routines package (crew routines + scheduler engine + shared defaults)."""
+"""Routines package (team routines + scheduler engine + shared defaults)."""

@@ -701,11 +701,11 @@ def gateway(
     from nanofolks.agent.loop import AgentLoop
     from nanofolks.bus.queue import MessageBus
     from nanofolks.channels.manager import ChannelManager
-    from nanofolks.routines.models import Routine
     from nanofolks.routines.service import RoutineService
-    from nanofolks.routines.crew.dashboard import DashboardService
-    from nanofolks.routines.crew.dashboard_server import DashboardHTTPServer
-    from nanofolks.routines.crew.multi_manager import MultiCrewRoutinesManager
+    from nanofolks.routines.executor import RoutineExecutor
+    from nanofolks.routines.team.dashboard import DashboardService
+    from nanofolks.routines.team.dashboard_server import DashboardHTTPServer
+    from nanofolks.routines.team.team_manager import MultiTeamRoutinesManager
     from nanofolks.utils.ids import room_to_session_id
 
     from nanofolks.utils.logging import configure_logging
@@ -777,60 +777,6 @@ def gateway(
     bus.set_broker(broker_manager)
     console.print("[green]✓[/green] Broker: per-room FIFO routing active")
 
-    # Set routines callback (needs agent)
-    async def on_cron_job(job: Routine) -> str | None:
-        """Execute a routine through the agent or handle system jobs."""
-        # Handle calibration jobs (system jobs, not user messages)
-        if job.payload.routine == "calibration" or job.payload.message == "CALIBRATE_ROUTING":
-            try:
-                from nanofolks.agent.router.calibration import CalibrationManager
-                calibration = CalibrationManager(
-                    patterns_file=config.workspace_path / "routing_patterns.json",
-                    analytics_file=config.workspace_path / "routing_stats.json",
-                    config=config.routing.auto_calibration.model_dump() if config.routing.auto_calibration else None,
-                )
-                if calibration.should_calibrate():
-                    results = calibration.calibrate()
-                    logger.info(f"Scheduled calibration completed: {results}")
-                    return f"Calibration completed: {results.get('patterns_added', 0)} patterns added, {results.get('patterns_removed', 0)} removed"
-                else:
-                    return "Calibration not needed yet (insufficient data or too soon)"
-            except Exception as e:
-                logger.error(f"Calibration job failed: {e}")
-                return f"Calibration failed: {e}"
-
-        # Team routines (system scope) route to internal channel and room context
-        if job.payload.scope == "system":
-            metadata = job.payload.metadata or {}
-            target_type = metadata.get("target_type")
-            target_id = metadata.get("target_id")
-            room_id = target_id if target_type == "room" else "general"
-            response = await agent.process_direct(
-                job.payload.message,
-                session_key=room_to_session_id(f"routine_{job.id}"),
-                channel=job.payload.channel or "internal",
-                chat_id=job.payload.to or "team",
-                room_id=room_id,
-            )
-        else:
-            # Regular user routine - process through agent
-            response = await agent.process_direct(
-                job.payload.message,
-                session_key=room_to_session_id(f"routine_{job.id}"),
-                channel=job.payload.channel or "cli",
-                chat_id=job.payload.to or "direct",
-            )
-        if job.payload.deliver and job.payload.to:
-            from nanofolks.bus.events import MessageEnvelope
-            await bus.publish_outbound(MessageEnvelope(
-                channel=job.payload.channel or "cli",
-                chat_id=job.payload.to,
-                content=response or "",
-                direction="outbound",
-            ))
-        return response
-    scheduler.on_job = on_cron_job
-
     # Create team manager with all 6 bots (internal checks only)
     try:
         # Load appearance configuration (teams and custom names)
@@ -891,7 +837,7 @@ def gateway(
         )
 
         # Initialize manager (internal)
-        multi_manager = MultiCrewRoutinesManager(routine_service=scheduler)
+        multi_manager = MultiTeamRoutinesManager(routine_service=scheduler)
         multi_manager.register_bot(researcher)
         multi_manager.register_bot(coder)
         multi_manager.register_bot(social)
@@ -927,7 +873,7 @@ def gateway(
         except Exception as _coord_err:
             logger.warning(f"CoordinatorBot init skipped: {_coord_err}")
 
-        # Initialize internal crew routines checks (legacy engine)
+        # Initialize internal team routines checks (legacy engine)
         from nanofolks.agent.work_log_manager import get_work_log_manager
         from nanofolks.reasoning.config import get_reasoning_config
 
@@ -944,7 +890,7 @@ def gateway(
                 workspace=config.workspace_path,
                 bot_name=bot.name,
             )
-            bot.initialize_crew_routines(
+            bot.initialize_team_routines(
                 workspace=config.workspace_path,
                 provider=provider,
                 routing_config=config.routing,
@@ -965,12 +911,16 @@ def gateway(
         else:
             logger.debug("Agent has no learning_manager; internal learnings will be in-memory only")
 
-        console.print("[green]✓[/green] Crew routines engine initialized (internal)")
+        console.print("[green]✓[/green] Team routines registered (internal)")
 
 
     except Exception as e:
-        logger.warning(f"Failed to initialize crew routines engine: {e}")
+        logger.warning(f"Failed to initialize team routines engine: {e}")
         multi_manager = None
+
+    # Wire routines executor (single execution path)
+    executor = RoutineExecutor(agent=agent, bus=bus, config=config, multi_manager=multi_manager)
+    scheduler.on_job = executor.handle_job
 
     # Create dashboard service for real-time monitoring
     try:
@@ -1003,10 +953,10 @@ def gateway(
         user_jobs = len(scheduler.list_jobs(include_disabled=True, scope="user"))
         system_jobs = len(scheduler.list_jobs(include_disabled=True, scope="system"))
         console.print(
-            f"[green]✓[/green] Routines: {user_jobs} user, {system_jobs} crew"
+            f"[green]✓[/green] Routines: {user_jobs} user, {system_jobs} team"
         )
 
-    console.print("[green]✓[/green] Routines active (user + crew)")
+    console.print("[green]✓[/green] Routines active (user + team)")
 
     async def run():
         try:
@@ -4172,13 +4122,9 @@ def peek(
         nanofolks peek dm-coder-auditor --limit 50
         nanofolks peek dm-leader-coder --limit 10
     """
-    from nanofolks.bots.dm_room_manager import BotDMRoomManager
+    from nanofolks.bots.room_manager import get_room_manager
 
-    # Get workspace/data directory
-    data_dir = get_data_dir()
-    workspace = data_dir.parent
-
-    dm_manager = BotDMRoomManager(workspace)
+    room_manager = get_room_manager()
 
     # Parse room_id: dm-bot_a-bot_b
     if not room_id.startswith("dm-"):
@@ -4197,7 +4143,13 @@ def peek(
     bot_a, bot_b = bots[0], bots[1]
 
     # Get conversation history
-    messages = dm_manager.get_conversation_history(bot_a, bot_b, limit=limit)
+    room = room_manager.get_room(room_id)
+    if not room:
+        console.print(f"[yellow]📭 No messages in {room_id} yet[/yellow]")
+        console.print("[dim]This room will be populated when bots communicate.[/dim]")
+        return
+
+    messages = (room.metadata.get("dm_messages", []) or [])[-limit:]
 
     if not messages:
         console.print(f"[yellow]📭 No messages in {room_id} yet[/yellow]")
@@ -4219,25 +4171,29 @@ def peek(
     }
 
     for msg in messages:
-        timestamp_str = msg.timestamp.strftime("%H:%M")
-        emoji = bot_emojis.get(msg.sender_bot, "🤖")
+        try:
+            from datetime import datetime
+            timestamp_str = datetime.fromisoformat(msg["timestamp"]).strftime("%H:%M")
+        except Exception:
+            timestamp_str = "??:??"
+        emoji = bot_emojis.get(msg.get("sender_bot"), "🤖")
 
         # Format based on message type
-        if msg.message_type.value == "query":
+        if msg.get("message_type") == "query":
             prefix = "[bold cyan]❓[/bold cyan] Query"
-        elif msg.message_type.value == "response":
+        elif msg.get("message_type") == "response":
             prefix = "[bold green]💬[/bold green] Response"
-        elif msg.message_type.value == "escalation":
+        elif msg.get("message_type") == "escalation":
             prefix = "[bold red]🚨[/bold red] Escalation"
-        elif msg.message_type.value == "coordination":
+        elif msg.get("message_type") == "coordination":
             prefix = "[bold yellow]📋[/bold yellow] Coordination"
         else:
             prefix = "[dim]📝[/dim] Info"
 
-        console.print(f"\n{emoji} [bold]{msg.sender_bot}[/bold] [{timestamp_str}] {prefix}:")
+        console.print(f"\n{emoji} [bold]{msg.get('sender_bot')}[/bold] [{timestamp_str}] {prefix}:")
 
         # Word wrap the content
-        content_lines = msg.content.split("\n")
+        content_lines = (msg.get("content") or "").split("\n")
         for line in content_lines:
             if len(line) > 70:
                 # Simple word wrap
@@ -4262,13 +4218,10 @@ def peek(
 @app.command("dm-rooms")
 def list_dm_rooms():
     """List all bot-to-bot DM rooms."""
-    from nanofolks.bots.dm_room_manager import BotDMRoomManager
+    from nanofolks.bots.room_manager import get_room_manager
 
-    data_dir = get_data_dir()
-    workspace = data_dir.parent
-
-    dm_manager = BotDMRoomManager(workspace)
-    rooms = dm_manager.list_all_rooms()
+    room_manager = get_room_manager()
+    rooms = room_manager.list_dm_rooms()
 
     if not rooms:
         console.print("[yellow]No bot-to-bot DM rooms found.[/yellow]")
@@ -4307,7 +4260,7 @@ def list_dm_rooms():
 app.add_typer(room_app, name="room")
 app.add_typer(project_app, name="project")
 
-# CrewRoutines CLI removed (use routines)
+# TeamRoutines CLI removed (use routines)
 
 # Import and wire security commands
 try:

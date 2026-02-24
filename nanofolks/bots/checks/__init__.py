@@ -1,12 +1,12 @@
-"""Crew routines checks for all bot types.
+"""team routines checks for all bot types.
 
-This module exports all domain-specific crew routines checks.
+This module exports all domain-specific team routines checks.
 Importing these modules automatically registers the checks
 with the global check registry.
 
 Example:
     from nanofolks.bots.checks import researcher_checks, coder_checks
-    # Checks are now registered and can be used by BotCrewRoutinesService
+    # Checks are now registered and can be used by BotTeamRoutinesService
 """
 
 # Import all check modules to ensure registration

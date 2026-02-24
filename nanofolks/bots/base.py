@@ -1,4 +1,4 @@
-"""Base class for all specialist bots with crew routines support."""
+"""Base class for all specialist bots with team routines support."""
 
 from __future__ import annotations
 
@@ -17,9 +17,9 @@ if TYPE_CHECKING:
 
 
 class SpecialistBot(ABC):
-    """Abstract base class for all bot implementations with autonomous crew routines.
+    """Abstract base class for all bot implementations with autonomous team routines.
 
-    Each bot runs its own independent crew routines with:
+    Each bot runs its own independent team routines with:
     - Role-specific periodic checks
     - Domain-optimized intervals
     - Autonomous task execution
@@ -50,14 +50,13 @@ class SpecialistBot(ABC):
         self.workspace_id = workspace_id
         self._workspace_path = workspace_path
         self._team_manager = team_manager
-        self._dm_room_manager = None  # Lazy initialized
         self.private_memory: Dict[str, Any] = {
             "learnings": [],  # Lessons learned by this bot
             "expertise_domains": [],  # Domains where bot is competent
             "mistakes": [],  # Errors and how they were recovered
             "confidence": 0.7,  # Self-assessed competence (0.0-1.0)
             "created_at": datetime.now().isoformat(),
-            "crew_routines_history": [],  # History of crew routines executions
+            "team_routines_history": [],  # History of team routines executions
         }
 
         # Persistent learning manager — injected by gateway via set_learning_manager().
@@ -73,9 +72,9 @@ class SpecialistBot(ABC):
         if custom_name:
             self.set_display_name(custom_name)
 
-        # Crew routines service (initialized lazily)
-        self._crew_routines = None
-        self._crew_routines_config = None
+        # team routines service (initialized lazily)
+        self._team_routines = None
+        self._team_routines_config = None
 
     @property
     def workspace(self) -> Optional["Path"]:
@@ -86,15 +85,6 @@ class SpecialistBot(ABC):
     def workspace(self, path: "Path"):
         """Set workspace path."""
         self._workspace_path = path
-        self._dm_room_manager = None  # Reset DM manager
-
-    @property
-    def dm_room_manager(self):
-        """Get or create the DM room manager."""
-        if self._dm_room_manager is None and self._workspace_path:
-            from nanofolks.bots.dm_room_manager import BotDMRoomManager
-            self._dm_room_manager = BotDMRoomManager(self._workspace_path)
-        return self._dm_room_manager
 
     def _create_tool_registry(self, workspace: "Path | None" = None):
         """Create a tool registry for this bot based on permissions.
@@ -243,7 +233,7 @@ class SpecialistBot(ABC):
 
         # Persist to the shared store when a LearningManager has been injected.
         # We schedule this as a fire-and-forget task so we never block the
-        # Crew routines tick that called us.
+        # team routines tick that called us.
         if self._learning_manager is not None:
             try:
                 import asyncio
@@ -256,7 +246,7 @@ class SpecialistBot(ABC):
                 learning_obj = Learning(
                     id=str(_uuid4()),
                     content=lesson,
-                    source=f"crew_routines:{self.role_card.bot_name}",
+                    source=f"team_routines:{self.role_card.bot_name}",
                     sentiment="neutral",
                     confidence=confidence,
                     recommendation=None,
@@ -288,7 +278,7 @@ class SpecialistBot(ABC):
                         )
                     )
             except Exception:
-                pass  # Never block crew routines
+                pass  # Never block team routines
 
     def record_mistake(self, error: str, recovery: str, lesson: Optional[str] = None) -> None:
         """Record a mistake and how it was recovered.
@@ -343,7 +333,7 @@ class SpecialistBot(ABC):
             "expertise_domains": self.private_memory["expertise_domains"],
             "confidence": self.private_memory["confidence"],
             "created_at": self.private_memory["created_at"],
-            "crew_routines_running": self.is_crew_routines_running,
+            "team_routines_running": self.is_team_routines_running,
         }
 
     async def get_recent_handoffs(self, limit: int = 20, room_id: Optional[str] = None):
@@ -358,10 +348,10 @@ class SpecialistBot(ABC):
             return []
 
     # ==================================================================
-    # Crew Routines Methods
+    # team routines Methods
     # ==================================================================
 
-    def initialize_crew_routines(
+    def initialize_team_routines(
         self,
         config=None,
         workspace=None,
@@ -369,38 +359,38 @@ class SpecialistBot(ABC):
         routing_config=None,
         reasoning_config=None,
         work_log_manager=None,
-        on_crew_routines=None,
+        on_team_routines=None,
         on_tick_complete: Optional[Callable] = None,
         on_check_complete: Optional[Callable] = None,
         tool_registry=None,
     ) -> None:
-        """Initialize bot's autonomous crew routines.
+        """Initialize bot's autonomous team routines.
 
         Args:
-            config: Crew routines configuration (uses default if None)
-            workspace: Path to bot's workspace (for CREW_ROUTINES.md)
-            provider: LLM provider for crew routines execution
+            config: team routines configuration (uses default if None)
+            workspace: Path to bot's workspace (for TEAM_ROUTINES.md)
+            provider: LLM provider for team routines execution
             routing_config: Smart routing config for model selection
             reasoning_config: Reasoning/CoT settings for this bot
-            work_log_manager: Work log manager for logging crew routines events
-            on_crew_routines: Callback to execute CREW_ROUTINES.md tasks via LLM
+            work_log_manager: Work log manager for logging team routines events
+            on_team_routines: Callback to execute TEAM_ROUTINES.md tasks via LLM
             on_tick_complete: Callback when tick completes
             on_check_complete: Callback when individual check completes
-            tool_registry: Optional tool registry for tool execution during crew routines
+            tool_registry: Optional tool registry for tool execution during team routines
         """
         if config is None:
             # Load default config for this bot type
-            from nanofolks.bots.crew_routines_configs import get_bot_crew_routines_config
-            config = get_bot_crew_routines_config(self.role_card.bot_name)
+            from nanofolks.bots.team_routines_configs import get_bot_team_routines_config
+            config = get_bot_team_routines_config(self.role_card.bot_name)
 
-        self._crew_routines_config = config
+        self._team_routines_config = config
 
         # Import here to avoid circular imports
-        from nanofolks.routines.crew.bot_crew_routines import BotCrewRoutinesService
+        from nanofolks.routines.team.bot_team_routines import BotTeamRoutinesService
 
         # Wrap callbacks to include bot context
         def tick_callback(tick):
-            self._on_crew_routines_tick_complete(tick)
+            self._on_team_routines_tick_complete(tick)
             if on_tick_complete:
                 on_tick_complete(tick)
 
@@ -409,7 +399,7 @@ class SpecialistBot(ABC):
             if on_check_complete:
                 on_check_complete(result)
 
-        self._crew_routines = BotCrewRoutinesService(
+        self._team_routines = BotTeamRoutinesService(
             bot_instance=self,
             config=config,
             workspace=workspace,
@@ -417,59 +407,59 @@ class SpecialistBot(ABC):
             routing_config=routing_config,
             reasoning_config=reasoning_config,
             work_log_manager=work_log_manager,
-            on_crew_routines=on_crew_routines,
+            on_team_routines=on_team_routines,
             on_tick_complete=tick_callback,
             on_check_complete=check_callback,
             tool_registry=tool_registry,
         )
 
         logger.info(
-            f"[{self.role_card.bot_name}] Crew routines initialized: "
+            f"[{self.role_card.bot_name}] team routines initialized: "
             f"{config.interval_s}s interval, {len(config.checks)} checks"
         )
 
-    async def start_crew_routines(self) -> None:
-        """Start bot's independent crew routines."""
-        if self._crew_routines is None:
+    async def start_team_routines(self) -> None:
+        """Start bot's independent team routines."""
+        if self._team_routines is None:
             # Auto-initialize with defaults
-            self.initialize_crew_routines()
+            self.initialize_team_routines()
 
-        if self._crew_routines:
-            await self._crew_routines.start()
+        if self._team_routines:
+            await self._team_routines.start()
 
-    def stop_crew_routines(self) -> None:
-        """Stop bot's crew routines."""
-        if self._crew_routines:
-            self._crew_routines.stop()
+    def stop_team_routines(self) -> None:
+        """Stop bot's team routines."""
+        if self._team_routines:
+            self._team_routines.stop()
 
     @property
-    def is_crew_routines_running(self) -> bool:
-        """Check if crew routines are currently running."""
-        return self._crew_routines is not None and self._crew_routines.is_running
+    def is_team_routines_running(self) -> bool:
+        """Check if team routines are currently running."""
+        return self._team_routines is not None and self._team_routines.is_running
 
-    def get_crew_routines_status(self) -> Dict[str, Any]:
-        """Get current crew routines status."""
-        if self._crew_routines:
-            return self._crew_routines.get_status()
+    def get_team_routines_status(self) -> Dict[str, Any]:
+        """Get current team routines status."""
+        if self._team_routines:
+            return self._team_routines.get_status()
         return {"running": False, "bot_name": self.role_card.bot_name}
 
-    async def trigger_crew_routines_now(self, reason: str = "manual"):
-        """Manually trigger a crew routines tick.
+    async def trigger_team_routines_now(self, reason: str = "manual"):
+        """Manually trigger a team routines tick.
 
         Args:
-            reason: Why crew routines are being triggered
+            reason: Why team routines are being triggered
 
         Returns:
-            CrewRoutinesTick result
+            TeamRoutinesTick result
         """
-        if self._crew_routines is None:
-            self.initialize_crew_routines()
+        if self._team_routines is None:
+            self.initialize_team_routines()
 
-        if self._crew_routines is not None:
-            return await self._crew_routines.trigger_now(reason)
+        if self._team_routines is not None:
+            return await self._team_routines.trigger_now(reason)
         return None
 
-    def _on_crew_routines_tick_complete(self, tick) -> None:
+    def _on_team_routines_tick_complete(self, tick) -> None:
         """Internal handler for tick completion.
 
         Records to bot's private memory and logs learning.
@@ -483,23 +473,23 @@ class SpecialistBot(ABC):
             "failed_checks": [r.check_name for r in tick.get_failed_checks()],
         }
 
-        self.private_memory["crew_routines_history"].append(tick_summary)
+        self.private_memory["team_routines_history"].append(tick_summary)
 
         # Trim history if too long
         max_history = tick.config.retain_history_count if tick.config else 100
-        if len(self.private_memory["crew_routines_history"]) > max_history:
-            self.private_memory["crew_routines_history"] = self.private_memory["crew_routines_history"][-max_history:]
+        if len(self.private_memory["team_routines_history"]) > max_history:
+            self.private_memory["team_routines_history"] = self.private_memory["team_routines_history"][-max_history:]
 
         # Record learning
         success_rate = tick.get_success_rate()
         if success_rate >= 0.9:
             self.record_learning(
-                lesson=f"CrewRoutines tick {tick.tick_id} completed with {success_rate:.0%} success",
+                lesson=f"TeamRoutines tick {tick.tick_id} completed with {success_rate:.0%} success",
                 confidence=0.9
             )
         elif success_rate < 0.5:
             self.record_mistake(
-                error=f"CrewRoutines tick {tick.tick_id} had low success rate: {success_rate:.0%}",
+                error=f"TeamRoutines tick {tick.tick_id} had low success rate: {success_rate:.0%}",
                 recovery="Review failed checks and adjust configuration"
             )
 
@@ -525,7 +515,7 @@ class SpecialistBot(ABC):
         priority: str = "normal",
         data: Optional[Dict[str, Any]] = None
     ) -> bool:
-        """Notify coordinator of crew routines finding.
+        """Notify coordinator of team routines finding.
 
         Args:
             message: Notification message
@@ -548,7 +538,7 @@ class SpecialistBot(ABC):
                 "message": message,
                 "priority": priority,
                 "data": data or {},
-                "source": "crew_routines",
+                "source": "team_routines",
                 "timestamp": datetime.now().isoformat()
             }
 
@@ -619,18 +609,19 @@ class SpecialistBot(ABC):
             If expect_reply=False: (True, None) on success, (False, None) on failure
             If expect_reply=True: (True, reply) on success, (False, error) on failure/timeout
         """
-        from nanofolks.models.bot_dm_room import BotMessageType
-
         # Log to DM room for transparency (before sending)
-        if self.dm_room_manager:
-            msg_type = BotMessageType.QUERY if expect_reply else BotMessageType.INFO
-            self.dm_room_manager.log_message(
+        try:
+            from nanofolks.bots.room_manager import get_room_manager
+            msg_type = "query" if expect_reply else "info"
+            get_room_manager().log_dm_message(
                 sender_bot=self.role_card.bot_name,
                 recipient_bot=recipient_bot,
                 content=message,
                 message_type=msg_type,
-                context=context
+                context=context,
             )
+        except Exception as e:
+            logger.debug(f"[{self.role_card.bot_name}] DM log failed: {e}")
 
         if self.bus is None:
             logger.warning(f"[{self.role_card.bot_name}] No bus available for messaging")
@@ -680,15 +671,18 @@ class SpecialistBot(ABC):
                         )
 
                         # Log reply to DM room for transparency
-                        if self.dm_room_manager:
-                            from nanofolks.models.bot_dm_room import BotMessageType
-                            self.dm_room_manager.log_message(
+                        try:
+                            from nanofolks.bots.room_manager import get_room_manager
+                            get_room_manager().log_dm_message(
                                 sender_bot=recipient_bot,
                                 recipient_bot=self.role_card.bot_name,
                                 content=msg.content,
-                                message_type=BotMessageType.RESPONSE,
-                                context={"reply_to": message_id}
+                                message_type="response",
+                                context={"reply_to": message_id},
+                                reply_to=message_id,
                             )
+                        except Exception as e:
+                            logger.debug(f"[{self.role_card.bot_name}] DM reply log failed: {e}")
 
                         return True, msg.content
 

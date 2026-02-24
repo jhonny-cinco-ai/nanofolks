@@ -1,6 +1,6 @@
-"""Data models for crew routines engine (legacy heartbeat).
+"""Data models for team routines engine (legacy heartbeat).
 
-This module defines the core data structures for per-bot crew routines,
+This module defines the core data structures for per-bot team routines,
 including configurations, check results, and execution tracking.
 """
 
@@ -11,15 +11,15 @@ from typing import Any, Callable, Coroutine, Dict, List, Optional
 
 
 class CheckPriority(Enum):
-    """Priority levels for crew routines checks."""
+    """Priority levels for team routines checks."""
     CRITICAL = "critical"    # Run immediately, alert on failure
     HIGH = "high"           # Run promptly, log failures
-    NORMAL = "normal"       # Run during normal crew routines
+    NORMAL = "normal"       # Run during normal team routines
     LOW = "low"             # Run when resources available
 
 
 class CheckStatus(Enum):
-    """Status of a crew routines check execution."""
+    """Status of a team routines check execution."""
     PENDING = "pending"
     RUNNING = "running"
     SUCCESS = "success"
@@ -30,7 +30,7 @@ class CheckStatus(Enum):
 
 @dataclass
 class CheckDefinition:
-    """Definition of a single crew routines check.
+    """Definition of a single team routines check.
 
     Attributes:
         name: Unique identifier for the check
@@ -54,7 +54,7 @@ class CheckDefinition:
 
 @dataclass
 class CheckResult:
-    """Result of executing a crew routines check.
+    """Result of executing a team routines check.
 
     Attributes:
         check_name: Name of the check that was executed
@@ -107,14 +107,14 @@ class CheckResult:
 
 
 @dataclass
-class CrewRoutinesConfig:
-    """Configuration for a bot's crew routines.
+class TeamRoutinesConfig:
+    """Configuration for a bot's team routines.
 
     Attributes:
         bot_name: Name of the bot this config belongs to
-        interval_s: Seconds between crew routines ticks (default: 3600 = 60 min)
+        interval_s: Seconds between team routines ticks (default: 3600 = 60 min)
         max_execution_time_s: Maximum time for entire tick
-        enabled: Whether crew routines are enabled
+        enabled: Whether team routines are enabled
         checks: List of checks to execute
         parallel_checks: Whether to run checks in parallel
         max_concurrent_checks: Maximum parallel checks
@@ -173,8 +173,8 @@ class CrewRoutinesConfig:
 
 
 @dataclass
-class CrewRoutinesTick:
-    """A single crew routines execution.
+class TeamRoutinesTick:
+    """A single team routines execution.
 
     Attributes:
         tick_id: Unique identifier for this tick
@@ -189,7 +189,7 @@ class CrewRoutinesTick:
     tick_id: str
     bot_name: str
     started_at: datetime
-    config: CrewRoutinesConfig
+    config: TeamRoutinesConfig
 
     # Execution tracking
     results: List[CheckResult] = field(default_factory=list)
@@ -240,8 +240,8 @@ class CrewRoutinesTick:
 
 
 @dataclass
-class CrewRoutinesHistory:
-    """History of crew routines executions for a bot.
+class TeamRoutinesHistory:
+    """History of team routines executions for a bot.
 
     Attributes:
         bot_name: Name of the bot
@@ -254,7 +254,7 @@ class CrewRoutinesHistory:
         last_failure_at: When the last failed tick ran
     """
     bot_name: str
-    ticks: List[CrewRoutinesTick] = field(default_factory=list)
+    ticks: List[TeamRoutinesTick] = field(default_factory=list)
 
     # Statistics
     total_ticks: int = 0
@@ -265,7 +265,7 @@ class CrewRoutinesHistory:
     last_success_at: Optional[datetime] = None
     last_failure_at: Optional[datetime] = None
 
-    def add_tick(self, tick: CrewRoutinesTick) -> None:
+    def add_tick(self, tick: TeamRoutinesTick) -> None:
         """Add a tick to history."""
         self.ticks.append(tick)
         self.total_ticks += 1
@@ -342,9 +342,9 @@ __all__ = [
     "CheckStatus",
     "CheckDefinition",
     "CheckResult",
-    "CrewRoutinesConfig",
-    "CrewRoutinesTick",
-    "CrewRoutinesHistory",
+    "TeamRoutinesConfig",
+    "TeamRoutinesTick",
+    "TeamRoutinesHistory",
     "CheckHandler",
     "AsyncCheckHandler",
 ]

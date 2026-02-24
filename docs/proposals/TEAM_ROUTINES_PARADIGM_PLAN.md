@@ -1,6 +1,6 @@
 # Team Routines Paradigm Plan
 
-Note: In this document, **cron** refers to the internal routines scheduler engine, and **crew_routines** refers to the crew routines engine. Both are internal; user-facing terminology is **routines**.
+Note: In this document, **cron** refers to the internal routines scheduler engine, and **team_routines** refers to the team routines engine. Both are internal; user-facing terminology is **routines**.
 
 **Status**: Proposed  
 **Owner**: Nanofolks Core  
@@ -12,14 +12,14 @@ Note: In this document, **cron** refers to the internal routines scheduler engin
 
 The current model is partially unified:
 - `when` is mostly unified (scheduler/routines)
-- `what` is still split (crew_routines files/checks vs scheduled jobs)
+- `what` is still split (team_routines files/checks vs scheduled jobs)
 
 This creates a confusing mental model and a fragile backend. For Nanofolks' target users, this is too technical.
 
 This plan defines a clean paradigm:
 - One backend concept: `routines`
 - One user-facing language: `team routines` and `your routines`
-- Team "alive" behavior stays, but crew_routines/cron stop being first-class concepts
+- Team "alive" behavior stays, but team_routines/cron stop being first-class concepts
 
 ---
 
@@ -31,7 +31,7 @@ This plan defines a clean paradigm:
 
 User-facing terms to remove:
 - `cron`
-- `crew_routines`
+- `team_routines`
 
 ---
 
@@ -58,7 +58,7 @@ Every scheduled action uses one model:
 3. `RoutineExecutor` executes by `intent + target`
 4. `RoutineMetrics` emits unified telemetry
 
-No separate runtime scheduler loops for crew_routines.
+No separate runtime scheduler loops for team_routines.
 
 ### 3) Team Alive Behavior
 
@@ -76,7 +76,7 @@ Team alive behavior is represented as `scope=system` routines:
 - Remove duplicate scheduling paths
 
 2. Remove split control planes
-- No separate "crew_routines scheduler controls" vs "cron controls"
+- No separate "team_routines scheduler controls" vs "cron controls"
 - One routines API for create/update/list/remove/enable/disable/run
 
 3. Keep team identity docs focused on behavior, not timing
@@ -100,7 +100,7 @@ Team alive behavior is represented as `scope=system` routines:
 ### Phase 2: Team Routine Migration
 
 - Convert current team alive jobs/checks into `scope=system` routines
-- Route existing crew_routines tick execution through `RoutineExecutor`
+- Route existing team_routines tick execution through `RoutineExecutor`
 - Keep behavior parity while removing separate timing loops
 
 ### Phase 3: Interface Unification
@@ -111,7 +111,7 @@ Team alive behavior is represented as `scope=system` routines:
 
 ### Phase 4: Legacy Removal
 
-- Remove user-facing `crew_routines` and `cron` commands
+- Remove user-facing `team_routines` and `cron` commands
 - Remove duplicated scheduler pathways and stale metrics names
 - Update docs, onboarding, and help text to routines terminology only
 
@@ -129,7 +129,7 @@ Team alive behavior is represented as `scope=system` routines:
 
 De-emphasize and eventually retire:
 - `nanofolks/routines/engine/*` (moved/aliased then removed)
-- `nanofolks/routines/crew/*` scheduling responsibilities (execution logic may be reused under routines executor)
+- `nanofolks/routines/team/*` scheduling responsibilities (execution logic may be reused under routines executor)
 
 ---
 
@@ -137,7 +137,7 @@ De-emphasize and eventually retire:
 
 ### CLI Onboarding Changes
 
-- Remove `crew_routines` file creation during onboarding.
+- Remove `team_routines` file creation during onboarding.
 - Replace with routine defaults in the new `routines` store.
 - Seed `team energy` as `balanced` by default during onboarding.
 - Allow edits later via `nanofolks configure` or by AI request in CLI chat.
@@ -199,7 +199,7 @@ Dashboard and CLI metrics should group by `scope` and `target_type`.
 - Risk: migration bugs causing missed jobs  
   Mitigation: migration dry-run validator + execution replay checks
 
-- Risk: hidden terminology leaks (`cron`/`crew_routines`)  
+- Risk: hidden terminology leaks (`cron`/`team_routines`)  
   Mitigation: lint/check for forbidden user-facing terms in docs and CLI help
 
 ---
@@ -232,7 +232,7 @@ Dashboard and CLI metrics should group by `scope` and `target_type`.
 | Unified routines tool for AI chat | 0% | Not started |
 | CLI routines-only surface complete | 0% | Not started |
 | Team energy control wired to cadence | 0% | Not started |
-| Legacy runtime path removal (`cron`/crew_routines schedulers) | 0% | Not started |
+| Legacy runtime path removal (`cron`/team_routines schedulers) | 0% | Not started |
 | Metrics namespace migrated to `routines.*` | 0% | Not started |
 | Docs/onboarding terminology cleanup complete | 0% | Not started |
 | Docker and integration tests passing after cutover | 0% | Not started |
@@ -242,6 +242,6 @@ Dashboard and CLI metrics should group by `scope` and `target_type`.
 ## Exit Criteria
 
 - Users can manage both personal and team proactive behavior through one concept: routines
-- Team remains "alive" with no crew_routines/cron mental model required
+- Team remains "alive" with no team_routines/cron mental model required
 - Backend has one scheduler/runtime truth
 - No split-path scheduling logic remains

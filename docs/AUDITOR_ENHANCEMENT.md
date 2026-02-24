@@ -165,7 +165,7 @@ hard_bans:
   - "No ignoring conflicting information between bot outputs"
 ```
 
-## New CrewRoutines Checks
+## New TeamRoutines Checks
 
 The Auditor now runs **8 comprehensive checks** every 60 minutes:
 

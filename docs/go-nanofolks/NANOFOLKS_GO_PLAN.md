@@ -73,8 +73,8 @@
 | Subsystem | Python Source | Go v1 Target | Parity Notes | Progress |
 |---|---|---|---|---|
 | Routines service + types | `nanofolks/routines/*` | `backend/internal/routines/*` | Include timezone support and job persistence. | Not started |
-| Team routines manager | `nanofolks/routines/crew/*` | `backend/internal/routines/manager/*` | Internal checks and notifications. | Not started |
-| Dashboard server | `nanofolks/routines/crew/dashboard_server.py` | `backend/internal/routines/dashboard_server.go` | HTTP + WS metrics. | Not started |
+| Team routines manager | `nanofolks/routines/team/*` | `backend/internal/routines/manager/*` | Internal checks and notifications. | Not started |
+| Dashboard server | `nanofolks/routines/team/dashboard_server.py` | `backend/internal/routines/dashboard_server.go` | HTTP + WS metrics. | Not started |
 
 ---
 
@@ -175,9 +175,9 @@
 - [ ] Compaction + background jobs
 - [ ] Preferences
 
-### Scheduling, Crew routines, Dashboard
+### Scheduling, team routines, Dashboard
 - [ ] Cron service + types
-- [ ] CrewRoutines models + manager
+- [ ] TeamRoutines models + manager
 - [ ] Dashboard server
 
 ### Tools, Skills, MCP
@@ -229,7 +229,7 @@ These improvements are recommended during the port process. Some can be done now
 
 **Defer to Go Port (post‑parity or v2):**
 - Unify DM rooms into standard rooms
-- Merge Cron + CrewRoutines into one scheduler
+- Merge Cron + TeamRoutines into one scheduler
 - Single orchestrator pipeline (tags → intent → dispatch → aggregation)
 - MemoryPolicy per room
 - Treat CLI/GUI as channels
@@ -250,7 +250,7 @@ These improvements are recommended during the port process. Some can be done now
 
 ## Improvements Carried from Python Plan
 - Unify DM rooms into standard rooms
-- Merge Cron + CrewRoutines into one scheduler
+- Merge Cron + TeamRoutines into one scheduler
 - Single orchestrator pipeline (tags → intent → dispatch → aggregation)
 - MemoryPolicy per room
 - Treat CLI/GUI as channels

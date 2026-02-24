@@ -182,6 +182,83 @@ class RoomManager:
         logger.info(f"Created room '{name}' with ID '{room_id}' and {len(participants)} bots")
         return room
 
+    def _generate_dm_room_id(self, bots: List[str]) -> str:
+        """Generate a consistent room ID for a bot DM room."""
+        sorted_bots = sorted([b.lower() for b in bots])
+        return "dm-" + "-".join(sorted_bots)
+
+    def get_or_create_dm_room(
+        self,
+        bots: List[str],
+        metadata: Optional[dict] = None,
+    ) -> Room:
+        """Get or create a DM room for one or more bots.
+
+        Args:
+            bots: List of bot names (2+)
+            metadata: Optional metadata for the room
+
+        Returns:
+            DM room
+        """
+        if len(bots) < 2:
+            raise ValueError("DM rooms require at least two bots")
+
+        room_id = self._generate_dm_room_id(bots)
+        existing = self._rooms.get(room_id)
+        if existing:
+            return existing
+
+        room = Room(
+            id=room_id,
+            name=f"DM: {' ↔ '.join(['@' + b for b in sorted(bots)])}",
+            type=RoomType.DIRECT,
+            room_type="direct",
+            participants=sorted([b.lower() for b in bots]),
+            owner="system",
+            created_at=datetime.now(),
+            metadata=metadata or {},
+        )
+
+        self._rooms[room_id] = room
+        self._save_room(room)
+        logger.info(f"Created DM room '{room_id}' for bots: {bots}")
+        return room
+
+    def log_dm_message(
+        self,
+        sender_bot: str,
+        recipient_bot: str,
+        content: str,
+        message_type: str = "info",
+        context: Optional[dict] = None,
+        reply_to: Optional[str] = None,
+    ) -> str:
+        """Log a bot-to-bot message into the DM room history.
+
+        Returns:
+            Message ID
+        """
+        import uuid
+
+        room = self.get_or_create_dm_room([sender_bot, recipient_bot])
+        message_id = str(uuid.uuid4())
+
+        room.add_message(sender=sender_bot, content=content)
+        room.metadata.setdefault("dm_messages", []).append({
+            "id": message_id,
+            "timestamp": datetime.now().isoformat(),
+            "sender_bot": sender_bot.lower(),
+            "recipient_bot": recipient_bot.lower(),
+            "message_type": message_type,
+            "content": content,
+            "context": context or {},
+            "reply_to": reply_to,
+        })
+        room.updated_at = datetime.now()
+        self._save_room(room)
+        return message_id
+
     def invite_bot(self, room_id: str, bot_name: str) -> bool:
         """Invite a bot to a room.
 
@@ -283,6 +360,26 @@ class RoomManager:
             }
             for room in self._rooms.values()
         ]
+
+    def list_dm_rooms(self) -> List[dict]:
+        """List all bot DM rooms."""
+        dm_rooms = []
+        for room in self._rooms.values():
+            if room.type != RoomType.DIRECT and not room.id.startswith("dm-"):
+                continue
+            dm_messages = room.metadata.get("dm_messages", []) or []
+            last_activity = None
+            if dm_messages:
+                last_activity = dm_messages[-1].get("timestamp")
+            elif room.history:
+                last_activity = room.history[-1].timestamp.isoformat()
+            dm_rooms.append({
+                "room_id": room.id,
+                "bots": room.participants,
+                "message_count": len(dm_messages) if dm_messages else len(room.history),
+                "last_activity": last_activity or "Never",
+            })
+        return dm_rooms
 
     def get_room_participants(self, room_id: str) -> List[str]:
         """Get list of bots in a room.

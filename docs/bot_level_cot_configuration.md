@@ -42,7 +42,7 @@ User Request
                │
                ▼
 ┌─────────────────────────────────────┐
-│ MultiCrewRoutinesManager               │
+│ MultiTeamRoutinesManager               │
 │  └─ Routes to appropriate bot       │
 └──────────────┬──────────────────────┘
                │

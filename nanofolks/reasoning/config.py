@@ -60,15 +60,15 @@ class ReasoningConfig:
     # Token budget for reflection
     max_reflection_tokens: int = 150
 
-    # LLM settings for crew_routines
+    # LLM settings for team_routines
     temperature: float = 0.7
     max_tokens: Optional[int] = None
 
-    def get_crew_routines_prompt(self) -> str:
-        """Get reasoning guidance for crew_routines tasks.
+    def get_team_routines_prompt(self) -> str:
+        """Get reasoning guidance for team_routines tasks.
 
         Returns:
-            Prompt segment with reasoning instructions for crew_routines
+            Prompt segment with reasoning instructions for team_routines
         """
         if self.cot_level == CoTLevel.NONE:
             return ""

@@ -17,7 +17,7 @@
 
 **Later (Go Port or Post‑Parity) — Higher Risk**
 - Unify DM rooms into standard rooms
-- Merge Cron + CrewRoutines into one scheduler
+- Merge Cron + TeamRoutines into one scheduler
 - Single orchestrator pipeline (tags → intent → dispatch → aggregation)
 - `MemoryPolicy` per room
 - Treat CLI/GUI as channels
@@ -108,12 +108,12 @@ Touchpoints:
 
 ---
 
-### B) Merge Cron + CrewRoutines Scheduler
+### B) Merge Cron + TeamRoutines Scheduler
 **Why later**: Deep architectural change, best done cleanly in Go.
 
 Touchpoints:
 - `/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks/routines/engine/*`
-- `/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks/routines/crew/*`
+- `/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks/routines/team/*`
 
 ---
 

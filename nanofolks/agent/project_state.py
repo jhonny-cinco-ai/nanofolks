@@ -58,6 +58,7 @@ class ProjectStateManager:
 
     TIMEOUT_MINUTES = 30
     QUICK_FLOW_TIMEOUT_MINUTES = 10
+    QUICK_FLOW_MAX_QUESTIONS = 2
     MIN_QUESTIONS = 3
     MIN_BOTS_WITH_QUESTIONS = 2
 
@@ -98,6 +99,7 @@ class ProjectStateManager:
 
     def _save_state(self):
         """Persist state to disk."""
+        self.state.updated_at = datetime.now()
         data = {
             'phase': self.state.phase.value,
             'user_goal': self.state.user_goal,
@@ -107,7 +109,7 @@ class ProjectStateManager:
             'approval': self.state.approval,
             'execution_plan': self.state.execution_plan,
             'created_at': self.state.created_at.isoformat(),
-            'updated_at': datetime.now().isoformat(),
+            'updated_at': self.state.updated_at.isoformat(),
             'iteration': self.state.iteration,
             'suggested_bots': self.state.suggested_bots,
         }
@@ -411,13 +413,14 @@ class ProjectStateManager:
         Args:
             quick_state: The quick flow state to save
         """
+        quick_state.updated_at = datetime.now()
         data = {
             'intent_type': quick_state.intent_type,
             'questions_asked': quick_state.questions_asked,
             'user_goal': quick_state.user_goal,
             'user_answers': quick_state.user_answers,
             'created_at': quick_state.created_at.isoformat(),
-            'updated_at': datetime.now().isoformat(),
+            'updated_at': quick_state.updated_at.isoformat(),
         }
         quick_file = self.state_dir / f"{self.room_id}_quick.json"
         with open(quick_file, 'w') as f:

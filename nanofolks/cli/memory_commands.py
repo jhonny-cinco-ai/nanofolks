@@ -59,6 +59,7 @@ def _format_confidence(confidence: float) -> str:
 
 # Memory Commands App
 memory_app = typer.Typer(name="memory", help="Memory system management commands")
+policy_app = typer.Typer(name="policy", help="Per-room memory policy overrides")
 
 
 @memory_app.command("init")
@@ -256,6 +257,118 @@ def memory_doctor():
         console.print(f"[red]Error: {e}[/red]")
     finally:
         memory_store.close()
+
+
+def _policy_paths(workspace, room: str) -> tuple[str, str]:
+    from nanofolks.utils.helpers import ensure_dir, get_memory_path
+    from nanofolks.utils.ids import normalize_room_id
+
+    policies_dir = ensure_dir(get_memory_path(workspace) / "policies")
+    if room == "default":
+        filename = "default.json"
+        room_id = "default"
+    else:
+        room_id = normalize_room_id(room) or room
+        filename = f"{room_id}.json"
+    return str(policies_dir / filename), room_id
+
+
+def _load_policy_payload(path: str) -> dict:
+    import json
+    from pathlib import Path
+
+    file_path = Path(path)
+    if not file_path.exists():
+        return {}
+    try:
+        data = json.loads(file_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if isinstance(data, dict) and "context_budget" in data and isinstance(data["context_budget"], dict):
+        return data["context_budget"]
+    if isinstance(data, dict):
+        return data
+    return {}
+
+
+def _write_policy_payload(path: str, payload: dict) -> None:
+    import json
+    from pathlib import Path
+
+    file_path = Path(path)
+    file_path.write_text(
+        json.dumps({"context_budget": payload}, indent=2, sort_keys=True),
+        encoding="utf-8"
+    )
+
+
+@policy_app.command("show")
+def policy_show(
+    room: str = typer.Option("default", "--room", "-r", help="Room ID or 'default'"),
+):
+    """Show memory policy overrides for a room."""
+    from nanofolks.config.loader import load_config
+
+    config = load_config()
+    path, room_id = _policy_paths(config.workspace_path, room)
+    payload = _load_policy_payload(path)
+
+    if payload:
+        console.print(f"\n[bold]Memory Policy ({room_id})[/bold]")
+        for key, value in payload.items():
+            console.print(f"  {key}: {value}")
+        console.print(f"[dim]Source: {path}[/dim]")
+    else:
+        console.print(f"[yellow]No policy overrides found for {room_id}[/yellow]")
+        console.print(f"[dim]Path: {path}[/dim]")
+
+
+@policy_app.command("set")
+def policy_set(
+    room: str = typer.Option("default", "--room", "-r", help="Room ID or 'default'"),
+    total: int = typer.Option(None, "--total", help="Total token budget"),
+    identity: int = typer.Option(None, "--identity", help="Identity budget"),
+    state: int = typer.Option(None, "--state", help="State budget"),
+    knowledge: int = typer.Option(None, "--knowledge", help="Knowledge budget"),
+    channel: int = typer.Option(None, "--channel", help="Channel budget"),
+    entities: int = typer.Option(None, "--entities", help="Entities budget"),
+    topics: int = typer.Option(None, "--topics", help="Topics budget"),
+    preferences: int = typer.Option(None, "--preferences", help="Preferences budget"),
+    learnings: int = typer.Option(None, "--learnings", help="Learnings budget"),
+    recent: int = typer.Option(None, "--recent", help="Recent budget"),
+):
+    """Set memory policy overrides for a room."""
+    from nanofolks.config.loader import load_config
+
+    overrides = {
+        "total": total,
+        "identity": identity,
+        "state": state,
+        "knowledge": knowledge,
+        "channel": channel,
+        "entities": entities,
+        "topics": topics,
+        "preferences": preferences,
+        "learnings": learnings,
+        "recent": recent,
+    }
+
+    updates = {k: v for k, v in overrides.items() if v is not None}
+    if not updates:
+        console.print("[yellow]No values provided. Use flags like --total or --identity.[/yellow]")
+        return
+
+    config = load_config()
+    path, room_id = _policy_paths(config.workspace_path, room)
+    payload = _load_policy_payload(path)
+    payload.update(updates)
+    _write_policy_payload(path, payload)
+
+    console.print(f"[green]Updated memory policy for {room_id}[/green]")
+    console.print(f"[dim]Saved to: {path}[/dim]")
+
+
+memory_app.add_typer(policy_app, name="policy")
 
 
 # Session Commands App

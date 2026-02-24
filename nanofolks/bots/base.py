@@ -346,6 +346,17 @@ class SpecialistBot(ABC):
             "heartbeat_running": self.is_heartbeat_running,
         }
 
+    async def get_recent_handoffs(self, limit: int = 20, room_id: Optional[str] = None):
+        """Get recent handoffs from the shared work log."""
+        try:
+            from nanofolks.agent import get_work_log_manager
+
+            manager = get_work_log_manager()
+            return manager.get_recent_handoffs(limit=limit, workspace_id=room_id)
+        except Exception as e:
+            logger.debug(f"[{self.role_card.bot_name}] Handoff lookup failed: {e}")
+            return []
+
     # ==================================================================
     # Heartbeat Methods
     # ==================================================================

@@ -37,7 +37,12 @@ from nanofolks.security.sanitizer import SecretSanitizer
 from nanofolks.session.dual_mode import create_session_manager
 from nanofolks.session.manager import Session
 from nanofolks.teams import TeamManager
-from nanofolks.utils.ids import normalize_room_id, room_to_session_id, session_key_for_message
+from nanofolks.utils.ids import (
+    normalize_room_id,
+    room_to_session_id,
+    session_key_for_message,
+    session_to_room_id,
+)
 
 
 class AgentLoop:
@@ -469,7 +474,8 @@ class AgentLoop:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content="🐚 I'm getting to know you first! Answer a few questions "
-                       "and I'll introduce you to the team. 😊"
+                       "and I'll introduce you to the team. 😊",
+                room_id=msg.room_id or self._current_room_id,
             )
 
         # Handle "tell me about X" during onboarding
@@ -487,7 +493,12 @@ class AgentLoop:
             actual_bot = bot_map.get(bot_name, bot_name)
             if actual_bot in ["leader", "researcher", "coder", "creative", "social", "auditor"]:
                 intro = onboarding.introduce_bot(actual_bot)
-                return MessageEnvelope(channel=msg.channel, chat_id=msg.chat_id, content=intro)
+                return MessageEnvelope(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=intro,
+                    room_id=msg.room_id or self._current_room_id,
+                )
 
         # Check onboarding state
         if onboarding.state == OnboardingState.NOT_STARTED:
@@ -558,7 +569,12 @@ class AgentLoop:
                 actual_bot = bot_map.get(bot_name, bot_name)
                 if actual_bot in ["leader", "researcher", "coder", "creative", "social", "auditor"]:
                     intro = onboarding.introduce_bot(actual_bot)
-                    return MessageEnvelope(channel=msg.channel, chat_id=msg.chat_id, content=intro)
+                    return MessageEnvelope(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        content=intro,
+                        room_id=msg.room_id or self._current_room_id,
+                    )
 
             # Otherwise, normal conversation after onboarding
             onboarding.complete()
@@ -1226,7 +1242,7 @@ class AgentLoop:
         # Check for ongoing project state first
         if self._hybrid_router_enabled:
             from nanofolks.agent.project_state import ProjectPhase, ProjectStateManager
-            room_id = msg.session_key  # Use session_key as room_id
+            room_id = msg.room_id or session_to_room_id(msg.session_key) or "general"
 
             state_manager = ProjectStateManager(self.workspace, room_id)
 
@@ -1239,6 +1255,14 @@ class AgentLoop:
                 if self.hybrid_router is None:
                     self.hybrid_router = IntentFlowRouter(self)
                 return await self.hybrid_router._continue_full_flow(msg, state_manager, session)
+
+            # If quick flow exists, continue it regardless of intent detection
+            quick_state = state_manager.get_quick_flow_state()
+            if quick_state is not None and not dispatch_result:
+                from nanofolks.agent.intent_flow_router import IntentFlowRouter
+                if self.hybrid_router is None:
+                    self.hybrid_router = IntentFlowRouter(self)
+                return await self.hybrid_router.route(msg, session)
 
             # NEW: Intent detection for new messages
             # Only use if NOT an explicit @mention (let existing dispatch handle those)

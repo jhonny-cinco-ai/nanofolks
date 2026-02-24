@@ -76,6 +76,16 @@ class IntentFlowRouter:
         """Handle cancellation request."""
         logger.info("User requested cancellation")
 
+        try:
+            from nanofolks.agent.project_state import ProjectStateManager
+
+            room_id = session_to_room_id(msg.session_key) or "general"
+            state_manager = ProjectStateManager(self.agent.workspace, room_id)
+            state_manager.clear_quick_flow_state()
+            state_manager.reset()
+        except Exception as e:
+            logger.warning(f"Failed to reset flow state on cancellation: {e}")
+
         from nanofolks.bus.events import MessageEnvelope
         return MessageEnvelope(
             channel=msg.channel,
@@ -140,7 +150,9 @@ class IntentFlowRouter:
                     metadata={'phase': 'error', 'intent': intent.intent_type.value}
                 )
 
-        if quick_state.questions_asked < 1:
+        max_questions = state_manager.QUICK_FLOW_MAX_QUESTIONS
+
+        if quick_state.questions_asked < max_questions:
             quick_state.user_answers.append(msg.content)
             state_manager.update_quick_flow_state(quick_state.questions_asked, quick_state.user_answers)
 

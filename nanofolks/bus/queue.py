@@ -64,6 +64,13 @@ class MessageBus:
     async def publish_outbound(self, msg: MessageEnvelope) -> None:
         """Publish a response from the agent to channels."""
         msg.direction = "outbound"
+        if msg.room_id is None and self._room_manager is not None:
+            try:
+                room_id = self._room_manager.get_room_for_channel(msg.channel, msg.chat_id)
+                if room_id:
+                    msg.set_room(room_id)
+            except Exception:
+                pass
         msg.apply_defaults("bot")
         await self.outbound.put(msg)
 

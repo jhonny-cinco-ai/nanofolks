@@ -6,8 +6,9 @@ using SQLite, with support for querying, formatting, and retrieval.
 
 import json
 import sqlite3
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from nanofolks.agent.learning_exchange import (
     ApplicabilityScope,
@@ -18,6 +19,28 @@ from nanofolks.agent.learning_exchange import (
 from nanofolks.agent.work_log import LogLevel, WorkLog, WorkLogEntry, WorkspaceType
 from nanofolks.config.loader import get_data_dir
 from nanofolks.utils.ids import normalize_room_id
+
+
+@dataclass
+class HandoffRecord:
+    """Summary of a bot-to-bot handoff for auditing and diagnostics."""
+
+    id: str
+    from_bot: str
+    to_bot: str
+    task: str
+    room_id: str
+    created_at: str
+    expected_deliverables: List[str] = field(default_factory=list)
+    actual_deliverables: List[str] = field(default_factory=list)
+    context_transferred: bool = True
+    definition_of_done: List[str] = field(default_factory=list)
+    dod_met: List[str] = field(default_factory=list)
+    information_loss_flags: List[str] = field(default_factory=list)
+    requires_approval: bool = False
+    approved: bool = False
+    status: Optional[str] = None
+    error: Optional[str] = None
 
 
 class WorkLogManager:
@@ -517,6 +540,143 @@ the current active log.
                 return logs
         except Exception as e:
             print(f"Warning: Failed to load work logs: {e}")
+            return []
+
+    def get_recent_handoffs(
+        self,
+        limit: int = 20,
+        workspace_id: Optional[str] = None,
+        completed_only: bool = True,
+    ) -> List[HandoffRecord]:
+        """Get recent handoffs aggregated from work log entries.
+
+        Args:
+            limit: Maximum number of handoff records to return
+            workspace_id: Optional workspace/room filter
+            completed_only: If True, return only completed handoffs
+
+        Returns:
+            List of HandoffRecord entries
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+
+                params: list[Any] = [LogLevel.HANDOFF.value]
+                where = "level = ?"
+
+                if workspace_id:
+                    normalized = normalize_room_id(workspace_id) or workspace_id
+                    where += " AND workspace_id = ?"
+                    params.append(normalized)
+
+                fetch_limit = max(limit * 5, 50)
+                params.append(fetch_limit)
+
+                cursor = conn.execute(
+                    f"""SELECT work_log_id, step, timestamp, details_json,
+                               workspace_id, bot_name, triggered_by
+                        FROM work_log_entries
+                        WHERE {where}
+                        ORDER BY timestamp DESC
+                        LIMIT ?""",
+                    params,
+                )
+
+                groups: dict[str, dict[str, Any]] = {}
+
+                for row in cursor.fetchall():
+                    details = json.loads(row["details_json"]) if row["details_json"] else {}
+                    invocation_id = details.get("invocation_id") or f"{row['work_log_id']}:{row['step']}"
+
+                    group = groups.get(invocation_id)
+                    if not group:
+                        from_bot = (row["triggered_by"] or row["bot_name"] or "leader")
+                        group = {
+                            "id": invocation_id,
+                            "from_bot": str(from_bot).lstrip("@"),
+                            "to_bot": details.get("target_bot", ""),
+                            "task": details.get("task", ""),
+                            "room_id": row["workspace_id"] or "general",
+                            "created_at": row["timestamp"],
+                            "expected_deliverables": [],
+                            "actual_deliverables": [],
+                            "context_transferred": True,
+                            "definition_of_done": [],
+                            "dod_met": [],
+                            "information_loss_flags": [],
+                            "requires_approval": False,
+                            "approved": False,
+                            "status": None,
+                            "error": None,
+                            "completed": False,
+                            "latest_ts": row["timestamp"],
+                        }
+                        groups[invocation_id] = group
+
+                    group["latest_ts"] = row["timestamp"]
+
+                    if details.get("target_bot"):
+                        group["to_bot"] = details.get("target_bot")
+                    if details.get("task"):
+                        group["task"] = details.get("task")
+                    if "context_transferred" in details:
+                        group["context_transferred"] = bool(details.get("context_transferred"))
+
+                    group["requires_approval"] = group["requires_approval"] or bool(details.get("requires_approval", False))
+                    group["approved"] = group["approved"] or bool(details.get("approved", False))
+
+                    status = details.get("status")
+                    if status:
+                        group["status"] = status
+                    error = details.get("error")
+                    if error:
+                        group["error"] = error
+
+                    if details.get("completed"):
+                        group["completed"] = True
+
+                    def _extend_unique(key: str, values: Any) -> None:
+                        if not values:
+                            return
+                        for item in values:
+                            if item not in group[key]:
+                                group[key].append(item)
+
+                    _extend_unique("expected_deliverables", details.get("expected_deliverables"))
+                    _extend_unique("actual_deliverables", details.get("actual_deliverables"))
+                    _extend_unique("definition_of_done", details.get("definition_of_done"))
+                    _extend_unique("dod_met", details.get("dod_met"))
+                    _extend_unique("information_loss_flags", details.get("information_loss_flags"))
+
+                records: list[tuple[str, HandoffRecord]] = []
+                for group in groups.values():
+                    if completed_only and not group["completed"]:
+                        continue
+                    record = HandoffRecord(
+                        id=group["id"],
+                        from_bot=group["from_bot"],
+                        to_bot=group["to_bot"],
+                        task=group["task"],
+                        room_id=group["room_id"],
+                        created_at=group["created_at"],
+                        expected_deliverables=group["expected_deliverables"],
+                        actual_deliverables=group["actual_deliverables"],
+                        context_transferred=group["context_transferred"],
+                        definition_of_done=group["definition_of_done"],
+                        dod_met=group["dod_met"],
+                        information_loss_flags=group["information_loss_flags"],
+                        requires_approval=group["requires_approval"],
+                        approved=group["approved"],
+                        status=group["status"],
+                        error=group["error"],
+                    )
+                    records.append((group["latest_ts"], record))
+
+                records.sort(key=lambda item: item[0], reverse=True)
+                return [record for _, record in records[:limit]]
+        except Exception as e:
+            print(f"Warning: Failed to load handoffs: {e}")
             return []
 
     def _load_log_from_row(self, conn: sqlite3.Connection, row: sqlite3.Row) -> WorkLog:

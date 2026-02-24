@@ -21,6 +21,8 @@ from collections import deque
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from nanofolks.metrics import get_metrics
+
 logger = logging.getLogger(__name__)
 
 
@@ -145,6 +147,7 @@ class DashboardService:
         """Collect current metrics from manager."""
         try:
             health = self.manager.get_team_health()
+            internal_metrics = get_metrics().snapshot()
 
             return {
                 "timestamp": datetime.now().isoformat(),
@@ -157,6 +160,7 @@ class DashboardService:
                 },
                 "bots": health.bots,
                 "alerts": health.alerts,
+                "internal_metrics": internal_metrics,
             }
         except Exception as e:
             logger.error(f"Error collecting metrics: {e}")
@@ -169,6 +173,7 @@ class DashboardService:
                 },
                 "bots": {},
                 "alerts": [f"Error collecting metrics: {str(e)}"],
+                "internal_metrics": {"counters": {}, "gauges": {}},
             }
 
     async def _broadcast_to_clients(self, metrics: Dict[str, Any]) -> None:
@@ -394,6 +399,41 @@ class DashboardService:
             margin-top: 15px;
         }
 
+        .system-metrics {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            max-height: 260px;
+            overflow: auto;
+        }
+
+        .metric-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 12px;
+            background: rgba(100, 100, 100, 0.08);
+            padding: 8px 10px;
+            border-radius: 6px;
+        }
+
+        .metric-name {
+            color: #cbd5f5;
+            flex: 1;
+            word-break: break-all;
+        }
+
+        .metric-value {
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        .metric-empty {
+            color: #94a3b8;
+            font-size: 12px;
+        }
+
         .metric {
             background: rgba(100, 100, 100, 0.1);
             padding: 12px;
@@ -611,6 +651,12 @@ class DashboardService:
                             ${renderBotList(metrics.bots || {})}
                         </div>
                     </div>
+                    <div class="card">
+                        <h2>System Metrics</h2>
+                        <div class="system-metrics">
+                            ${renderSystemMetrics(metrics.internal_metrics || {})}
+                        </div>
+                    </div>
                 </div>
 
                 ${metrics.alerts && metrics.alerts.length > 0 ? `
@@ -650,6 +696,27 @@ class DashboardService:
                             <div class="stat-value">${data.total_checks || 0}</div>
                         </div>
                     </div>
+                </div>
+            `).join('');
+        }
+
+        function renderSystemMetrics(internal) {
+            const counters = Object.entries(internal.counters || {});
+            const gauges = Object.entries(internal.gauges || {});
+            const items = [
+                ...counters.map(([name, value]) => [`c:${name}`, value]),
+                ...gauges.map(([name, value]) => [`g:${name}`, value]),
+            ];
+
+            if (!items.length) {
+                return '<div class="metric-empty">No metrics yet</div>';
+            }
+
+            items.sort((a, b) => a[0].localeCompare(b[0]));
+            return items.slice(0, 12).map(([name, value]) => `
+                <div class="metric-row">
+                    <div class="metric-name">${name}</div>
+                    <div class="metric-value">${value}</div>
                 </div>
             `).join('');
         }

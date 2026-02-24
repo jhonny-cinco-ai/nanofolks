@@ -164,7 +164,7 @@ class BotInvoker:
         logger.info(f"Invoking {bot_role} (id: {invocation_id}, async): {task[:50]}...")
 
         # Log the bot invocation request
-        self._log_invocation_request(bot_role, task, context)
+        self._log_invocation_request(invocation_id, bot_role, task, context)
 
         # Launch in background, don't wait
         task_handle = asyncio.create_task(
@@ -217,13 +217,13 @@ class BotInvoker:
             logger.info(f"Async invocation {invocation_id} completed")
 
             # Log the bot's response
-            self._log_invocation_response(bot_role, task, result)
+            self._log_invocation_response(invocation_id, bot_role, task, result)
 
         except Exception as e:
             logger.error(f"Async invocation {invocation_id} failed: {e}")
             result = f"Error: {str(e)}"
             status = "error"
-            self._log_invocation_error(bot_role, task, str(e))
+            self._log_invocation_error(invocation_id, bot_role, task, str(e))
         finally:
             # Cleanup
             self._active_invocations.pop(invocation_id, None)
@@ -475,6 +475,7 @@ Focus only on your domain expertise and provide a helpful response.
 
     def _log_invocation_request(
         self,
+        invocation_id: str,
         bot_role: str,
         task: str,
         context: Optional[str] = None,
@@ -497,9 +498,13 @@ Focus only on your domain expertise and provide a helpful response.
                 category="bot_invocation",
                 message=f"Delegating task to @{bot_role}",
                 details={
+                    "invocation_id": invocation_id,
                     "target_bot": bot_role,
                     "task": task[:500],
                     "context": context[:500] if context else None,
+                    "expected_deliverables": ["response"],
+                    "context_transferred": bool(context),
+                    "requires_approval": False,
                 },
                 triggered_by="leader"
             )
@@ -508,6 +513,7 @@ Focus only on your domain expertise and provide a helpful response.
 
     def _log_invocation_response(
         self,
+        invocation_id: str,
         bot_role: str,
         task: str,
         response: str,
@@ -536,11 +542,28 @@ Focus only on your domain expertise and provide a helpful response.
                 },
                 triggered_by=f"@{bot_role}"
             )
+
+            self.work_log_manager.log(
+                level=LogLevel.HANDOFF,
+                category="bot_invocation_complete",
+                message=f"@{bot_role} handoff completed",
+                details={
+                    "invocation_id": invocation_id,
+                    "target_bot": bot_role,
+                    "task": task[:500],
+                    "actual_deliverables": ["response"],
+                    "completed": True,
+                    "status": "ok",
+                    "response_length": len(response),
+                },
+                triggered_by=f"@{bot_role}"
+            )
         except Exception as e:
             logger.warning(f"Failed to log invocation response: {e}")
 
     def _log_invocation_error(
         self,
+        invocation_id: str,
         bot_role: str,
         task: str,
         error: str,
@@ -560,6 +583,22 @@ Focus only on your domain expertise and provide a helpful response.
                     "error": error,
                 },
                 triggered_by="leader"
+            )
+
+            self.work_log_manager.log(
+                level=LogLevel.HANDOFF,
+                category="bot_invocation_complete",
+                message=f"@{bot_role} handoff failed",
+                details={
+                    "invocation_id": invocation_id,
+                    "target_bot": bot_role,
+                    "task": task[:500],
+                    "actual_deliverables": [],
+                    "completed": True,
+                    "status": "error",
+                    "error": error,
+                },
+                triggered_by=f"@{bot_role}"
             )
         except Exception as e:
             logger.warning(f"Failed to log invocation error: {e}")

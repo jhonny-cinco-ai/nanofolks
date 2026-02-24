@@ -167,13 +167,13 @@ That's it! Your crew is ready to go!
 ## Start Chatting
 
 ```bash
-nanofolks agent -m "Hello!"
+nanofolks chat -m "Hello!"
 ```
 
 Or enter interactive mode:
 
 ```bash
-nanofolks agent
+nanofolks chat
 ```
 
 ---
@@ -355,7 +355,7 @@ Workspace/
 │   └── ...
 ├── role/               # Bot roles (Leader, Coder, Researcher...)
 ├── soul/               # Bot soul files (personality, greeting)
-├── bots/               # Bot agent instructions
+├── bots/               # Bot instructions
 ├── memory/             # Shared knowledge
 ├── skills/            # Crew skills
 └── config.yaml        # Crew configuration
@@ -949,7 +949,7 @@ Nanofolks also respects these env vars:
 |---------|-------------|
 | `nanofolks onboard` | First-time setup |
 | `nanofolks configure` | Interactive configuration |
-| `nanofolks agent -m "msg"` | Send a message |
+| `nanofolks chat -m "msg"` | Send a message |
 | `nanofolks chat` | Interactive chat mode |
 | `nanofolks gateway` | Start multi-channel gateway |
 | `nanofolks metrics` | Show live broker/cron/heartbeat metrics |

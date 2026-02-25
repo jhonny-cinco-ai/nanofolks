@@ -13,6 +13,7 @@ from typing import Any, Optional
 
 from loguru import logger
 
+from nanofolks.agent.stages import RoutingContext, RoutingStage
 from nanofolks.agent.tools.registry import ToolRegistry
 from nanofolks.agent.sidekicks import (
     SidekickLimitError,
@@ -23,9 +24,10 @@ from nanofolks.agent.sidekicks import (
 from nanofolks.agent.work_log import LogLevel
 from nanofolks.bus.events import MessageEnvelope
 from nanofolks.bus.queue import MessageBus
-from nanofolks.config.schema import ExecToolConfig, SidekickConfig
+from nanofolks.config.schema import ExecToolConfig, RoutingConfig, SidekickConfig
 from nanofolks.providers.base import LLMProvider
 from nanofolks.security.sanitizer import SecretSanitizer
+from nanofolks.session.manager import Session
 from nanofolks.utils.ids import room_to_session_id
 
 # Available specialist bots that can be invoked
@@ -84,6 +86,7 @@ class BotInvoker:
         allowed_paths: list[str] | None = None,
         protected_paths: list[str] | None = None,
         sidekick_config: "SidekickConfig | None" = None,
+        routing_config: "RoutingConfig | None" = None,
     ):
         self.provider = provider
         self.workspace = workspace
@@ -98,6 +101,14 @@ class BotInvoker:
         self.protected_paths = protected_paths or []
         self.allowed_paths = allowed_paths or []
         self.sidekick_config = sidekick_config or SidekickConfig()
+        self.routing_config = routing_config
+        self.routing_stage: RoutingStage | None = None
+        if routing_config and routing_config.enabled:
+            self.routing_stage = RoutingStage(
+                config=routing_config,
+                provider=provider,
+                workspace=workspace,
+            )
 
         # Initialize secret sanitizer
         self.sanitizer = SecretSanitizer()
@@ -539,6 +550,7 @@ Focus only on your domain expertise and provide a helpful response.
         room_id: str | None = None,
         max_tokens: int | None = None,
         allow_sidekicks: bool = True,
+        model: str | None = None,
     ) -> str:
         """Call LLM with bot's context and execute tools if needed.
 
@@ -573,7 +585,7 @@ Focus only on your domain expertise and provide a helpful response.
         for iteration in range(max_iterations):
             # Call LLM
             response = await self.provider.chat(
-                model=self.model,
+                model=model or self.model,
                 messages=messages,
                 temperature=self.temperature,
                 max_tokens=max_tokens or self.max_tokens,
@@ -682,6 +694,33 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
 
         return system_prompt
 
+    async def _select_sidekick_model(self, task: SidekickTaskEnvelope) -> str:
+        """Select model for a sidekick task using smart routing when available."""
+        default_model = self.model
+        if not self.routing_stage or not self.routing_config or not self.routing_config.enabled:
+            return default_model
+
+        try:
+            content = self._build_sidekick_context_packet(task)
+            msg = MessageEnvelope(
+                channel="sidekick",
+                chat_id=task.task_id,
+                content=content,
+                room_id=task.room_id,
+            )
+            session = Session(key=room_to_session_id(f"sidekick_{task.task_id}"))
+            routing_ctx = RoutingContext(
+                message=msg,
+                session=session,
+                default_model=default_model,
+                config=self.routing_config,
+            )
+            routing_ctx = await self.routing_stage.execute(routing_ctx)
+            return routing_ctx.model or default_model
+        except Exception as exc:
+            logger.warning(f"[sidekick] Smart routing failed, using default model: {exc}")
+            return default_model
+
     async def run_sidekicks(
         self,
         parent_bot_role: str,
@@ -704,6 +743,7 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
 
             # Use a clean, per-sidekick session id
             session_id = room_to_session_id(f"sidekick_{task.task_id}")
+            model = await self._select_sidekick_model(task)
 
             response = await self._call_bot_llm(
                 parent_bot_role,
@@ -713,6 +753,7 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
                 room_id=room_id,
                 max_tokens=self.sidekick_config.max_tokens,
                 allow_sidekicks=False,
+                model=model,
             )
 
             return SidekickResult(

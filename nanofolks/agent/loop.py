@@ -388,6 +388,7 @@ class AgentLoop:
             allowed_paths=allowed_paths,
             protected_paths=protected_paths,
             sidekick_config=sidekick_config or SidekickConfig(),
+            routing_config=self.routing_config,
         )
 
         # Initialize hybrid flow router for Phase 2 intent detection

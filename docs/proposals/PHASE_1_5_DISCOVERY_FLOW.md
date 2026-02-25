@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-Phase 1.5 introduced a **Discovery Phase** between the current Phase 1 (Multi-Bot Foundation) and Phase 2 (Session Migration). This phase addresses a key UX issue: the current model where Leader privately coordinates and returns summaries feels like "one assistant" rather than a true crew.
+Phase 1.5 introduced a **Discovery Phase** between the current Phase 1 (Multi-Bot Foundation) and Phase 2 (Session Migration). This phase addresses a key UX issue: the current model where Leader privately coordinates and returns summaries feels like "one assistant" rather than a true team.
 
 **Inspiration:** GSD (Get Shit Done) framework's `discuss → plan → execute → verify` cycle
 
@@ -1765,7 +1765,7 @@ nanofolks/
 ## Backward Compatibility
 
 - [ ] Existing single-bot workflows unchanged
-- [ ] Phase 1 features (@all, @crew, affinity) still work
+- [ ] Phase 1 features (@all, __PROT_ATTEAM__, affinity) still work
 - [ ] No breaking changes to existing commands
 - [ ] Config flag not needed (automatic detection)
 
@@ -2045,4 +2045,4 @@ Phase 1.5 adds the **Communal Discovery Flow** inspired by GSD's structured appr
 | TASK | clarify → execute | "Write this email" |
 | BUILD | D→S→A→E→R | "Build me a website" |
 
-This transforms from "one assistant" to "true crew" - users see bots collaborating, asking questions, and reaching understanding before executing.
+This transforms from "one assistant" to "true team" - users see bots collaborating, asking questions, and reaching understanding before executing.

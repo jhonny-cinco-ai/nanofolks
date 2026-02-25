@@ -9,7 +9,7 @@ IDENTITY_TEMPLATES_DIR = Path(__file__).parent / "identity"
 ROLE_TEMPLATES_DIR = Path(__file__).parent / "role"
 
 BOT_NAMES = ["leader", "researcher", "coder", "social", "creative", "auditor"]
-TEAM_NAMES = ["pirate_crew", "rock_band", "swat_team", "feral_clowder", "executive_suite", "space_crew"]
+TEAM_NAMES = ["pirate_team", "rock_band", "swat_team", "feral_clowder", "executive_suite", "space_team"]
 
 
 def get_agents_template(bot_name: str) -> str | None:

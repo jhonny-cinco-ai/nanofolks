@@ -68,7 +68,7 @@ class MultiTeamRoutinesManager:
     - Schedule all bot team routines
     - Coordinate cross-bot checks
     - Monitor overall team health
-    - Aggregate crew routine metrics
+    - Aggregate team routine metrics
     - Handle bot failures and recovery
 
     Example:

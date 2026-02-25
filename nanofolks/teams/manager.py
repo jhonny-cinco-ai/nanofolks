@@ -18,11 +18,11 @@ from nanofolks.teams.profiles import (
 class TeamManager:
     """Manage team selection and application using template-based discovery."""
 
-    def __init__(self, default_team: str = "pirate_crew", workspace_path: Optional[Path] = None):
+    def __init__(self, default_team: str = "pirate_team", workspace_path: Optional[Path] = None):
         """Initialize team manager.
 
         Args:
-            default_team: Default team name (pirate_crew, rock_band, swat_team, feral_clowder, executive_suite, space_crew)
+            default_team: Default team name (pirate_team, rock_band, swat_team, feral_clowder, executive_suite, space_team)
             workspace_path: Optional workspace path for overrides
         """
         self.current_team: Optional[str] = default_team
@@ -60,7 +60,7 @@ class TeamManager:
         """Select a team.
 
         Args:
-            team_name: Team name (pirate_crew, rock_band, etc.)
+            team_name: Team name (pirate_team, rock_band, etc.)
 
         Returns:
             Selected team data or None if not found

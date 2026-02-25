@@ -127,7 +127,7 @@ class RoomTask:
 
 @dataclass
 class Room:
-    """A room for crew collaboration."""
+    """A room for team collaboration."""
 
     id: str  # "general", "project-alpha", "dm-researcher"
     name: str = ""  # Display name (e.g., "General", "Project Website")

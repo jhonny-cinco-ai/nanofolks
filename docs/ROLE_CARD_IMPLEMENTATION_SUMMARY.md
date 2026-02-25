@@ -286,7 +286,7 @@ role_card.format_for_prompt()  # NEW
 
 The new system follows the core principle from the article:
 
-> **"Don't think 'what should it do?' Think 'if it screws up, what's the worst case?' Then write bans targeting those worst cases."**
+> **"Don't think 'what should it do?' Think 'if it steams up, what's the worst case?' Then write bans targeting those worst cases."**
 
 Every hard ban exists because it could prevent a real problem:
 - "No direct posting" → Prevents tweets without approval

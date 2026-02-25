@@ -743,11 +743,11 @@ from enum import Enum
 from typing import Dict, List, Any
 
 class TeamName(Enum):
-    PIRATE_CREW = "pirate_crew"
+    PIRATE_TEAM = "__PROT_pirate_team__"
     ROCK_BAND = "rock_band"
     SWAT_TEAM = "swat_team"
     PROFESSIONAL = "professional"
-    SPACE_CREW = "space_crew"
+    SPACE_TEAM = "__PROT_space_team__"
 
 @dataclass
 class BotTeamProfile:
@@ -778,8 +778,8 @@ class Team:
 **File:** `nanofolks/teams/presets.py`
 
 ```python
-PIRATE_CREW = Team(
-    name=TeamName.PIRATE_CREW,
+PIRATE_TEAM = Team(
+    name=TeamName.PIRATE_TEAM,
     description="Bold adventurers exploring uncharted territories",
     nanofolks=BotTeamProfile(
         title="Captain",
@@ -823,13 +823,13 @@ PROFESSIONAL = Team(
     # ... all bots with professional team profiles
 )
 
-SPACE_CREW = Team(
-    name=TeamName.SPACE_CREW,
+SPACE_TEAM = Team(
+    name=TeamName.SPACE_TEAM,
     description="Exploratory team discovering new frontiers",
     # ... all bots with space exploration team profiles
 )
 
-AVAILABLE_TEAMS = [PIRATE_CREW, ROCK_BAND, SWAT_TEAM, PROFESSIONAL, SPACE_CREW]
+AVAILABLE_TEAMS = [PIRATE_TEAM, ROCK_BAND, SWAT_TEAM, PROFESSIONAL, SPACE_TEAM]
 ```
 
 **File:** `nanofolks/teams/team_manager.py`
@@ -917,11 +917,11 @@ class OnboardingWizard:
     def _select_team(self) -> str:
         """Guide user to choose personality team."""
         teams = [
-            ("🏴‍☠️ Pirate Crew (Bold, adventurous)", "pirate_crew"),
+            ("🏴‍☠️ Pirate Crew (Bold, adventurous)", "__PROT_pirate_team__"),
             ("🎸 Rock Band (Creative, collaborative)", "rock_band"),
             ("🎯 SWAT Team (Tactical, precise)", "swat_team"),
             ("💼 Professional Office (Formal, structured)", "professional"),
-            ("🚀 Space Crew (Exploratory, technical)", "space_crew"),
+            ("🚀 Space Crew (Exploratory, technical)", "__PROT_space_team__"),
         ]
         
         questions = [

@@ -103,7 +103,7 @@ room:
 **Best case scenario** - Discord channels map 1:1 to rooms.
 
 ```
-Discord Server "nanofolks Crew"
+Discord Server "nanofolks Team"
 ├── #general → room:general
 ├── #project-alpha → room:project-alpha  
 ├── #dm-coder → room:dm-coder (private channel)
@@ -420,11 +420,11 @@ rooms:
 
 ## The Communal Experience: Multi-Bot Interactions
 
-### The Vision: True Crew Dynamics
+### The Vision: True Team Dynamics
 
-> **nanofolks isn't an assistant with tools. It's a crew of characters.**
+> **nanofolks isn't an assistant with tools. It's a team of characters.**
 
-Current implementation filters everything through the Leader bot, making it feel like "one assistant with subcontractors." The room-centric architecture unlocks true communal interaction where the whole crew participates as distinct personalities.
+Current implementation filters everything through the Leader bot, making it feel like "one assistant with subcontractors." The room-centric architecture unlocks true communal interaction where the whole team participates as distinct personalities.
 
 ### Current vs Communal Flow
 
@@ -439,7 +439,7 @@ Leader: [Summarizes for everyone]
 User: [Only hears Leader's voice]
 ```
 
-**Communal (True Crew):**
+**Communal (True Team):**
 ```
 User: @all How's everyone doing today?
 
@@ -456,7 +456,7 @@ User: @all How's everyone doing today?
 
 ### Multi-Response Modes
 
-#### **Mode 1: Full Crew (@all)**
+#### **Mode 1: Full Team (@all)**
 **Use Case:** Check-ins, brainstorming, banter, team status
 
 **Behavior:** All bots in the room respond simultaneously with their unique personalities.
@@ -476,14 +476,14 @@ User: @all I need help with the database
 - Maximum 3-4 bots respond unless user explicitly requests everyone
 - `/brief` mode available for shorter responses
 
-#### **Mode 2: Context-Aware (@crew)**
+#### **Mode 2: Context-Aware (__PROT_ATTEAM__)**
 **Use Case:** Tasks, decisions, focused work
 
 **Behavior:** Only bots relevant to the topic respond.
 
 **Example:**
 ```
-User: @crew Should we use React or Vue?
+User: __PROT_ATTEAM__ Should we use React or Vue?
 
 🤖 Coder: "Technically, both work. React has better ecosystem..."
 📊 Researcher: "Our users prefer React based on survey data..."
@@ -492,7 +492,7 @@ User: @crew Should we use React or Vue?
 ```
 
 #### **Mode 3: Bot-to-Bot Discussion (/gather)**
-**Use Case:** Let the crew discuss among themselves
+**Use Case:** Let the team discuss among themselves
 
 **Behavior:** User poses question, bots discuss, user watches the conversation.
 
@@ -507,7 +507,7 @@ User: /gather What's the best approach for user authentication?
 👑 Leader: "Let's go with OAuth2 + TOTP MFA. Coder, can you implement?"
 🤖 Coder: "On it. Will have PR by EOD."
 
-[User observes the crew collaborating, then jumps in]
+[User observes the team collaborating, then jumps in]
 User: Perfect, thanks team!
 ```
 
@@ -519,14 +519,14 @@ nanofolks already has **affinity relationships** defined in each bot's IDENTITY.
 - **Navigator (Sparrow):** "My trusted first mate. We see eye-to-eye on most voyages."
 - **Gunner (Cannonball):** "Reliable and eager for action. Sometimes too eager."
 - **Artist (Seawolf):** "Creative soul. Sometimes too dreamy, but brings vision."
-- **Quartermaster (One-Eye):** "Keeps us honest. The conscience of the crew."
+- **Quartermaster (One-Eye):** "Keeps us honest. The conscience of the team."
 
 #### **From Space Crew - Safety Officer's Relationships:**
-- **Science Officer (Nova):** "I help ensure her experiments don't jeopardize the crew."
+- **Science Officer (Nova):** "I help ensure her experiments don't jeopardize the team."
 - **Engineer (Tech):** "We collaborate on systems that are both capable and safe."
 - **Visionary (Star):** "I help ground her visions in what's actually safe."
 
-### Crew Dynamics Implementation
+### Team Dynamics Implementation
 
 #### **1. Cross-Referencing (Bots Reference Each Other)**
 
@@ -580,7 +580,7 @@ Bots can mention and respond to each other's points:
 
 #### **3. Team-Specific Dynamics**
 
-Each team (Pirate, Space, Rock Band, etc.) has unique crew chemistry:
+Each team (Pirate, Space, Rock Band, etc.) has unique team chemistry:
 
 **Pirate Crew (Camaraderie + Sass):**
 ```
@@ -616,18 +616,18 @@ User: @all Budget review?
 
 #### **Room as Stage, Bots as Characters**
 
-Each room is like a stage where the crew performs:
+Each room is like a stage where the team performs:
 
 **General Room (Daily Banter):**
 ```
-User: @all Good morning crew!
+User: @all Good morning team!
 
-[Full crew responds with morning greetings, inside jokes, today's mood]
+[Full team responds with morning greetings, inside jokes, today's mood]
 ```
 
 **Project Room (Focused Work):**
 ```
-User: @crew The client wants changes to the homepage
+User: __PROT_ATTEAM__ The client wants changes to the homepage
 
 [Only relevant bots respond: Creative, Coder, maybe Researcher for UX data]
 ```
@@ -666,7 +666,7 @@ class DispatchMode(Enum):
     DIRECT_BOT = "direct_bot"          # Single bot
     DM = "dm"                          # Direct message
     MULTI_BOT = "multi_bot"            # NEW: Multiple bots respond
-    CREW_DISCUSSION = "crew_discuss"   # NEW: Bots discuss among themselves
+    TEAM_DISCUSSION = "team_discuss"   # NEW: Bots discuss among themselves
 
 @dataclass
 class CommunalResult:
@@ -680,7 +680,7 @@ class CommunalResult:
 #### **Response Generation Pipeline**
 
 ```python
-async def generate_crew_responses(
+async def generate_team_responses(
     user_message: str,
     room: Room,
     mode: DispatchMode
@@ -722,7 +722,7 @@ def build_communal_context(bot_name, other_bots, room, user_message):
     context = f"""
     You are {bot_name} in a group conversation.
     Room: {room.display_name}
-    Other crew members present: {', '.join(other_bots)}
+    Other team members present: {', '.join(other_bots)}
     
     Your relationships (from IDENTITY.md):
     {get_bot_relationships(bot_name, other_bots)}
@@ -744,11 +744,11 @@ def build_communal_context(bot_name, other_bots, room, user_message):
 ### Commands for Communal Mode
 
 ```bash
-# Full crew response
+# Full team response
 @all How's everyone doing?
 
 # Context-aware (relevant bots only)
-@crew Help me with the database
+__PROT_ATTEAM__ Help me with the database
 
 # Watch bots discuss
 /gather Should we use React or Vue?
@@ -771,48 +771,48 @@ def build_communal_context(bot_name, other_bots, room, user_message):
 |------|----------------|-------------|----------|
 | **@all /brief** | 3-4 | ~2K | Quick check-ins |
 | **@all full** | 5-6 | ~5K | Brainstorming sessions |
-| **@crew** | 2-3 | ~2K | Focused tasks |
+| **__PROT_ATTEAM__** | 2-3 | ~2K | Focused tasks |
 | **/gather** | 3-5 | ~8K | Deep discussions |
 
 **Offset by Smart Routing Savings:**
 - Smart Routing saves 45-96% on token costs
 - Savings fund multi-bot interactions
-- User can set `crew_mode: brief/normal/verbose` per room
+- User can set `team_mode: brief/normal/verbose` per room
 
 ### Benefits of Communal Architecture
 
 | Benefit | Description |
 |---------|-------------|
-| **True Crew Feel** | Multiple distinct voices, not one assistant |
+| **True Team Feel** | Multiple distinct voices, not one assistant |
 | **Personality Shine** | Each bot's character is visible and distinct |
 | **Relationship Dynamics** | Bots interact based on affinity (agree, disagree, joke) |
-| **Transparency** | See how crew collaborates on tasks |
+| **Transparency** | See how team collaborates on tasks |
 | **Engagement** | More entertaining and immersive experience |
 | **Expertise Visibility** | Learn what each bot is good at naturally |
-| **Team Immersion** | Pirate crew feels like pirates, not just labels |
+| **Team Immersion** | Pirate team feels like pirates, not just labels |
 
 ### Integration with Room-Centric Design
 
 **The Perfect Marriage:**
 
-1. **Room = Persistent Stage**: Crew has ongoing history and relationships
-2. **Cross-Channel = Consistent Cast**: Same crew in Telegram, Slack, Discord
+1. **Room = Persistent Stage**: Team has ongoing history and relationships
+2. **Cross-Channel = Consistent Cast**: Same team in Telegram, Slack, Discord
 3. **Communal = Distinct Voices**: Each bot maintains personality across platforms
-4. **Transparency = User Trust**: Watch the crew work together in real-time
+4. **Transparency = User Trust**: Watch the team work together in real-time
 
 **Example:**
 ```
 User on Discord: @all How's the project going?
-[See full crew response]
+[See full team response]
 
-User on Telegram (same room): @crew I need the mockups
+User on Telegram (same room): __PROT_ATTEAM__ I need the mockups
 [Creative responds, references previous Discord discussion]
 
 User on CLI (same room): /peek dm-creative-coder
 [Watch Creative and Coder discussing implementation details]
 ```
 
-The crew is always there, always consistent, always collaborative - regardless of which channel the user chooses.
+The team is always there, always consistent, always collaborative - regardless of which channel the user chooses.
 
 ## Implementation Phases
 

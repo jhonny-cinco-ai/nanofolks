@@ -812,7 +812,7 @@ def session_reset():
 if __name__ == "__main__":
     app = typer.Typer(
         name="nanofolks",
-        help=f"{__logo__} nanofolks - Your friendly AI crew",
+        help=f"{__logo__} nanofolks - Your friendly AI team",
         no_args_is_help=True,
         include_apps=[memory_app, session_app],
     )

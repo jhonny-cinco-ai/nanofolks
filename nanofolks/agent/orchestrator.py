@@ -30,7 +30,7 @@ class OrchestratorPipeline:
         """
         self._apply_tags(msg)
 
-        # Dispatch: multi-bot triggers (explicit mentions, @all/@crew)
+        # Dispatch: multi-bot triggers (explicit mentions, @all/@team)
         dispatch_result = self.agent._check_multi_bot_dispatch(msg.content, session)
         if dispatch_result and dispatch_result.get("is_multi_bot"):
             msg.metadata.setdefault("dispatch", {})

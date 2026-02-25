@@ -3,10 +3,10 @@
 Routes messages through the Leader bot first, unless user directly
 tags/mentions a specific bot or sends a DM.
 
-The Leader acts as the nexus between user and crew, with powers to:
+The Leader acts as the nexus between user and team, with powers to:
 - Create rooms
 - Invite bots to rooms
-- Coordinate responses from crew members
+- Coordinate responses from team members
 """
 
 import re
@@ -23,7 +23,7 @@ class DispatchTarget(Enum):
     DIRECT_BOT = "direct_bot"          # User tagged a specific bot
     DM = "dm"                          # Direct message to specific bot
     MULTI_BOT = "multi_bot"            # All specified bots respond (@all)
-    CREW_CONTEXT = "crew_context"      # Relevant bots respond (@crew)
+    TEAM_CONTEXT = "team_context"      # Relevant bots respond (@team)
 
 
 @dataclass
@@ -43,7 +43,7 @@ class BotDispatch:
     1. Default: Message goes to Leader first
     2. Exception: User tags @bot → Direct to that bot
     3. Exception: DM to bot → Direct to that bot
-    4. Exception: @all or @crew → All participants
+    4. Exception: @all or @team → All participants
     """
 
     # Bot mention patterns
@@ -56,11 +56,10 @@ class BotDispatch:
         "@creative": "creative",
         "@auditor": "auditor",
         "@all": "all",
-        "@crew": "crew",
-        "@team": "all",
+        "@team": "team",
     }
 
-    # Keywords that trigger specific bots for @crew mode
+    # Keywords that trigger specific bots for @team mode
     BOT_KEYWORDS = {
         "coder": ["code", "programming", "bug", "fix", "python", "javascript", "api", "database", "sql", "develop", "function", "class", "module"],
         "researcher": ["research", "data", "analyze", "market", "competitor", "trend", "survey", "study", "investigate", "report"],
@@ -121,16 +120,16 @@ class BotDispatch:
                     room_id=room.id if room else None,
                     reason="User tagged @all - all bots respond"
                 )
-            elif "crew" in mentioned:
-                # @crew - relevant bots based on keywords
+            elif "team" in mentioned:
+                # @team - relevant bots based on keywords
                 participants = room.participants if room else ["leader", "coder", "researcher", "creative", "social", "auditor"]
                 relevant_bots = self._select_relevant_bots(message, participants)
                 return DispatchResult(
-                    target=DispatchTarget.CREW_CONTEXT,
+                    target=DispatchTarget.TEAM_CONTEXT,
                     primary_bot="leader",
                     secondary_bots=relevant_bots,
                     room_id=room.id if room else None,
-                    reason="User tagged @crew - relevant bots respond"
+                    reason="User tagged @team - relevant bots respond"
                 )
             elif len(mentioned) == 1:
                 # Single bot mentioned
@@ -176,19 +175,19 @@ class BotDispatch:
         mentions = []
 
         # Check for @all variations first (highest priority)
-        all_patterns = ["@all", "@team", "@everyone"]
+        all_patterns = ["@all", "@everyone"]
         for pattern in all_patterns:
             if pattern in message_lower:
                 mentions.append("all")
                 break
 
-        # Check for @crew
-        if "@crew" in message_lower:
-            mentions.append("crew")
+        # Check for @team
+        if "@team" in message_lower:
+            mentions.append("team")
 
-        # Check for specific bot mentions (excluding @all/@crew)
+        # Check for specific bot mentions (excluding @all/@team)
         for mention, bot_name in self.BOT_MENTIONS.items():
-            if bot_name not in ["all", "crew"] and mention.lower() in message_lower:
+            if bot_name not in ["all", "team"] and mention.lower() in message_lower:
                 if bot_name not in mentions:
                     mentions.append(bot_name)
 

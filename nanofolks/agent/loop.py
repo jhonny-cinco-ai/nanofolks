@@ -83,8 +83,15 @@ class AgentLoop:
         sidekick_config: "SidekickConfig | None" = None,
         web_config: "WebToolsConfig | None" = None,
         browser_config: "BrowserToolsConfig | None" = None,
+        document_config: "DocumentToolsConfig | None" = None,
     ):
-        from nanofolks.config.schema import BrowserToolsConfig, ExecToolConfig, SidekickConfig, WebToolsConfig
+        from nanofolks.config.schema import (
+            BrowserToolsConfig,
+            DocumentToolsConfig,
+            ExecToolConfig,
+            SidekickConfig,
+            WebToolsConfig,
+        )
         self.bus = bus
         self.provider = provider
         self.workspace = workspace
@@ -111,6 +118,7 @@ class AgentLoop:
         self.exec_config = exec_config or ExecToolConfig()
         self.web_config = web_config or WebToolsConfig()
         self.browser_config = browser_config or BrowserToolsConfig()
+        self.document_config = document_config or DocumentToolsConfig()
         self.cron_service = cron_service
         self.system_timezone = system_timezone
         self.restrict_to_workspace = restrict_to_workspace
@@ -125,6 +133,7 @@ class AgentLoop:
         self._mcp_lock = asyncio.Lock()
         self._mcp_connected_bots: set[str] = set()
         self._mcp_connected_servers: set[str] = set()
+        self._document_processor = None
 
         # Initialize secret sanitizer for security
         self.sanitizer = SecretSanitizer()
@@ -132,57 +141,6 @@ class AgentLoop:
         # Stream callback for real-time progress
         self._stream_callback: callable | None = None
     
-    def _strip_think(self, text: str | None) -> str | None:
-        """Strip thinking blocks from model content.
-        
-        Removes blocks like:
-        - [:]Yes, I think...[/]
-        - [:]Let me analyze...[/]
-        
-        Args:
-            text: The model response content
-            
-        Returns:
-            Content with thinking blocks removed, or None
-        """
-        if not text:
-            return None
-        import re
-        return re.sub(r"\[:\s*Yes,.*?\]", "", text, flags=re.DOTALL).strip() or None
-    
-    def _tool_hint(self, tool_calls: list) -> str:
-        """Format tool calls as concise hint.
-        
-        Example: 'web_search("query")' or 'read_file("src/main.py")'
-        
-        Args:
-            tool_calls: List of tool call objects
-            
-        Returns:
-            Formatted tool hint string
-        """
-        def _fmt(tc):
-            if getattr(tc, "name", None) == "sidekick":
-                args = tc.arguments if isinstance(getattr(tc, "arguments", None), dict) else None
-                tasks = args.get("tasks") if args else None
-                count = len(tasks) if isinstance(tasks, list) else 0
-                if count:
-                    return f"🤝 sidekicks x{count}"
-                return "🤝 sidekicks"
-            val = None
-            if tc.arguments:
-                # Get first argument value
-                for v in tc.arguments.values():
-                    val = v
-                    break
-            if not isinstance(val, str):
-                return tc.name
-            if len(val) > 40:
-                return f'{tc.name}("{val[:40]}…")'
-            return f'{tc.name}("{val}")'
-        
-        return ", ".join(_fmt(tc) for tc in tool_calls)
-
         self.context = ContextBuilder(workspace)
 
         # Initialize session manager (dual-mode with room-centric support)
@@ -407,6 +365,91 @@ class AgentLoop:
         # Ensure team styling is applied to leader SOUL on first agent start
         self._apply_team_if_needed()
 
+    def _strip_think(self, text: str | None) -> str | None:
+        """Strip thinking blocks from model content.
+        
+        Removes blocks like:
+        - [:]Yes, I think...[/]
+        - [:]Let me analyze...[/]
+        
+        Args:
+            text: The model response content
+            
+        Returns:
+            Content with thinking blocks removed, or None
+        """
+        if not text:
+            return None
+        import re
+        return re.sub(r"\[:\s*Yes,.*?\]", "", text, flags=re.DOTALL).strip() or None
+
+    def _tool_hint(self, tool_calls: list) -> str:
+        """Format tool calls as concise hint.
+        
+        Example: 'web_search("query")' or 'read_file("src/main.py")'
+        
+        Args:
+            tool_calls: List of tool call objects
+            
+        Returns:
+            Formatted tool hint string
+        """
+        def _fmt(tc):
+            if getattr(tc, "name", None) == "sidekick":
+                args = tc.arguments if isinstance(getattr(tc, "arguments", None), dict) else None
+                tasks = args.get("tasks") if args else None
+                count = len(tasks) if isinstance(tasks, list) else 0
+                if count:
+                    return f"🤝 sidekicks x{count}"
+                return "🤝 sidekicks"
+            val = None
+            if tc.arguments:
+                # Get first argument value
+                for v in tc.arguments.values():
+                    val = v
+                    break
+            if not isinstance(val, str):
+                return tc.name
+            if len(val) > 40:
+                return f'{tc.name}("{val[:40]}…")'
+            return f'{tc.name}("{val}")'
+        
+        return ", ".join(_fmt(tc) for tc in tool_calls)
+
+    def _process_document_media(self, msg: MessageEnvelope, session: Session) -> None:
+        """Auto-parse PDF attachments and store digests in session metadata."""
+        if not self.document_config.auto_parse_pdf:
+            return
+        if not msg.media:
+            return
+
+        room_id = msg.room_id or self._current_room_id
+        if not room_id:
+            return
+
+        try:
+            from nanofolks.config.loader import get_data_dir
+            from nanofolks.documents.processor import DocumentProcessor
+
+            if self._document_processor is None:
+                self._document_processor = DocumentProcessor(get_data_dir(), self.document_config)
+
+            self._document_processor.process_pdfs(
+                msg.media,
+                room_id=room_id,
+                session_metadata=session.metadata,
+            )
+        except Exception as e:
+            logger.warning(f"Document processing skipped: {e}")
+
+    def _get_document_digests(self, session: Session) -> list[dict[str, Any]]:
+        """Return recent document digests for prompt injection."""
+        docs = session.metadata.get("documents", []) or []
+        if not docs:
+            return []
+        max_items = max(1, int(self.document_config.max_digests_in_prompt))
+        return docs[-max_items:]
+
     def _init_chat_onboarding(self) -> None:
         """Initialize chat onboarding system."""
         self._chat_onboarding: "ChatOnboarding | None" = None
@@ -508,7 +551,7 @@ class AgentLoop:
                 "researcher": "researcher", "navigator": "researcher",
                 "coder": "coder", "builder": "coder", "quartermaster": "coder",
                 "creative": "creative", "artist": "creative", "carpenter": "creative",
-                "social": "social", "crewman": "social", "boatswain": "social",
+                "social": "social", "teamman": "social", "boatswain": "social",
                 "auditor": "auditor", "logkeeper": "auditor", "scop": "auditor",
             }
             actual_bot = bot_map.get(bot_name, bot_name)
@@ -584,7 +627,7 @@ class AgentLoop:
                     "researcher": "researcher", "navigator": "researcher",
                     "coder": "coder", "builder": "coder", "quartermaster": "coder",
                     "creative": "creative", "artist": "creative", "carpenter": "creative",
-                    "social": "social", "crewman": "social", "boatswain": "social",
+                    "social": "social", "teamman": "social", "boatswain": "social",
                     "auditor": "auditor", "logkeeper": "auditor", "scop": "auditor",
                 }
                 actual_bot = bot_map.get(bot_name, bot_name)
@@ -634,8 +677,8 @@ class AgentLoop:
         dispatch = BotDispatch(room_manager=room_mgr)
         result = dispatch.dispatch_message(message, room=current_room, is_dm=False)
 
-        # Only handle MULTI_BOT and CREW_CONTEXT modes
-        if result.target in [DispatchTarget.MULTI_BOT, DispatchTarget.CREW_CONTEXT]:
+        # Only handle MULTI_BOT and TEAM_CONTEXT modes
+        if result.target in [DispatchTarget.MULTI_BOT, DispatchTarget.TEAM_CONTEXT]:
             # Get all bots to respond (primary + secondary)
             all_bots = [result.primary_bot] + result.secondary_bots
             # Remove duplicates while preserving order
@@ -799,7 +842,7 @@ class AgentLoop:
             # Check if team styling has been applied already (use leader as indicator)
             soul_file = self.workspace / "bots" / "leader" / "SOUL.md"
             if soul_file.exists():
-                # Team already applied to crew
+                # Team already applied to team
                 logger.debug("Team SOUL files already initialized")
                 return
 
@@ -813,19 +856,19 @@ class AgentLoop:
                 return
 
             # Define the complete team (all available bots)
-            crew = ["leader", "researcher", "coder", "social", "creative", "auditor"]
+            team = ["leader", "researcher", "coder", "social", "creative", "auditor"]
 
-            # Apply the team to all crew members
+            # Apply the team to all team members
             soul_manager = SoulManager(self.workspace)
-            results = soul_manager.apply_team_to_crew(
+            results = soul_manager.apply_team_to_team(
                 team_name,
-                crew,
+                team,
                 force=False
             )
 
             # Log results
             successful = sum(1 for v in results.values() if v)
-            logger.info(f"Initialized SOUL files for {successful}/{len(crew)} team members")
+            logger.info(f"Initialized SOUL files for {successful}/{len(team)} team members")
 
             # Show which bots are ready
             for bot_name, success in results.items():
@@ -1565,6 +1608,10 @@ class AgentLoop:
                 logger.error(f"Session compaction failed: {e}")
                 # Continue without compaction - don't block message processing
 
+        # Auto-parse document attachments (PDF) into digests
+        self._process_document_media(msg, session)
+        document_digests = self._get_document_digests(session)
+
         # Build initial messages (use get_history for LLM-formatted messages)
         messages = self.context.build_messages(
             history=session.get_history(),
@@ -1573,6 +1620,7 @@ class AgentLoop:
             channel=msg.channel,
             chat_id=msg.chat_id,
             memory_context=memory_context if memory_context else None,
+            document_digests=document_digests,
             bot_name=self.bot_name,
             room_id=self._current_room_id,
             room_type=self._current_room_type,
@@ -1902,6 +1950,10 @@ class AgentLoop:
         if isinstance(routines_tool, RoutinesTool):
             routines_tool.set_context(origin_channel, origin_chat_id)
 
+        # Auto-parse document attachments (PDF) into digests
+        self._process_document_media(msg, session)
+        document_digests = self._get_document_digests(session)
+
         # Build messages with the announce content
         messages = self.context.build_messages(
             history=session.get_history(),
@@ -1910,6 +1962,7 @@ class AgentLoop:
             chat_id=origin_chat_id,
             bot_name=self.bot_name,
             connected_mcp_servers=self._mcp_connected_servers,
+            document_digests=document_digests,
         )
 
         # Select model using smart routing

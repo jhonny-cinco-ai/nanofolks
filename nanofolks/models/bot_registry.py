@@ -89,14 +89,14 @@ class BotRegistry:
         agents_file = self.bots_dir / f"{bot_name}_AGENTS.md"
         return agents_file.exists()
 
-    def get_soul_content(self, bot_name: str, team_name: str = "pirate_crew") -> Optional[str]:
+    def get_soul_content(self, bot_name: str, team_name: str = "pirate_team") -> Optional[str]:
         """Get SOUL.md content for a bot and team."""
         soul_file = self.soul_dir / team_name / f"{bot_name}_SOUL.md"
         if soul_file.exists():
             return soul_file.read_text(encoding="utf-8")
         return None
 
-    def get_identity_content(self, bot_name: str, team_name: str = "pirate_crew") -> Optional[str]:
+    def get_identity_content(self, bot_name: str, team_name: str = "pirate_team") -> Optional[str]:
         """Get IDENTITY.md content for a bot and team."""
         identity_file = self.identity_dir / team_name / f"{bot_name}_IDENTITY.md"
         if identity_file.exists():

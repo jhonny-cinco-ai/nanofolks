@@ -42,7 +42,7 @@ console = Console()
 ACCENT_COLOR = "bright_magenta"
 
 # Main CLI app
-app = typer.Typer(name="nanofolks", help="🐱 nanofolks - Your friendly AI crew")
+app = typer.Typer(name="nanofolks", help="🐱 nanofolks - Your friendly AI team")
 
 # Import memory commands
 try:
@@ -609,7 +609,7 @@ def onboard(
     This wizard will guide you through:
     1. AI Provider & API key configuration
     2. Model selection
-    3. Team selection with full crew preview
+    3. Team selection with full team preview
     4. Workspace creation with all bots ready
     """
     from nanofolks.cli.onboarding import OnboardingWizard
@@ -865,6 +865,7 @@ def gateway(
         sidekick_config=config.agents.sidekicks,
         web_config=config.tools.web,
         browser_config=config.tools.browser,
+        document_config=config.tools.documents,
     )
 
     # Wire per-room FIFO broker (Phase 1: single AgentLoop, per-room queues)
@@ -1543,6 +1544,7 @@ def chat(
         sidekick_config=config.agents.sidekicks,
         web_config=config.tools.web,
         browser_config=config.tools.browser,
+        document_config=config.tools.documents,
     )
 
     async def _send_cli(_msg: MessageEnvelope) -> None:
@@ -2870,6 +2872,7 @@ def routines_run(
         sidekick_config=config.agents.sidekicks,
         web_config=config.tools.web,
         browser_config=config.tools.browser,
+        document_config=config.tools.documents,
     )
 
     store_path = get_data_dir() / "routines" / "jobs.json"
@@ -3546,12 +3549,12 @@ app.add_typer(skills_app, name="skills")
 # Team Commands
 # ============================================================================
 
-team_app = typer.Typer(help="Manage crew teams and bot personalities")
+team_app = typer.Typer(help="Manage team teams and bot personalities")
 
 
 @team_app.command("list")
 def team_list():
-    """List available crew teams."""
+    """List available team teams."""
     from nanofolks.templates import list_teams
 
     teams = list_teams()
@@ -3560,7 +3563,7 @@ def team_list():
         console.print("[yellow]No teams available.[/yellow]")
         return
 
-    table = Table(title="Available Crew Teams")
+    table = Table(title="Available Team Teams")
     table.add_column("Team", style="cyan")
     table.add_column("Description")
     table.add_column("Emoji", justify="center")
@@ -3573,14 +3576,14 @@ def team_list():
         )
 
     console.print(table)
-    console.print("\n[dim]Use 'nanofolks team set <team_name>' to change your crew's team[/dim]")
+    console.print("\n[dim]Use 'nanofolks team set <team_name>' to change your team's team[/dim]")
 
 
 @team_app.command("set")
 def team_set(
-    team_name: str = typer.Argument(..., help="Team name (pirate_crew, rock_band, swat_team, feral_clowder, executive_suite, space_crew)"),
+    team_name: str = typer.Argument(..., help="Team name (pirate_team, rock_band, swat_team, feral_clowder, executive_suite, space_team)"),
 ):
-    """Set the crew team."""
+    """Set the team team."""
     import json
 
     from nanofolks.templates import get_team
@@ -3614,7 +3617,7 @@ def team_set(
     console.print(f"[dim]{team.get('description', '')}[/dim]\n")
 
     # Show bot personalities in this team
-    table = Table(title="Your Crew")
+    table = Table(title="Your Team")
     table.add_column("Role", style="cyan")
     table.add_column("Name")
     table.add_column("Title")
@@ -3643,7 +3646,7 @@ def team_set(
             )
 
     console.print(table)
-    console.print("\n[dim]Restart nanofolks to apply the new team to your crew.[/dim]")
+    console.print("\n[dim]Restart nanofolks to apply the new team to your team.[/dim]")
 
 
 @team_app.command("show")
@@ -3659,9 +3662,9 @@ def team_show():
 
     if team_config_file.exists():
         team_config = json.loads(team_config_file.read_text())
-        current_team_name = team_config.get("current_team", "pirate_crew")
+        current_team_name = team_config.get("current_team", "pirate_team")
     else:
-        current_team_name = "pirate_crew"
+        current_team_name = "pirate_team"
 
     # Get team
     team_manager = TeamManager(current_team_name)
@@ -3678,7 +3681,7 @@ def team_show():
     console.print(f"\n{leader_emoji} [bold]{display_name}[/bold]")
     console.print(f"[dim]{team.get('description', '') if team else ''}[/dim]\n")
 
-    table = Table(title="Current Crew")
+    table = Table(title="Current Team")
     table.add_column("Role", style="cyan")
     table.add_column("Name")
     table.add_column("Title")
@@ -3714,12 +3717,12 @@ app.add_typer(team_app, name="team")
 # Bot Management Commands
 # ============================================================================
 
-bot_app = typer.Typer(help="Manage your AI crew members")
+bot_app = typer.Typer(help="Manage your AI team members")
 
 
 @bot_app.command("list")
 def bot_list():
-    """List all crew members."""
+    """List all team members."""
     import json
 
     # Load custom names
@@ -3733,7 +3736,7 @@ def bot_list():
     registry = get_bot_registry()
     bot_names = registry.get_bot_names()
 
-    table = Table(title="Your AI Crew")
+    table = Table(title="Your AI Team")
     table.add_column("Bot", style="cyan")
     table.add_column("Display Name")
     table.add_column("Domain")
@@ -3764,7 +3767,7 @@ def bot_rename(
     bot_name: str = typer.Argument(..., help="Bot to rename (leader, researcher, coder, social, creative, auditor)"),
     new_name: str = typer.Argument(..., help="New display name"),
 ):
-    """Rename a crew member."""
+    """Rename a team member."""
     import json
 
     # Validate bot name
@@ -3798,7 +3801,7 @@ def bot_rename(
 def bot_reset(
     bot_name: str = typer.Argument(..., help="Bot to reset (or 'all' for all bots)"),
 ):
-    """Reset a crew member's name to default."""
+    """Reset a team member's name to default."""
     import json
 
     config_dir = get_data_dir()
@@ -3815,7 +3818,7 @@ def bot_reset(
         count = len(custom_names)
         custom_names = {}
         bot_names_file.write_text(json.dumps(custom_names, indent=2))
-        console.print(f"\n🔄 [green]✓ Reset {count} crew members to default names[/green]")
+        console.print(f"\n🔄 [green]✓ Reset {count} team members to default names[/green]")
     else:
         # Reset specific bot
         if bot_name.lower() in custom_names:

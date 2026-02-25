@@ -28,7 +28,7 @@ This document outlines the original two-phase implementation strategy. For the c
 │  PHASE 1 (Weeks 1-3): Hybrid Foundation                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
 │  │ DM Rooms     │  │ Multi-Bot    │  │ Affinity     │               │
-│  │ /peek        │  │ @all/@crew   │  │ Relations    │               │
+│  │ /peek        │  │ @all/__PROT_ATTEAM__   │  │ Relations    │               │
 │  └──────────────┘  └──────────────┘  └──────────────┘               │
 │                                                                     │
 │  • Keep channel:chat_id sessions                                    │
@@ -403,12 +403,12 @@ def ensure_dm_rooms_exist(self):
 ### Week 2: Multi-Bot Response Modes ✅ COMPLETE
 
 #### Objective
-Enable simultaneous responses from multiple bots for `@all` and `@crew` mentions, creating the communal experience.
+Enable simultaneous responses from multiple bots for `@all` and `__PROT_ATTEAM__` mentions, creating the communal experience.
 
 #### Implementation Details
 
 **Status:** Implementation complete in:
-- `nanofolks/bots/dispatch.py` - Enhanced with MULTI_BOT and CREW_CONTEXT modes
+- `nanofolks/bots/dispatch.py` - Enhanced with MULTI_BOT and TEAM_CONTEXT modes
 - `nanofolks/agent/multi_bot_generator.py` - New parallel response generator
 - `nanofolks/agent/loop.py` - Multi-bot handling integrated
 
@@ -426,8 +426,8 @@ class DispatchMode(Enum):
     DIRECT_BOT = "direct_bot"          # Current: Single bot response
     DM = "dm"                          # Current: Direct message
     MULTI_BOT = "multi_bot"            # NEW: All bots respond (@all)
-    CREW_CONTEXT = "crew_context"      # NEW: Relevant bots respond (@crew)
-    CREW_DISCUSSION = "crew_discuss"   # NEW: Bots discuss among themselves
+    TEAM_CONTEXT = "team_context"      # NEW: Relevant bots respond (__PROT_ATTEAM__)
+    TEAM_DISCUSSION = "team_discuss"   # NEW: Bots discuss among themselves
 
 @dataclass
 class DispatchResult:
@@ -453,15 +453,15 @@ class BotDispatch:
                 reason="User tagged @all - all bots respond"
             )
         
-        # Check for @crew mention
-        if "@crew" in message.lower():
+        # Check for __PROT_ATTEAM__ mention
+        if "__PROT_ATTEAM__" in message.lower():
             relevant_bots = self._select_relevant_bots(message, room.participants)
             return DispatchResult(
-                mode=DispatchMode.CREW_CONTEXT,
+                mode=DispatchMode.TEAM_CONTEXT,
                 primary_bot="leader",
                 secondary_bots=relevant_bots,
                 context_aware=True,
-                reason="User tagged @crew - relevant bots respond"
+                reason="User tagged __PROT_ATTEAM__ - relevant bots respond"
             )
         
         # Check for specific bot mentions
@@ -695,7 +695,7 @@ async def _process_message(self, msg: MessageEnvelope) -> MessageEnvelope | None
     # Get dispatch result
     dispatch_result = self.dispatcher.dispatch(msg.content, room)
     
-    if dispatch_result.mode in [DispatchMode.MULTI_BOT, DispatchMode.CREW_CONTEXT]:
+    if dispatch_result.mode in [DispatchMode.MULTI_BOT, DispatchMode.TEAM_CONTEXT]:
         # Handle multi-bot response
         return await self._handle_multi_bot_response(
             msg, dispatch_result, room, session
@@ -826,7 +826,7 @@ def _get_bot_color(self, bot_name: str) -> str:
 
 #### Testing Checklist
 - [x] `@all` triggers responses from all room participants
-- [x] `@crew` selects relevant bots based on keywords
+- [x] `__PROT_ATTEAM__` selects relevant bots based on keywords
 - [x] Bot mentions work (single and multiple)
 - [x] Responses generated in parallel
 - [x] Each bot responds with unique personality
@@ -1208,7 +1208,7 @@ class CrossReferenceInjector:
 
 2. **Multi-Bot Response Modes** ✅ COMPLETE
    - ✅ `@all` - All bots respond
-   - ✅ `@crew` - Relevant bots respond (keyword-based selection)
+   - ✅ `__PROT_ATTEAM__` - Relevant bots respond (keyword-based selection)
    - ✅ Parallel response generation with `MultiBotResponseGenerator`
    - ✅ Formatted output with bot emojis
    - ✅ Integrated into agent loop

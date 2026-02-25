@@ -132,7 +132,7 @@ def get_bot_metadata(bot_name: str, team_name: str) -> Optional[BotMetadata]:
     
     Args:
         bot_name: Bot role name (leader, researcher, coder, social, creative, auditor)
-        team_name: Team name (pirate_crew, executive_suite, etc.)
+        team_name: Team name (pirate_team, executive_suite, etc.)
         
     Returns:
         BotMetadata object or None if templates not found

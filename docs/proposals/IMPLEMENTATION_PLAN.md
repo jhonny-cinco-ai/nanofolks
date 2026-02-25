@@ -31,7 +31,7 @@ Phase 1 established the foundational multi-bot infrastructure, enabling bots to 
 
 ### 1.2 Multi-Bot Response Modes ✅
 - `@all` - All bots respond simultaneously
-- `@crew` - Relevant bots respond (keyword-based selection)
+- `__PROT_ATTEAM__` - Relevant bots respond (keyword-based selection)
 - **Parallel response generation** via `MultiBotResponseGenerator`
 - **Formatted output** with bot emojis
 - **Integrated** into agent loop
@@ -126,7 +126,7 @@ Route user messages to the appropriate interaction model based on detected inten
 ### Priority Order
 
 ```
-1. Explicit @mentions (@all, @crew, @bot) → Always win
+1. Explicit @mentions (@all, __PROT_ATTEAM__, @bot) → Always win
 2. No mention + CHAT → Simultaneous (all bots in room respond)
 3. No mention + ADVICE/RESEARCH → Quick flow (1-2 questions → answer)
 4. No mention + BUILD/TASK/EXPLORE → Leader-first (Leader decides approach)

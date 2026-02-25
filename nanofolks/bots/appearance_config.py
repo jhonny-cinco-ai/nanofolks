@@ -1,7 +1,7 @@
 """Configuration utilities for bot teams and custom names.
 
 Provides functions to load and apply user preferences for:
-- Crew teams (pirate, rock band, etc.)
+- Team teams (pirate, rock band, etc.)
 - Custom bot display names
 """
 
@@ -34,15 +34,15 @@ class BotAppearanceConfig:
         if self.team_file.exists():
             try:
                 team_config = json.loads(self.team_file.read_text())
-                current_team = team_config.get("current_team", "pirate_crew")
+                current_team = team_config.get("current_team", "pirate_team")
                 self._team_manager = TeamManager(current_team)
                 logger.debug(f"Loaded team: {current_team}")
             except Exception as e:
                 logger.warning(f"Failed to load team config: {e}")
-                self._team_manager = TeamManager("pirate_crew")
+                self._team_manager = TeamManager("pirate_team")
         else:
-            # Default to pirate crew
-            self._team_manager = TeamManager("pirate_crew")
+            # Default to pirate team
+            self._team_manager = TeamManager("pirate_team")
 
         # Load custom names
         if self.names_file.exists():

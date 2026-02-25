@@ -383,7 +383,7 @@ metrics:
 
 ### Writing Good Hard Bans
 
-Don't ask "what should it do?" Ask "if it screws up, what's the worst case?"
+Don't ask "what should it do?" Ask "if it steams up, what's the worst case?"
 
 **Bad:** "Be careful with social media"
 **Good:** "No direct posting (drafts only)"

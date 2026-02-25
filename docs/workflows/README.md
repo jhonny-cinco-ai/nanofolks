@@ -160,7 +160,7 @@ class ProjectState:
 These workflows complement Phase 1 features:
 
 - **DM Rooms** - Bots can use DM rooms for private coordination during execution
-- **@all/@crew** - Still work for requesting multiple bot responses
+- **@all/__PROT_ATTEAM__** - Still work for requesting multiple bot responses
 - **Affinity** - Relationship dynamics injected into bot contexts
 - **Multi-bot** - Multiple bots can participate in any flow
 

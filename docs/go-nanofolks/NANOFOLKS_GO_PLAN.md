@@ -287,7 +287,7 @@ These improvements are recommended during the port process. Some can be done now
 
 ### 6) Identity, Teams, and Collaboration
 - Versioned team bundles
-- Team presets to switch the entire crew’s personalities
+- Team presets to switch the entire team’s personalities
 - Shared team packs for multi‑device sync
 
 ### 7) UX (GUI + CLI)

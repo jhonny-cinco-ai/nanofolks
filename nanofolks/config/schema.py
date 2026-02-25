@@ -216,6 +216,15 @@ class BrowserToolsConfig(Base):
     binary: str = "agent-browser"
 
 
+class DocumentToolsConfig(Base):
+    """Local document parsing configuration."""
+    auto_parse_pdf: bool = True
+    max_pages: int = 30
+    max_chars: int = 200000
+    summary_chars: int = 1200
+    max_digests_in_prompt: int = 5
+
+
 class ExecToolConfig(Base):
     """Shell exec tool configuration."""
     timeout: int = 60
@@ -237,6 +246,7 @@ class ToolsConfig(Base):
     web: WebToolsConfig = Field(default_factory=WebToolsConfig)
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
     browser: BrowserToolsConfig = Field(default_factory=BrowserToolsConfig)
+    documents: DocumentToolsConfig = Field(default_factory=DocumentToolsConfig)
     restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
     evolutionary: bool = True  # If true, use allowed_paths whitelist instead of restrict_to_workspace
     allowed_paths: list[str] = Field(default_factory=list)  # Paths allowed when evolutionary mode is enabled (e.g., ["/projects/nanofolks-turbo", "~/.nanofolks"])

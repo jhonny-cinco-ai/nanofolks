@@ -298,7 +298,7 @@ Information about the user to help personalize interactions.
 
         # Get the team's name (custom or default from team)
         team = self.team_manager.get_current_team()
-        default_team_name = team["name"].replace("_", " ").title() if team else "Crew"
+        default_team_name = team["name"].replace("_", " ").title() if team else "Team"
         team_name = self.answers.team_name or default_team_name
 
         return f"""Great to know you better, {self.answers.name or "friend"}! 🎉

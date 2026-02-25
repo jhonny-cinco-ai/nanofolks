@@ -1,7 +1,7 @@
 """Multi-bot response generator for simultaneous bot responses.
 
 This module handles generating responses from multiple bots in parallel
-for @all and @crew mentions, creating a communal multi-bot experience.
+for @all and @team mentions, creating a communal multi-bot experience.
 """
 
 import asyncio
@@ -111,7 +111,7 @@ class MultiBotResponseGenerator:
         Args:
             user_message: The user's message
             bot_names: List of bot names to generate responses from
-            mode: Dispatch mode (MULTI_BOT or CREW_CONTEXT)
+            mode: Dispatch mode (MULTI_BOT or TEAM_CONTEXT)
             room_context: Optional room context information
             conversation_history: Recent messages from the active session (LLM format)
             memory_context: Pre-assembled memory context string from ContextAssembler
@@ -306,9 +306,9 @@ class MultiBotResponseGenerator:
                 "- You can reference what other bots might say",
                 "- Use your specific tone (professional, casual, technical, etc.)",
             ])
-        else:  # CREW_CONTEXT
+        else:  # TEAM_CONTEXT
             context_parts.extend([
-                "- You were selected as relevant to this message (@crew was mentioned)",
+                "- You were selected as relevant to this message (@team was mentioned)",
                 "- Focus on your domain of expertise",
                 "- Be concise (2-3 sentences max)",
                 "- Provide specific, actionable insights",

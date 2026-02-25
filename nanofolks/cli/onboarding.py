@@ -152,8 +152,8 @@ class OnboardingWizard:
                 "  1. [bold]Security[/bold] - Keyring setup for secure API key storage\n"
                 "  2. [bold]AI Provider[/bold] + Model\n"
                 "  3. [bold]Network Security[/bold] (Tailscale + secure ports)\n"
-                "  4. [bold]Team[/bold] - Choose your crew's personality\n"
-                "  5. [bold]Launch[/bold] - Create your workspace and crew",
+                "  4. [bold]Team[/bold] - Choose your team's personality\n"
+                "  5. [bold]Launch[/bold] - Create your workspace and team",
                 title="🎉",
                 border_style="bright_magenta",
             )
@@ -260,7 +260,7 @@ class OnboardingWizard:
     def _configure_provider(self) -> None:
         """Step 1: Configure AI provider and API key."""
         console.print("[bold bright_magenta]Step 2: AI Provider Setup[/bold bright_magenta]\n")
-        console.print("Choose the AI provider for your crew:\n")
+        console.print("Choose the AI provider for your team:\n")
 
         for key, (name, desc) in self.PROVIDERS.items():
             console.print(f"  [{key}] {desc}")
@@ -302,7 +302,7 @@ class OnboardingWizard:
 
         # Model selection
         console.print("[bold]Select Model[/bold]")
-        console.print("Choose the default model for your crew:\n")
+        console.print("Choose the default model for your team:\n")
 
         models = self._get_available_models(provider_name)
         for i, model in enumerate(models[:5], 1):
@@ -554,13 +554,13 @@ Then restart nanofolks for secure access.
 
     def _select_team(self) -> None:
         """Interactive team selection."""
-        console.print("[bold bright_magenta]Step 4: Choose Your Crew Team[/bold bright_magenta]\n")
+        console.print("[bold bright_magenta]Step 4: Choose Your Team Team[/bold bright_magenta]\n")
 
         teams = list_teams()
         [t["name"] for t in teams]
 
-        # First show just the crew team options
-        console.print("Choose your crew's personality:\n")
+        # First show just the team team options
+        console.print("Choose your team's personality:\n")
         for i, team in enumerate(teams, 1):
             console.print(f"  [{i}] {team['display_name']} - {team['description']}")
         console.print("  [b] Back to previous step")
@@ -569,7 +569,7 @@ Then restart nanofolks for secure access.
 
         # Let user select
         choice = self._prompt(
-            "Select crew team",
+            "Select team team",
             choices=[str(i) for i in range(1, len(teams) + 1)] + ["b"],
             default="1",
         )
@@ -585,7 +585,7 @@ Then restart nanofolks for secure access.
 
         # Confirm with option to go back
         console.print()
-        confirm = self._confirm(f"✓ Confirm {selected_team['display_name']} crew?", default=True)
+        confirm = self._confirm(f"✓ Confirm {selected_team['display_name']} team?", default=True)
 
         if confirm:
             self.team_manager.select_team(self.selected_team)
@@ -603,11 +603,11 @@ Then restart nanofolks for secure access.
         if not team:
             return
 
-        console.print(f"\n[bold]Crew: {team_name}[/bold]\n")
+        console.print(f"\n[bold]Team: {team_name}[/bold]\n")
         console.print(f"[dim]{team['description']}[/dim]\n")
 
         # Create a table showing each team member
-        team_table = Table(title="Your Crew Members", box=box.ROUNDED, show_lines=True)
+        team_table = Table(title="Your Team Members", box=box.ROUNDED, show_lines=True)
         team_table.add_column("Name", style="green", width=12)
         team_table.add_column("Title", style="bright_magenta", width=15)
         team_table.add_column("Role", style="magenta", width=12)
@@ -655,12 +655,12 @@ Then restart nanofolks for secure access.
         console.print(summary_table)
         console.print()
 
-        if self._confirm("🚀 Launch your crew?", default=True):
+        if self._confirm("🚀 Launch your team?", default=True):
             console.print("\n[green]✓ Setup complete![/green]\n")
-            console.print("Your AI crew is ready!")
+            console.print("Your AI team is ready!")
             console.print("\n[bold]Get started:[/bold]")
             console.print("  [bright_magenta]nanofolks chat[/bright_magenta]        - Start chatting")
-            console.print("  [bright_magenta]#general[/bright_magenta]            - Crew chat room")
+            console.print("  [bright_magenta]#general[/bright_magenta]            - Team chat room")
             console.print("  [bright_magenta]@researcher[/bright_magenta]        - DM a bot directly")
             console.print("  [bright_magenta]nanofolks configure[/bright_magenta]  - Add more providers/models\n")
         else:
@@ -725,9 +725,9 @@ Then restart nanofolks for secure access.
             console.print(f"[yellow]⚠ Could not save room: {e}[/yellow]")
 
     def _apply_team_to_workspace(self, workspace_path: Path) -> None:
-        """Apply selected team to all crew members in workspace.
+        """Apply selected team to all team members in workspace.
 
-        Creates SOUL.md, IDENTITY.md, and ROLE.md personality files for the entire crew.
+        Creates SOUL.md, IDENTITY.md, and ROLE.md personality files for the entire team.
 
         Args:
             workspace_path: Path to workspace
@@ -737,14 +737,14 @@ Then restart nanofolks for secure access.
             soul_manager = SoulManager(workspace_path)
 
             if self.selected_team:
-                console.print("\n[bright_magenta]Initializing crew personalities...[/bright_magenta]")
+                console.print("\n[bright_magenta]Initializing team personalities...[/bright_magenta]")
 
-                # Apply team to entire crew
-                crew = ["leader", "researcher", "coder", "social", "creative", "auditor"]
+                # Apply team to entire team
+                team = ["leader", "researcher", "coder", "social", "creative", "auditor"]
 
                 # Apply SOUL.md, IDENTITY.md, and ROLE.md team styles
-                soul_results = soul_manager.apply_team_to_crew(
-                    self.selected_team, crew, force=True
+                soul_results = soul_manager.apply_team_to_team(
+                    self.selected_team, team, force=True
                 )
 
                 # Show results
@@ -752,15 +752,15 @@ Then restart nanofolks for secure access.
 
                 if soul_successful > 0:
                     console.print(
-                        f"[green]✓ Initialized {soul_successful}/{len(crew)} bot personality files[/green]"
+                        f"[green]✓ Initialized {soul_successful}/{len(team)} bot personality files[/green]"
                     )
                     console.print("[dim]  (SOUL.md, IDENTITY.md, ROLE.md, AGENTS.md)[/dim]")
 
                 # Show team personalities
                 from nanofolks.teams import get_bot_team_profile
 
-                console.print("\n[bold]Crew personalities configured:[/bold]")
-                for bot_name in crew:
+                console.print("\n[bold]Team personalities configured:[/bold]")
+                for bot_name in team:
                     profile = get_bot_team_profile(
                         bot_name, self.selected_team, workspace_path=workspace_path
                     )

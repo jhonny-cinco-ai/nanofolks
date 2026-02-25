@@ -15,7 +15,7 @@ Panda CSS provides a type-safe, build-time CSS-in-JS solution that enables:
 
 - **Design system enforcement** through tokens and recipes
 - **AI-friendly development** via MCP server integration
-- **Team consistency** across the 6 crew identities
+- **Team consistency** across the 6 team identities
 - **Type safety** that prevents AI-generated styling errors
 - **Build-time optimization** with zero runtime overhead
 
@@ -50,7 +50,7 @@ colors: {
   muted: { DEFAULT: '#f5f5f5', _dark: '#262626' },
   border: { DEFAULT: '#e5e5e5', _dark: '#404040' },
   
-  // Status colors (consistent across all crews)
+  // Status colors (consistent across all teams)
   success: { DEFAULT: '#22c55e', foreground: '#ffffff' },
   warning: { DEFAULT: '#f59e0b', foreground: '#ffffff' },
   danger: { DEFAULT: '#ef4444', foreground: '#ffffff' },
@@ -87,9 +87,9 @@ radii: {
 }
 ```
 
-#### Layer 2: Crew Team Tokens (6 Teams)
+#### Layer 2: Team Team Tokens (6 Teams)
 
-Each crew defines shape, colors, and emblem:
+Each team defines shape, colors, and emblem:
 
 **Pirate Crew**
 - Shape: Hexagon (8 sides, adventure symbolism)
@@ -141,26 +141,26 @@ Each crew defines shape, colors, and emblem:
 
 #### Layer 3: Component Tokens
 
-Semantic mappings that reference crew tokens:
+Semantic mappings that reference team tokens:
 
 ```typescript
 button: {
   primary: {
-    bg: '{crew.primary}',
-    color: '{crew.primary.foreground}',
-    hover: '{crew.primary.dark}'
+    bg: '{team.primary}',
+    color: '{team.primary.foreground}',
+    hover: '{team.primary.dark}'
   },
   secondary: {
-    bg: '{crew.surface.DEFAULT}',
-    border: '{crew.primary}',
-    color: '{crew.primary}'
+    bg: '{team.surface.DEFAULT}',
+    border: '{team.primary}',
+    color: '{team.primary}'
   }
 }
 
 badge: {
   role: {
-    bg: '{crew.primary}',
-    color: '{crew.primary.foreground}'
+    bg: '{team.primary}',
+    color: '{team.primary.foreground}'
   },
   status: {
     online: '{colors.success}',
@@ -182,7 +182,7 @@ Visual structure:
 │ Layer 3: Role Detail                │
 │ (Leader headband, Coder glasses)    │
 ├─────────────────────────────────────┤
-│ Layer 2: Crew Iconic                │
+│ Layer 2: Team Iconic                │
 │ (Rock Band lightning, Pirate skull) │
 ├─────────────────────────────────────┤
 │ Layer 1: Base Shape                 │
@@ -193,7 +193,7 @@ Visual structure:
 **Recipe Structure:**
 - Base container with positioning
 - Layer 1: Geometric shape (clip-path or SVG)
-- Layer 2: Crew emblem overlay
+- Layer 2: Team emblem overlay
 - Layer 3: Role-specific detail
 - Sizes: sm (24px), md (40px), lg (64px), xl (96px)
 
@@ -209,7 +209,7 @@ Visual structure:
 
 2. **Role Badges**
    - Text: "LEADER", "CODER", "RESEARCHER", etc.
-   - Styled with crew colors
+   - Styled with team colors
    - Uppercase, bold
 
 3. **Activity Badges**
@@ -217,24 +217,24 @@ Visual structure:
    - "TYPING..." animated indicator
    - Unread message count
 
-4. **Crew Badges**
-   - Small crew emblem
-   - Quick crew identification
+4. **Team Badges**
+   - Small team emblem
+   - Quick team identification
    - Used in room lists
 
 ### 3.3 Button Variants
 
-- **Primary**: Filled with crew primary color
-- **Secondary**: Outlined with crew primary border
-- **Ghost**: Subtle hover with crew accent
-- **Destructive**: Consistent red across all crews (for danger actions)
+- **Primary**: Filled with team primary color
+- **Secondary**: Outlined with team primary border
+- **Ghost**: Subtle hover with team accent
+- **Destructive**: Consistent red across all teams (for danger actions)
 
 ### 3.4 Room Header
 
-- Background: Crew surface color
-- Text: Crew foreground color
-- Accent border: Crew primary color (bottom border)
-- Crew emblem: Small badge indicator
+- Background: Team surface color
+- Text: Team foreground color
+- Accent border: Team primary color (bottom border)
+- Team emblem: Small badge indicator
 
 ---
 
@@ -249,9 +249,9 @@ Visual structure:
 
 ### 4.2 Implementation Flow
 
-1. User selects crew team in Settings panel
+1. User selects team team in Settings panel
 2. Team ID written to user config file
-3. Svelte store `teamStore` updated with new crew ID
+3. Svelte store `teamStore` updated with new team ID
 4. CSS custom properties regenerated
 5. All components reactively update
 
@@ -259,9 +259,9 @@ Visual structure:
 
 ```typescript
 // Svelte store for reactive team management
-export const teamStore = writable<TeamId>('pirate_crew')
+export const teamStore = writable<TeamId>('__PROT_pirate_team__')
 
-// Derived store for current crew tokens
+// Derived store for current team tokens
 export const currentTeamTokens = derived(teamStore, $team => {
   return teamTokens[$team]
 })
@@ -276,7 +276,7 @@ export const currentTeamTokens = derived(teamStore, $team => {
 - Spacing
 - Typography
 
-**Crew Accents (Crew Tokens):**
+**Team Accents (Team Tokens):**
 - Bot avatars
 - Buttons
 - Badges
@@ -310,7 +310,7 @@ frontend/
 │   │   └── index.ts             # Team exports & switching
 │   ├── components/
 │   │   ├── BotAvatar.svelte     # Uses avatar recipe
-│   │   ├── CrewBadge.svelte     # Uses badge recipe
+│   │   ├── TeamBadge.svelte     # Uses badge recipe
 │   │   └── TeamButton.svelte    # Uses button recipe
 │   └── stores/
 │       └── team.ts             # Svelte team store
@@ -394,7 +394,7 @@ AI assistants can query:
 - **Design tokens**: Colors, spacing, typography
 - **Component recipes**: Available variants and props
 - **Token usage**: What's used vs. unused
-- **Team definitions**: Crew-specific values
+- **Team definitions**: Team-specific values
 
 ### 7.4 Example AI Prompts
 
@@ -412,7 +412,7 @@ AI assistants can query:
 Panda's TypeScript integration catches errors at build time:
 
 ```typescript
-// ❌ TypeScript Error: 'pirat' is not a valid crew
+// ❌ TypeScript Error: 'pirat' is not a valid team
 css({ bg: 'pirat.primary' })
 
 // ❌ TypeScript Error: 'primaryy' is not a valid token
@@ -452,30 +452,30 @@ css({ bg: 'pirate.primary' })
 
 ### 9.2 Shape Definitions
 
-Shapes defined as CSS custom properties or SVG paths in crew tokens, applied via recipe variants.
+Shapes defined as CSS custom properties or SVG paths in team tokens, applied via recipe variants.
 
 ---
 
 ## 10. Future Extensions
 
-### 10.1 Adding New Crews
+### 10.1 Adding New Teams
 
-1. Create `src/team/tokens/newcrew.ts`
+1. Create `src/team/tokens/newteam.ts`
 2. Define shape, colors, emblem
 3. Export from `src/team/index.ts`
-4. Components automatically support new crew
+4. Components automatically support new team
 
 ### 10.2 Team Customization
 
 Users could potentially:
 - Override specific tokens
-- Create custom crew teams
+- Create custom team teams
 - Import/export team presets
 
 ### 10.3 Animation Tokens
 
 Future addition:
-- Crew-specific animations
+- Team-specific animations
 - Transition timings
 - Micro-interactions
 
@@ -527,8 +527,8 @@ export default defineConfig({
 When migrating existing components:
 1. Replace inline styles with Panda `css()` function
 2. Use semantic token references instead of hardcoded values
-3. Apply crew team via recipe variants
-4. Test across all 6 crew teams
+3. Apply team team via recipe variants
+4. Test across all 6 team teams
 5. Verify TypeScript types resolve correctly
 
 ---

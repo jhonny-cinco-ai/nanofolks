@@ -458,11 +458,11 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
             appearance = get_appearance_config()
             team_manager = appearance.team_manager
             if team_manager and team_manager.get_current_team_name():
-                self._cached_team_name = team_manager.get_current_team_name() or "pirate_crew"
+                self._cached_team_name = team_manager.get_current_team_name() or "pirate_team"
             else:
-                self._cached_team_name = "pirate_crew"
+                self._cached_team_name = "pirate_team"
         except Exception:
-            self._cached_team_name = "pirate_crew"
+            self._cached_team_name = "pirate_team"
 
         return self._cached_team_name
 

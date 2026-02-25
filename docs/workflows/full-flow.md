@@ -11,13 +11,13 @@ Handle BUILD intent - full structured discovery flow: Discovery â†’ Synthesis â†
 </context>
 
 <philosophy>
-**Collaborative clarification.** Multiple bots ask questions in the room. User sees the crew working together to understand their vision.
+**Collaborative clarification.** Multiple bots ask questions in the room. User sees the team working together to understand their vision.
 
 **User approves before building.** No work happens until user says "yes, that's what I want." Prevents wasted effort on wrong thing.
 </philosophy>
 
 <scope_guardrail>
-**Minimum 2 bots must participate.** Shows "crew" not single assistant.
+**Minimum 2 bots must participate.** Shows "team" not single assistant.
 
 **Synthesis must be approved.** If user rejects synthesis, loop back to discovery with feedback.
 </scope_guardrail>

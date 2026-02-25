@@ -1,6 +1,6 @@
 <div align="center">
   <img src="nanofolks_header.png" alt="nanofolks" width="660">
-  <h1>nanofolks - Your crew's already on it.</h1>
+  <h1>nanofolks - Your team's already on it.</h1>
   <p>
     <a href="https://pypi.org/project/nanofolks/"><img src="https://img.shields.io/pypi/v/nanofolks" alt="PyPI"></a>
     <a href="https://pepy.tech/project/nanofolks"><img src="https://static.pepy.tech/badge/nanofolks" alt="Downloads"></a>
@@ -10,13 +10,13 @@
   </p>
 </div>
 
-nanofolks is a platform for building friendly AI crews, teams of characters that collaborate to help you think, create, plan, and build.
+nanofolks is a platform for building friendly AI teams, teams of characters that collaborate to help you think, create, plan, and build.
 
-Instead of a single assistant, you work alongside a crew of AI specialists with distinct roles and personalities.
+Instead of a single assistant, you work alongside a team of AI specialists with distinct roles and personalities.
 
 From pirate captains to space explorers to creative misfits, your companions don't just respond. They work together.
 
-Pick the kind of crew that fits you.
+Pick the kind of team that fits you.
 
 
 ## What Makes nanofolks Different?
@@ -57,7 +57,7 @@ nanofolks provides a flexible architecture for:
 **Inspired by nanobot's simplicity, nanofolks expands the concept into a more expressive, team-oriented system.**
 
 > [!TIP]
-> nanofolks is a fork of [nanobot](https://github.com/HKUDS/nanobot). We maintain certain compatibility while adding crew-based features.
+> nanofolks is a fork of [nanobot](https://github.com/HKUDS/nanobot). We maintain certain compatibility while adding team-based features.
 
 ---
 
@@ -143,8 +143,8 @@ This will guide you through:
 | **1. Security** | Keyring check for secure API key storage |
 | **2. Provider + Model** | Select your AI provider and default model |
 | **3. Network Security** | Tailscale + secure ports info |
-| **4. Team** | Choose your crew's personality |
-| **5. Launch** | Create your workspace and crew |
+| **4. Team** | Choose your team's personality |
+| **5. Launch** | Create your workspace and team |
 
 Smart routing and evolutionary mode are enabled by default and can be changed anytime with `nanofolks configure`.
 
@@ -163,9 +163,24 @@ Configure these in:
 nanofolks configure
 ```
 
+### Documents
+
+When you upload a PDF (Discord/Telegram), nanofolks **auto‑parses it locally** and keeps the room context clean:
+
+- Extracted text is stored under `~/.nanofolks/documents/<room_id>/`.
+- A short **document digest** (summary + stats + path) is injected into the room context.
+- The full text stays out of the main chat to avoid flooding.
+
+Defaults (configurable in `nanofolks configure`):
+- `tools.documents.auto_parse_pdf` (default: true)
+- `tools.documents.max_pages` (default: 30)
+- `tools.documents.max_chars` (default: 200000)
+- `tools.documents.summary_chars` (default: 1200)
+- `tools.documents.max_digests_in_prompt` (default: 5)
+
 ### Your Team
 
-Each nanofolks crew has 6 bots:
+Each nanofolks team has 6 bots:
 
 | Bot | Role | What they do |
 |-----|------|--------------|
@@ -176,7 +191,7 @@ Each nanofolks crew has 6 bots:
 | **Creative** (@creative) | Creative | Brainstorms, designs, creates |
 | **Auditor** (@auditor) | Quality | Reviews, validates, tests |
 
-That's it! Your crew is ready to go!
+That's it! Your team is ready to go!
 
 
 ## Start Chatting
@@ -317,16 +332,16 @@ Requires Node.js ≥18.
 
 # Core Concepts
 
-This section explains the architectural concepts behind nanofolks. Understanding these will help you configure and customize your crew.
+This section explains the architectural concepts behind nanofolks. Understanding these will help you configure and customize your team.
 
 
 ## 🤖 Multi-Bot Architecture
 
-nanofolks supports multiple AI characters working together as a crew.
+nanofolks supports multiple AI characters working together as a team.
 
-### The Crew Concept
+### The Team Concept
 
-A "crew" is a group of 6 AI characters, each with:
+A "team" is a group of 6 AI characters, each with:
 
 - **Personality** - How they respond (from the team)
 - **Role** - What they're good at
@@ -334,7 +349,7 @@ A "crew" is a group of 6 AI characters, each with:
 
 ### Teams & Personalities
 
-nanofolks comes with **built-in teams** that give your crew distinct personalities:
+nanofolks comes with **built-in teams** that give your team distinct personalities:
 
 | Team | Vibe | Example |
 |-------|------|---------|
@@ -345,15 +360,15 @@ nanofolks comes with **built-in teams** that give your crew distinct personaliti
 | **SWAT Team** | Tactical, precise | "Moving in for the takedown" |
 | **Feral Clowder** | Chaotic, cat-like | "*knocks things off desk*"
 
-Choose a team during setup to give your crew personality!
+Choose a team during setup to give your team personality!
 
 ### Your Team
 
-Each nanofolks crew has 6 bots:
+Each nanofolks team has 6 bots:
 
 | Bot | Role | Expertise |
 |-----|------|-----------|
-| **Leader** (@leader) | Coordinates the crew | Planning, delegation, decision-making |
+| **Leader** (@leader) | Coordinates the team | Planning, delegation, decision-making |
 | **Researcher** (@researcher) | Deep research | Analysis, information gathering |
 | **Coder** (@coder) | Technical implementation | Code, debugging, architecture |
 | **Social** (@social) | Community engagement | Communication, user relations |
@@ -365,20 +380,20 @@ Each nanofolks crew has 6 bots:
 ```
 Workspace/
 ├── identity/            # Bot personalities & team styles
-│   ├── pirate_crew/   # Pirate crew style
-│   ├── space_crew/    # Space crew style
+│   ├── __PROT_pirate_team__/   # Pirate team style
+│   ├── __PROT_space_team__/    # Space team style
 │   └── ...
 ├── role/               # Bot roles (Leader, Coder, Researcher...)
 ├── soul/               # Bot soul files (personality, greeting)
 ├── bots/               # Bot instructions
 ├── memory/             # Shared knowledge
-├── skills/            # Crew skills
-└── config.yaml        # Crew configuration
+├── skills/            # Team skills
+└── config.yaml        # Team configuration
 ```
 
 ### Single Bot Mode
 
-Not ready for a full crew? nanofolks works perfectly as a single assistant:
+Not ready for a full team? nanofolks works perfectly as a single assistant:
 - Default General room has one bot
 - Works in DM mode
 - Same memory and learning capabilities
@@ -403,7 +418,7 @@ nanofolks runs every message through a single, consistent pipeline:
 4. **Collect** — Gather responses from assigned bots.
 5. **Final** — Produce one clear response for the user.
 
-This keeps multi-bot teamwork predictable and easy to debug, while still letting the Leader coordinate the crew.
+This keeps multi-bot teamwork predictable and easy to debug, while still letting the Leader coordinate the team.
 
 ### Sidekicks (Focused Helpers)
 
@@ -750,7 +765,7 @@ nanofolks skills scan /path/to/skill
 
 ## 🏠 Rooms & Collaboration
 
-nanofolks uses **rooms** as collaboration spaces where your crew works together. Think of rooms as dedicated spaces for different projects, topics, or conversation types.
+nanofolks uses **rooms** as collaboration spaces where your team works together. Think of rooms as dedicated spaces for different projects, topics, or conversation types.
 
 ### What Are Rooms?
 
@@ -771,7 +786,7 @@ A **room** is a conversation context where:
 
 ### Room Tasks
 
-Each room can track **tasks** so your crew’s work stays organized. Tasks belong to a room, have an owner and status, and include **handoff history** when ownership changes. When the Leader assigns a bot, nanofolks also creates a matching room task automatically so progress stays visible.
+Each room can track **tasks** so your team’s work stays organized. Tasks belong to a room, have an owner and status, and include **handoff history** when ownership changes. When the Leader assigns a bot, nanofolks also creates a matching room task automatically so progress stays visible.
 
 ### Room-Centric Architecture
 
@@ -806,7 +821,7 @@ room:project-abc123  → Project room (multi-platform)
 
 ### The @ Mention System
 
-Use **@** to direct messages to specific bots or the entire crew:
+Use **@** to direct messages to specific bots or the entire team:
 
 #### Direct to a Bot
 ```
@@ -825,8 +840,8 @@ Use **@** to direct messages to specific bots or the entire crew:
 @all review this architecture proposal
 → All bots in the room respond with feedback
 
-@crew brainstorm marketing ideas
-→ Entire crew collaborates
+@team brainstorm marketing ideas
+→ Relevant bots respond (based on keywords)
 ```
 
 #### Leader Coordination (Default)
@@ -839,8 +854,9 @@ I need help planning the product launch
 ### How @ Routing Works
 
 1. **@botname mentioned?** → Goes directly to that bot
-2. **@all or @crew mentioned?** → Broadcast to all room participants
-3. **No mention?** → Leader analyzes and coordinates response
+2. **@all mentioned?** → Broadcast to all room participants
+3. **@team mentioned?** → Relevant bots respond (keyword‑based)
+4. **No mention?** → Leader analyzes and coordinates response
 
 #### Best Practices
 
@@ -893,7 +909,7 @@ nanofolks doesn't just wait for you to message it. It can proactively act.
 nanofolks supports routines (scheduled tasks). There are two kinds:
 
 - **Your Routines**: reminders or recurring tasks you create
-- **Team Routines**: background check-ins that keep the crew “alive”
+- **Team Routines**: background check-ins that keep the team “alive”
 
 You can control both from the CLI, without needing to know what a cron job is.
 
@@ -1115,7 +1131,7 @@ docker run -v ~/.nanofolks:/root/.nanofolks -p 18790:18790 nanofolks gateway
 
 > **nanofolks isn't about replacing you.**
 > 
-> It's about expanding what you can do, by surrounding you with the right crew.
+> It's about expanding what you can do, by surrounding you with the right team.
 
 We believe AI should:
 - ✨ Work *with* you, not *for* you
@@ -1147,5 +1163,5 @@ This project is for educational, research, and technical exchange purposes only.
 ---
 
 <p align="center">
-  <em>Your crew's already on it.</em>
+  <em>Your team's already on it.</em>
 </p>

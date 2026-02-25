@@ -267,7 +267,7 @@ def dispatch_message(self, message: str, room: Optional[Room] = None,
                 target=DispatchTarget.DIRECT_BOT,
                 primary_bot="nanofolks",  # Leader coordinates
                 secondary_bots=room.participants if room else ["nanofolks"],
-                reason="User tagged @all/@crew - leader coordinates all bots"
+                reason="User tagged @all/__PROT_ATTEAM__ - leader coordinates all bots"
             )
         else:
             return DispatchResult(

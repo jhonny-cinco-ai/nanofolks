@@ -42,11 +42,11 @@ class TeamRoster:
             appearance = get_appearance_config()
             team_manager = appearance.team_manager
             if team_manager and team_manager.get_current_team_name():
-                return team_manager.get_current_team_name() or "pirate_crew"
+                return team_manager.get_current_team_name() or "pirate_team"
         except Exception:
             pass
 
-        return "pirate_crew"
+        return "pirate_team"
 
     def _get_profile(self, bot_role: str):
         try:

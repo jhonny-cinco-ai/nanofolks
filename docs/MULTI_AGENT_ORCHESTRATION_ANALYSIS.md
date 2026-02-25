@@ -21,7 +21,7 @@
 
 **Key Innovations:**
 1. **Workspace Model** - Contextual conversations (not one-size-fits-all)
-2. **Personality Teams** - Pirate crew, Rock band, SWAT team (accessible UX)
+2. **Personality Teams** - Pirate team, Rock band, SWAT team (accessible UX)
 3. **Hybrid Memory** - Private learnings + shared knowledge
 4. **Tagging System** - @botname (direct bot mentions)
 5. **Coordinator Mode** - nanofolks manages when you're away
@@ -312,7 +312,7 @@ THEME = {
         }
     },
     "affinity_modifiers": {
-        "crew_loyalty": 0.1  # Pirates trust each other more
+        "team_loyalty": 0.1  # Pirates trust each other more
     }
 }
 ```

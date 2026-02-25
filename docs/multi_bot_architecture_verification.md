@@ -100,19 +100,19 @@ A researcher's job (analyze data, find information) doesn't change whether they'
 
 ### Teams Implemented (6 teams × 12 files = 72 total)
 
-1. **pirate_crew** - 12 files (6 SOUL + 6 IDENTITY)
+1. **__PROT_pirate_team__** - 12 files (6 SOUL + 6 IDENTITY)
 2. **rock_band** - 12 files (6 SOUL + 6 IDENTITY)
 3. **swat_team** - 12 files (6 SOUL + 6 IDENTITY)
 4. **feral_clowder** - 12 files (6 SOUL + 6 IDENTITY)
 5. **executive_suite** - 12 files (6 SOUL + 6 IDENTITY)
-6. **space_crew** - 12 files (6 SOUL + 6 IDENTITY)
+6. **__PROT_space_team__** - 12 files (6 SOUL + 6 IDENTITY)
 
 ### Template Files
 
 ```
 nanofolks/templates/
 ├── soul/
-│   ├── pirate_crew/
+│   ├── __PROT_pirate_team__/
 │   │   ├── nanofolks_SOUL.md
 │   │   ├── researcher_SOUL.md
 │   │   ├── coder_SOUL.md
@@ -127,10 +127,10 @@ nanofolks/templates/
 │   │   └── [6 files]
 │   ├── executive_suite/
 │   │   └── [6 files]
-│   └── space_crew/
+│   └── __PROT_space_team__/
 │       └── [6 files]
 ├── identity/
-│   ├── pirate_crew/
+│   ├── __PROT_pirate_team__/
 │   │   └── [6 files]
 │   ├── rock_band/
 │   │   └── [6 files]
@@ -140,7 +140,7 @@ nanofolks/templates/
 │   │   └── [6 files]
 │   ├── executive_suite/
 │   │   └── [6 files]
-│   └── space_crew/
+│   └── __PROT_space_team__/
 │       └── [6 files]
 └── bots/
     ├── nanofolks_AGENTS.md

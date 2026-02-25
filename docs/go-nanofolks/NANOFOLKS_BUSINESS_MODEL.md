@@ -33,7 +33,7 @@ nanofolks follows an **Open Core business model**: a fully-featured open-source 
 - Bring-your-own-model flexibility
 
 **Value Proposition:**
-"Full-featured AI crew platform that you control completely. Free forever, community-driven."
+"Full-featured AI team platform that you control completely. Free forever, community-driven."
 
 ### 2. Normal Users (Proprietary GUI)
 
@@ -52,7 +52,7 @@ nanofolks follows an **Open Core business model**: a fully-featured open-source 
 - Reliable, managed service
 
 **Value Proposition:**
-"Your AI crew, ready to help. Just install and start chatting. One simple price, unlimited use."
+"Your AI team, ready to help. Just install and start chatting. One simple price, unlimited use."
 
 ---
 
@@ -263,14 +263,14 @@ These are **different markets**. Mom won't self-host. Developers won't pay for m
 #### Consumer Plans
 
 **Free Tier:**
-- 1 bot (not full crew)
+- 1 bot (not full team)
 - 50 messages/day
 - Local storage only
 - Basic features
 - **Goal:** Try before buy, viral spread
 
 **Pro ($12/month):**
-- Full 6-bot crew
+- Full 6-bot team
 - Unlimited messages
 - Cloud sync
 - Web access

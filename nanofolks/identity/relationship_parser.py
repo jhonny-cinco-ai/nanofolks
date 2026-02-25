@@ -92,7 +92,7 @@ class RelationshipParser:
         relationship_section = self._extract_section(
             identity_content,
             [
-                "## Relationship with the Crew",
+                "## Relationship with the Team",
                 "## Relationships",
                 "### Relationships",
                 "## Relationships with Others",

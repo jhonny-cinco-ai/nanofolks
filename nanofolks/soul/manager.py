@@ -36,7 +36,7 @@ class SoulManager:
         self.bots_dir = self.workspace / "bots"
         self.bots_dir.mkdir(parents=True, exist_ok=True)
 
-    def apply_team_to_crew(
+    def apply_team_to_team(
         self,
         team_name: str,
         team: List[str],

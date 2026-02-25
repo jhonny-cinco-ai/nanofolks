@@ -773,6 +773,7 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
         channel: str | None = None,
         chat_id: str | None = None,
         memory_context: str | None = None,
+        document_digests: list[dict[str, Any]] | None = None,
         room_id: str | None = None,
         room_type: str | None = None,
         participants: list[str] | None = None,
@@ -844,6 +845,12 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
             except Exception as e:
                 logger.warning(f"Failed to generate semantic memory context: {e}")
 
+        # Add document digests (short, to avoid flooding context)
+        if document_digests:
+            digest_section = self._format_document_digests(document_digests)
+            if digest_section:
+                system_prompt += f"\n\n## Document Digest\n{digest_section}"
+
         messages.append({"role": "system", "content": system_prompt})
 
         # History
@@ -854,6 +861,25 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
         messages.append({"role": "user", "content": user_content})
 
         return messages
+
+    @staticmethod
+    def _format_document_digests(digests: list[dict[str, Any]]) -> str:
+        lines: list[str] = []
+        for digest in digests:
+            filename = digest.get("filename", "document")
+            doc_id = digest.get("doc_id", "unknown")
+            summary = digest.get("summary", "")
+            page_count = digest.get("page_count", 0)
+            extracted = digest.get("extracted_chars", 0)
+            text_path = digest.get("text_path", "")
+
+            lines.append(f"- {filename} (doc:{doc_id}, pages:{page_count}, chars:{extracted})")
+            if summary:
+                lines.append(f"  Summary: {summary}")
+            if text_path:
+                lines.append(f"  Full text: {text_path}")
+
+        return "\n".join(lines).strip()
 
     def _build_user_content(self, text: str, media: list[str] | None) -> str | list[dict[str, Any]]:
         """Build user message content with optional base64-encoded images."""

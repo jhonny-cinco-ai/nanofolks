@@ -8,8 +8,8 @@ echo "=== Building Docker image ==="
 docker build -t "$IMAGE_NAME" .
 
 echo ""
-echo "=== Running 'nanobot onboard' ==="
-docker run --name nanobot-test-run "$IMAGE_NAME" onboard
+echo "=== Running 'nanofolks onboard' ==="
+docker run --name nanobot-test-run "$IMAGE_NAME" onboard --non-interactive
 
 echo ""
 echo "=== Running 'nanobot status' ==="
@@ -31,13 +31,13 @@ check() {
     fi
 }
 
-check "nanobot Status"
+check "nanofolks Status"
 check "Config:"
 check "Workspace:"
 check "Model:"
-check "OpenRouter API:"
-check "Anthropic API:"
-check "OpenAI API:"
+check "OpenRouter:"
+check "Anthropic:"
+check "OpenAI:"
 
 echo ""
 if $PASS; then

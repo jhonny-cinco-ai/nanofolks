@@ -243,6 +243,7 @@ Use this context to provide personalized and informed responses."""
         self,
         query: str,
         channel: str = None,
+        room_id: str = None,
         limit: int = 5,
     ) -> list[Entity]:
         """
@@ -251,13 +252,17 @@ Use this context to provide personalized and informed responses."""
         Args:
             query: Current user query
             channel: Current channel (for filtering)
+            room_id: Current room (preferred for filtering)
             limit: Max entities to return
 
         Returns:
             List of relevant entities
         """
         # Get entities mentioned in recent events from this channel
-        if channel:
+        if room_id:
+            session_key = room_to_session_id(room_id)
+            recent_entities = self.store.get_entities_for_session(session_key, limit=limit * 2)
+        elif channel:
             recent_entities = self.store.get_entities_for_channel(channel, limit=limit * 2)
         else:
             # Get most frequently mentioned entities

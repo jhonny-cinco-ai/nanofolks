@@ -85,9 +85,6 @@ class KnowledgeGraphManager:
             if alias not in primary.aliases:
                 primary.aliases.append(alias)
 
-        # Merge metadata
-        primary.metadata.update(duplicate.metadata)
-
         # Update all edges pointing to duplicate
         edges = self.store.get_edges_for_entity(duplicate_id)
         for edge in edges:
@@ -100,14 +97,14 @@ class KnowledgeGraphManager:
         # Update all facts for duplicate
         facts = self.store.get_facts_for_entity(duplicate_id)
         for fact in facts:
-            if fact.subject_id == duplicate_id:
-                fact.subject_id = primary_id
-            if fact.object_id == duplicate_id:
-                fact.object_id = primary_id
+            if fact.subject_entity_id == duplicate_id:
+                fact.subject_entity_id = primary_id
+            if fact.object_entity_id == duplicate_id:
+                fact.object_entity_id = primary_id
             self.store.update_fact(fact)
 
         # Increment mention count
-        primary.mention_count += duplicate.mention_count
+        primary.event_count += duplicate.event_count
         primary.last_seen = datetime.now()
 
         # Save primary and delete duplicate
@@ -122,8 +119,9 @@ class KnowledgeGraphManager:
         self,
         source_id: str,
         target_id: str,
+        relation: str,
         relation_type: str,
-        confidence: float = 0.8
+        strength: float = 0.8
     ) -> Edge:
         """
         Create or update an edge between two entities.
@@ -134,22 +132,22 @@ class KnowledgeGraphManager:
         Args:
             source_id: Source entity ID
             target_id: Target entity ID
+            relation: Relationship label (e.g., "works_at")
             relation_type: Type of relationship
-            confidence: Confidence score (0-1)
+            strength: Strength score (0-1)
 
         Returns:
             Created or updated Edge
         """
         # Check for existing edge
-        existing = self.store.get_edge(source_id, target_id, relation_type)
+        existing = self.store.get_edge(source_id, target_id, relation, relation_type)
 
         if existing:
             # Update existing edge
             existing.strength = min(1.0, existing.strength + 0.1)  # Boost strength
-            existing.evidence_count += 1
-            existing.last_updated = datetime.now()
-            if confidence > existing.confidence:
-                existing.confidence = confidence
+            existing.last_seen = datetime.now()
+            if strength > existing.strength:
+                existing.strength = strength
 
             self.store.update_edge(existing)
             return existing
@@ -159,12 +157,11 @@ class KnowledgeGraphManager:
                 id=str(uuid4()),
                 source_entity_id=source_id,
                 target_entity_id=target_id,
+                relation=relation,
                 relation_type=relation_type,
-                strength=confidence,
-                confidence=confidence,
-                evidence_count=1,
+                strength=strength,
                 first_seen=datetime.now(),
-                last_updated=datetime.now(),
+                last_seen=datetime.now(),
             )
 
             self.store.create_edge(edge)
@@ -181,22 +178,22 @@ class KnowledgeGraphManager:
             Existing fact if found, None if should create new
         """
         # Look for similar facts
-        existing_facts = self.store.get_facts_for_subject(fact.subject_id)
+        existing_facts = self.store.get_facts_for_subject(fact.subject_entity_id)
 
         for existing in existing_facts:
             # Check if same predicate and similar object
             if (existing.predicate == fact.predicate and
-                self._similar_objects(existing.object_value, fact.object_value)):
+                self._similar_objects(existing.object_text, fact.object_text)):
 
                 # Update confidence if new fact is more confident
                 if fact.confidence > existing.confidence:
                     existing.confidence = fact.confidence
-                    existing.object_value = fact.object_value
+                    existing.object_text = fact.object_text
                     self.store.update_fact(existing)
 
-                # Increment evidence count
-                existing.evidence_count = existing.evidence_count + 1
-                existing.last_seen = datetime.now()
+                # Increment strength on re-mention
+                existing.strength = min(1.0, existing.strength + 0.1)
+                existing.valid_to = datetime.now()
                 self.store.update_fact(existing)
 
                 return existing
@@ -301,7 +298,7 @@ class KnowledgeGraphManager:
         # Add related facts
         facts = self.store.get_facts_for_entity(entity_id)
         for fact in facts:
-            texts.append(f"{fact.predicate} {fact.object_value}")
+            texts.append(f"{fact.predicate} {fact.object_text}")
 
         # Combine and embed
         combined_text = " ".join(texts)

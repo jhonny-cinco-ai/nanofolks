@@ -16,11 +16,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from loguru import logger
 
 if TYPE_CHECKING:
-    from nanofolks.memory.embedding import EmbeddingProvider
-from pathlib import Path
-from typing import Optional
-
-from loguru import logger
+    from nanofolks.memory.embeddings import EmbeddingProvider
 
 from nanofolks.config.schema import MemoryConfig
 from nanofolks.memory.migrations import MigrationManager
@@ -876,22 +872,20 @@ class TurboMemoryStore:
         conn.execute(
             """
             INSERT INTO edges (
-                id, source_entity_id, target_entity_id, relation_type,
-                strength, confidence, evidence_count, metadata,
-                first_seen, last_updated
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, source_entity_id, target_entity_id, relation, relation_type,
+                strength, source_event_ids, first_seen, last_seen
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 edge.id,
                 edge.source_entity_id,
                 edge.target_entity_id,
+                edge.relation,
                 edge.relation_type,
                 edge.strength,
-                edge.confidence,
-                edge.evidence_count,
-                json.dumps(edge.metadata) if edge.metadata else None,
+                json.dumps(edge.source_event_ids) if edge.source_event_ids else None,
                 edge.first_seen.timestamp() if edge.first_seen else None,
-                edge.last_updated.timestamp() if edge.last_updated else None,
+                edge.last_seen.timestamp() if edge.last_seen else None,
             )
         )
         conn.commit()
@@ -903,6 +897,7 @@ class TurboMemoryStore:
         self,
         source_id: str,
         target_id: str,
+        relation: str,
         relation_type: str
     ) -> Optional[Edge]:
         """
@@ -911,7 +906,8 @@ class TurboMemoryStore:
         Args:
             source_id: Source entity ID
             target_id: Target entity ID
-            relation_type: Type of relationship
+            relation: Relationship label (e.g., "works_at")
+            relation_type: Type of relationship (e.g., "professional")
 
         Returns:
             Edge if found, None otherwise
@@ -921,9 +917,9 @@ class TurboMemoryStore:
         row = conn.execute(
             """
             SELECT * FROM edges
-            WHERE source_entity_id = ? AND target_entity_id = ? AND relation_type = ?
+            WHERE source_entity_id = ? AND target_entity_id = ? AND relation = ? AND relation_type = ?
             """,
-            (source_id, target_id, relation_type)
+            (source_id, target_id, relation, relation_type)
         ).fetchone()
 
         if row:
@@ -971,19 +967,19 @@ class TurboMemoryStore:
         conn.execute(
             """
             UPDATE edges SET
+                relation = ?,
+                relation_type = ?,
                 strength = ?,
-                confidence = ?,
-                evidence_count = ?,
-                metadata = ?,
-                last_updated = ?
+                source_event_ids = ?,
+                last_seen = ?
             WHERE id = ?
             """,
             (
+                edge.relation,
+                edge.relation_type,
                 edge.strength,
-                edge.confidence,
-                edge.evidence_count,
-                json.dumps(edge.metadata) if edge.metadata else None,
-                edge.last_updated.timestamp() if edge.last_updated else None,
+                json.dumps(edge.source_event_ids) if edge.source_event_ids else None,
+                edge.last_seen.timestamp() if edge.last_seen else None,
                 edge.id,
             )
         )
@@ -993,21 +989,20 @@ class TurboMemoryStore:
 
     def _row_to_edge(self, row: sqlite3.Row) -> Edge:
         """Convert a database row to an Edge object."""
-        metadata = {}
-        if row['metadata']:
-            metadata = json.loads(row['metadata'])
+        source_ids = []
+        if row['source_event_ids']:
+            source_ids = json.loads(row['source_event_ids'])
 
         return Edge(
             id=row['id'],
             source_entity_id=row['source_entity_id'],
             target_entity_id=row['target_entity_id'],
+            relation=row['relation'],
             relation_type=row['relation_type'],
             strength=row['strength'],
-            confidence=row['confidence'],
-            evidence_count=row['evidence_count'],
-            metadata=metadata,
+            source_event_ids=source_ids,
             first_seen=datetime.fromtimestamp(row['first_seen']) if row['first_seen'] else None,
-            last_updated=datetime.fromtimestamp(row['last_updated']) if row['last_updated'] else None,
+            last_seen=datetime.fromtimestamp(row['last_seen']) if row['last_seen'] else None,
         )
 
     # =========================================================================
@@ -1029,19 +1024,22 @@ class TurboMemoryStore:
         conn.execute(
             """
             INSERT INTO facts (
-                id, subject_id, predicate, object_value,
-                confidence, source_event_ids, first_seen, last_seen
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                id, subject_entity_id, predicate, object_text, object_entity_id,
+                fact_type, confidence, strength, source_event_ids, valid_from, valid_to
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 fact.id,
-                fact.subject_id,
+                fact.subject_entity_id,
                 fact.predicate,
-                fact.object_value,
+                fact.object_text,
+                fact.object_entity_id,
+                fact.fact_type,
                 fact.confidence,
-                json.dumps(fact.source_event_ids),
-                fact.first_seen.timestamp() if fact.first_seen else None,
-                fact.last_seen.timestamp() if fact.last_seen else None,
+                fact.strength,
+                json.dumps(fact.source_event_ids) if fact.source_event_ids else None,
+                fact.valid_from.timestamp() if fact.valid_from else None,
+                fact.valid_to.timestamp() if fact.valid_to else None,
             )
         )
         conn.commit()
@@ -1064,7 +1062,7 @@ class TurboMemoryStore:
         rows = conn.execute(
             """
             SELECT * FROM facts
-            WHERE subject_id = ? OR object_id = ?
+            WHERE subject_entity_id = ? OR object_entity_id = ?
             ORDER BY confidence DESC
             """,
             (entity_id, entity_id)
@@ -1072,12 +1070,12 @@ class TurboMemoryStore:
 
         return [self._row_to_fact(row) for row in rows]
 
-    def get_facts_for_subject(self, subject_id: str) -> list[Fact]:
+    def get_facts_for_subject(self, subject_entity_id: str) -> list[Fact]:
         """
         Get all facts where entity is the subject.
 
         Args:
-            subject_id: Subject entity ID
+            subject_entity_id: Subject entity ID
 
         Returns:
             List of facts
@@ -1087,13 +1085,49 @@ class TurboMemoryStore:
         rows = conn.execute(
             """
             SELECT * FROM facts
-            WHERE subject_id = ?
+            WHERE subject_entity_id = ?
             ORDER BY confidence DESC
             """,
-            (subject_id,)
+            (subject_entity_id,)
         ).fetchall()
 
         return [self._row_to_fact(row) for row in rows]
+
+    def find_fact(
+        self,
+        subject_entity_id: str,
+        predicate: str,
+        object_text: str,
+        object_entity_id: str | None = None,
+    ) -> Optional[Fact]:
+        """
+        Find a specific fact by subject + predicate + object.
+
+        Args:
+            subject_entity_id: Subject entity ID
+            predicate: Predicate
+            object_text: Object text
+            object_entity_id: Optional object entity ID
+
+        Returns:
+            Fact if found, None otherwise
+        """
+        conn = self._get_connection()
+
+        row = conn.execute(
+            """
+            SELECT * FROM facts
+            WHERE subject_entity_id = ?
+              AND predicate = ?
+              AND object_text = ?
+              AND (object_entity_id IS ? OR object_entity_id = ?)
+            """,
+            (subject_entity_id, predicate, object_text, object_entity_id, object_entity_id)
+        ).fetchone()
+
+        if row:
+            return self._row_to_fact(row)
+        return None
 
     def update_fact(self, fact: Fact):
         """
@@ -1107,17 +1141,25 @@ class TurboMemoryStore:
         conn.execute(
             """
             UPDATE facts SET
-                object_value = ?,
+                object_text = ?,
+                object_entity_id = ?,
+                fact_type = ?,
                 confidence = ?,
-                evidence_count = ?,
-                last_seen = ?
+                strength = ?,
+                source_event_ids = ?,
+                valid_from = ?,
+                valid_to = ?
             WHERE id = ?
             """,
             (
-                fact.object_value,
+                fact.object_text,
+                fact.object_entity_id,
+                fact.fact_type,
                 fact.confidence,
-                fact.evidence_count,
-                fact.last_seen.timestamp() if fact.last_seen else None,
+                fact.strength,
+                json.dumps(fact.source_event_ids) if fact.source_event_ids else None,
+                fact.valid_from.timestamp() if fact.valid_from else None,
+                fact.valid_to.timestamp() if fact.valid_to else None,
                 fact.id,
             )
         )
@@ -1133,14 +1175,38 @@ class TurboMemoryStore:
 
         return Fact(
             id=row['id'],
-            subject_id=row['subject_id'],
+            subject_entity_id=row['subject_entity_id'],
             predicate=row['predicate'],
-            object_value=row['object_value'],
+            object_text=row['object_text'],
+            object_entity_id=row['object_entity_id'],
+            fact_type=row['fact_type'],
             confidence=row['confidence'],
+            strength=row['strength'],
             source_event_ids=source_ids,
-            first_seen=datetime.fromtimestamp(row['first_seen']) if row['first_seen'] else None,
-            last_seen=datetime.fromtimestamp(row['last_seen']) if row['last_seen'] else None,
+            valid_from=datetime.fromtimestamp(row['valid_from']) if row['valid_from'] else None,
+            valid_to=datetime.fromtimestamp(row['valid_to']) if row['valid_to'] else None,
         )
+
+    def get_events_for_session(self, session_key: str, limit: int = 50) -> list[Event]:
+        """Get events for a specific session key."""
+        return self.get_events_by_session(session_key, limit=limit, offset=0)
+
+    def get_entities_for_session(self, session_key: str, limit: int = 20) -> list[Entity]:
+        """Get entities mentioned in a specific session."""
+        conn = self._get_connection()
+
+        rows = conn.execute(
+            """
+            SELECT DISTINCT e.* FROM entities e
+            JOIN events ev ON ev.content LIKE '%' || e.name || '%'
+            WHERE ev.session_key = ?
+            ORDER BY e.event_count DESC
+            LIMIT ?
+            """,
+            (session_key, limit)
+        ).fetchall()
+
+        return [self._row_to_entity(row) for row in rows]
 
     def search_similar_entities(
         self,

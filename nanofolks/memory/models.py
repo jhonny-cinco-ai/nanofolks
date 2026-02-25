@@ -153,7 +153,7 @@ class SummaryNode:
     """
     id: str
     node_type: str  # "root", "channel", "entity", "topic", "user_preferences"
-    key: str  # e.g., "root", "channel:telegram", "entity:{id}"
+    key: str  # e.g., "root", "room:general", "entity:{id}"
 
     # Hierarchy
     parent_id: Optional[str] = None

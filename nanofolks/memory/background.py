@@ -73,6 +73,7 @@ class BackgroundProcessor:
         self,
         memory_store,
         activity_tracker: ActivityTracker,
+        summary_manager=None,
         interval_seconds: int = 60,
     ):
         """
@@ -85,6 +86,7 @@ class BackgroundProcessor:
         """
         self.memory_store = memory_store
         self.activity_tracker = activity_tracker
+        self.summary_manager = summary_manager
         self.interval_seconds = interval_seconds
 
         self.running = False
@@ -173,7 +175,11 @@ class BackgroundProcessor:
         Returns:
             Number of events processed
         """
-        from nanofolks.memory.extraction import ExtractionConfig, extract_entities
+        from datetime import datetime
+
+        from nanofolks.config.schema import ExtractionConfig
+        from nanofolks.memory.extraction import extract_entities
+        from nanofolks.utils.ids import session_to_room_id
 
         # Get pending events
         pending = self.memory_store.get_pending_events(limit=20)
@@ -184,11 +190,14 @@ class BackgroundProcessor:
         # Use default config (gliner2) if not available
         config = ExtractionConfig(provider="gliner2")  # Use GLiNER2 as primary extractor
 
+        summary_manager = self.summary_manager
         count = 0
         for event in pending:
             try:
                 # Extract entities, edges, and facts
                 result = await extract_entities(event, config)
+
+                entity_id_map: dict[str, str] = {}
 
                 # Save entities
                 for entity in result.entities:
@@ -201,10 +210,75 @@ class BackgroundProcessor:
                         existing.event_count += 1
                         existing.last_seen = entity.last_seen
                         self.memory_store.update_entity(existing)
+                        entity_id_map[entity.id] = existing.id
                     else:
                         self.memory_store.save_entity(entity)
+                        entity_id_map[entity.id] = entity.id
 
-                # TODO: Save edges and facts (implement in Phase 3.6)
+                def map_entity_id(entity_id: str | None) -> str | None:
+                    if not entity_id:
+                        return None
+                    return entity_id_map.get(entity_id, entity_id)
+
+                # Save edges
+                for edge in result.edges:
+                    edge.source_entity_id = map_entity_id(edge.source_entity_id) or edge.source_entity_id
+                    edge.target_entity_id = map_entity_id(edge.target_entity_id) or edge.target_entity_id
+
+                    existing_edge = self.memory_store.get_edge(
+                        edge.source_entity_id,
+                        edge.target_entity_id,
+                        edge.relation,
+                        edge.relation_type,
+                    )
+
+                    if existing_edge:
+                        existing_edge.strength = min(1.0, existing_edge.strength + 0.1)
+                        existing_edge.last_seen = edge.last_seen or datetime.now()
+                        existing_edge.source_event_ids = list(
+                            set(existing_edge.source_event_ids + edge.source_event_ids)
+                        )
+                        self.memory_store.update_edge(existing_edge)
+                    else:
+                        self.memory_store.create_edge(edge)
+
+                # Save facts
+                for fact in result.facts:
+                    fact.subject_entity_id = map_entity_id(fact.subject_entity_id) or fact.subject_entity_id
+                    if fact.object_entity_id:
+                        fact.object_entity_id = map_entity_id(fact.object_entity_id)
+
+                    existing_fact = self.memory_store.find_fact(
+                        fact.subject_entity_id,
+                        fact.predicate,
+                        fact.object_text,
+                        fact.object_entity_id,
+                    )
+
+                    if existing_fact:
+                        existing_fact.confidence = max(existing_fact.confidence, fact.confidence)
+                        existing_fact.strength = min(1.0, existing_fact.strength + 0.1)
+                        existing_fact.source_event_ids = list(
+                            set(existing_fact.source_event_ids + fact.source_event_ids)
+                        )
+                        if fact.valid_from:
+                            if not existing_fact.valid_from or fact.valid_from < existing_fact.valid_from:
+                                existing_fact.valid_from = fact.valid_from
+                        if fact.valid_to:
+                            if not existing_fact.valid_to or fact.valid_to > existing_fact.valid_to:
+                                existing_fact.valid_to = fact.valid_to
+                        self.memory_store.update_fact(existing_fact)
+                    else:
+                        self.memory_store.create_fact(fact)
+
+                # Increment summary staleness (room + entity nodes)
+                if summary_manager:
+                    room_id = session_to_room_id(event.session_key)
+                    if room_id:
+                        summary_manager.increment_staleness(
+                            room_id,
+                            entity_ids=list(set(entity_id_map.values())),
+                        )
 
                 # Mark as extracted
                 self.memory_store.mark_event_extracted(event.id, "complete")
@@ -223,15 +297,17 @@ class BackgroundProcessor:
         Returns:
             Number of summaries refreshed
         """
-        from nanofolks.memory.summaries import SummaryTreeManager
-
         try:
-            # Create temporary summary manager
-            summary_manager = SummaryTreeManager(
-                store=self.memory_store,
-                staleness_threshold=10,
-                max_refresh_batch=20,
-            )
+            # Use shared summary manager when available
+            summary_manager = self.summary_manager
+            if summary_manager is None:
+                from nanofolks.memory.summaries import SummaryTreeManager
+
+                summary_manager = SummaryTreeManager(
+                    store=self.memory_store,
+                    staleness_threshold=10,
+                    max_refresh_batch=20,
+                )
 
             # Refresh stale summaries
             stats = summary_manager.refresh_all_stale()

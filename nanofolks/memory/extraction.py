@@ -200,7 +200,7 @@ class Gliner2Extractor:
                         fact_type="preference",
                         confidence=0.8,
                         source_event_ids=[event.id],
-                        created_at=datetime.now(),
+                        valid_from=datetime.now(),
                     )
                     facts.append(fact)
 

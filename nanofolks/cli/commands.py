@@ -510,7 +510,13 @@ If disabled, your bot will use [bold]{}[/bold] for all queries.
 
 
 @app.command("onboard")
-def onboard():
+def onboard(
+    non_interactive: bool = typer.Option(
+        False,
+        "--non-interactive",
+        help="Run onboarding with defaults (no prompts).",
+    ),
+):
     """Set up your multi-agent team from scratch.
 
     This wizard will guide you through:
@@ -521,7 +527,7 @@ def onboard():
     """
     from nanofolks.cli.onboarding import OnboardingWizard
 
-    wizard = OnboardingWizard()
+    wizard = OnboardingWizard(non_interactive=non_interactive)
     wizard.run()
 
 
@@ -3781,6 +3787,7 @@ def room_show(
 def task_list(
     room_id: str = typer.Option("general", "--room", "-r", help="Room ID"),
     status: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status"),
+    owner: Optional[str] = typer.Option(None, "--owner", "-o", help="Filter by owner"),
 ):
     """List tasks in a room."""
     from nanofolks.bots.room_manager import get_room_manager
@@ -3791,9 +3798,11 @@ def task_list(
         console.print(f"[red]❌ Room '{room_id}' not found[/red]")
         raise typer.Exit(1)
 
-    tasks = room.list_tasks(status=status)
+    tasks = room.list_tasks(status=status, owner=owner)
     if not tasks:
         msg = f"No tasks in room '{room_id}'." if not status else f"No tasks with status '{status}'."
+        if owner:
+            msg = f"No tasks owned by '{owner}' in room '{room_id}'."
         console.print(f"[yellow]{msg}[/yellow]")
         return
 
@@ -3884,6 +3893,7 @@ def task_assign(
     task_id: str = typer.Argument(..., help="Task ID (prefix ok)"),
     owner: str = typer.Argument(..., help="New owner"),
     room_id: str = typer.Option("general", "--room", "-r", help="Room ID"),
+    reason: Optional[str] = typer.Option(None, "--reason", help="Reason for reassignment"),
 ):
     """Assign a task to a new owner."""
     from nanofolks.bots.room_manager import get_room_manager
@@ -3902,12 +3912,89 @@ def task_assign(
         console.print(f"[yellow]Multiple tasks match '{task_id}'. Use a longer id.[/yellow]")
         raise typer.Exit(1)
 
-    ok = room.assign_task(matched[0].id, owner)
+    ok = room.assign_task(matched[0].id, owner, reason=reason)
     if ok:
         manager._save_room(room)
         console.print(f"[green]✓ Assigned task {matched[0].id[:8]} → {owner}[/green]")
     else:
         console.print(f"[red]Failed to assign task {task_id}[/red]")
+
+
+@task_app.command("handoff")
+def task_handoff(
+    task_id: str = typer.Argument(..., help="Task ID (prefix ok)"),
+    owner: str = typer.Argument(..., help="New owner"),
+    room_id: str = typer.Option("general", "--room", "-r", help="Room ID"),
+    reason: Optional[str] = typer.Option(None, "--reason", help="Reason for handoff"),
+    from_owner: Optional[str] = typer.Option(None, "--from", help="Handoff from (optional)"),
+):
+    """Record a task handoff to a new owner."""
+    from nanofolks.bots.room_manager import get_room_manager
+
+    manager = get_room_manager()
+    room = manager.get_room(room_id)
+    if not room:
+        console.print(f"[red]❌ Room '{room_id}' not found[/red]")
+        raise typer.Exit(1)
+
+    matched = [t for t in room.tasks if t.id.startswith(task_id)]
+    if not matched:
+        console.print(f"[yellow]No task matching '{task_id}' in {room_id}[/yellow]")
+        raise typer.Exit(1)
+    if len(matched) > 1:
+        console.print(f"[yellow]Multiple tasks match '{task_id}'. Use a longer id.[/yellow]")
+        raise typer.Exit(1)
+
+    ok = room.handoff_task(matched[0].id, owner, reason=reason, from_owner=from_owner)
+    if ok:
+        manager._save_room(room)
+        console.print(f"[green]✓ Handoff recorded {matched[0].id[:8]} → {owner}[/green]")
+    else:
+        console.print(f"[red]Failed to handoff task {task_id}[/red]")
+
+
+@task_app.command("history")
+def task_history(
+    task_id: str = typer.Argument(..., help="Task ID (prefix ok)"),
+    room_id: str = typer.Option("general", "--room", "-r", help="Room ID"),
+):
+    """Show handoff history for a task."""
+    from nanofolks.bots.room_manager import get_room_manager
+
+    manager = get_room_manager()
+    room = manager.get_room(room_id)
+    if not room:
+        console.print(f"[red]❌ Room '{room_id}' not found[/red]")
+        raise typer.Exit(1)
+
+    matched = [t for t in room.tasks if t.id.startswith(task_id)]
+    if not matched:
+        console.print(f"[yellow]No task matching '{task_id}' in {room_id}[/yellow]")
+        raise typer.Exit(1)
+    if len(matched) > 1:
+        console.print(f"[yellow]Multiple tasks match '{task_id}'. Use a longer id.[/yellow]")
+        raise typer.Exit(1)
+
+    handoffs = matched[0].metadata.get("handoffs", [])
+    if not handoffs:
+        console.print(f"[yellow]No handoffs recorded for {matched[0].id[:8]}[/yellow]")
+        return
+
+    table = Table(title=f"Handoffs ({matched[0].id[:8]})")
+    table.add_column("From", style="cyan")
+    table.add_column("To", style="green")
+    table.add_column("Reason", style="white")
+    table.add_column("At", style="dim")
+
+    for handoff in handoffs:
+        table.add_row(
+            handoff.get("from", "-"),
+            handoff.get("to", "-"),
+            handoff.get("reason", "") or "-",
+            handoff.get("timestamp", "") or "-",
+        )
+
+    console.print(table)
 
 
 

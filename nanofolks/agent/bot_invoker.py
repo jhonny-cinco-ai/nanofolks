@@ -67,6 +67,7 @@ class BotInvoker:
         workspace: Path,
         bus: MessageBus,
         work_log_manager: Any = None,
+        memory_store: Any = None,
         model: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
@@ -95,9 +96,11 @@ class BotInvoker:
 
         # Work log manager for multi-bot tracking
         self.work_log_manager = work_log_manager
+        self._memory_store = memory_store
 
         # Active invocations (all async now)
         self._active_invocations: dict[str, asyncio.Task[None]] = {}
+        self._invocation_task_map: dict[str, dict[str, str]] = {}
         self._cached_team_name: str | None = None
 
     async def invoke(
@@ -109,6 +112,7 @@ class BotInvoker:
         origin_channel: str = "cli",
         origin_chat_id: str = "direct",
         origin_room_id: str | None = None,
+        room_task_id: str | None = None,
     ) -> str:
         """
         Invoke a specialist bot to handle a task.
@@ -147,6 +151,7 @@ class BotInvoker:
             origin_channel=origin_channel,
             origin_chat_id=origin_chat_id,
             origin_room_id=origin_room_id,
+            room_task_id=room_task_id,
         )
 
     async def _invoke_async(
@@ -159,12 +164,19 @@ class BotInvoker:
         origin_channel: str,
         origin_chat_id: str,
         origin_room_id: str | None,
+        room_task_id: str | None,
     ) -> str:
         """Asynchronous invocation - fires off task and notifies when complete."""
         logger.info(f"Invoking {bot_role} (id: {invocation_id}, async): {task[:50]}...")
 
         # Log the bot invocation request
         self._log_invocation_request(invocation_id, bot_role, task, context)
+
+        if room_task_id and origin_room_id:
+            self._invocation_task_map[invocation_id] = {
+                "room_id": origin_room_id,
+                "task_id": room_task_id,
+            }
 
         # Launch in background, don't wait
         task_handle = asyncio.create_task(
@@ -176,6 +188,7 @@ class BotInvoker:
                 session_id=session_id,
                 origin_channel=origin_channel,
                 origin_chat_id=origin_chat_id,
+                origin_room_id=origin_room_id,
             )
         )
         self._active_invocations[invocation_id] = task_handle
@@ -196,6 +209,7 @@ class BotInvoker:
         session_id: str,
         origin_channel: str,
         origin_chat_id: str,
+        origin_room_id: str | None,
     ) -> None:
         """Process a bot invocation and announce result when complete."""
         result: str = ""
@@ -211,7 +225,13 @@ class BotInvoker:
                 user_message = f"Context from Leader:\n{context}\n\n---\n\nTask:\n{task}"
 
             # Process through LLM
-            response = await self._call_bot_llm(bot_role, system_prompt, user_message, session_id)
+            response = await self._call_bot_llm(
+                bot_role,
+                system_prompt,
+                user_message,
+                session_id,
+                room_id=origin_room_id,
+            )
             result = response or "Task completed but no response generated."
 
             logger.info(f"Async invocation {invocation_id} completed")
@@ -278,6 +298,73 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
 
         await self.bus.publish_inbound(msg)
         logger.debug(f"Invocation {invocation_id} announced result to {origin_channel}:{origin_chat_id}")
+
+        self._update_room_task(invocation_id, status, result)
+
+    def _update_room_task(self, invocation_id: str, status: str, result: str) -> None:
+        mapping = self._invocation_task_map.pop(invocation_id, None)
+        if not mapping:
+            return
+        try:
+            from nanofolks.bots.room_manager import get_room_manager
+
+            manager = get_room_manager()
+            room = manager.get_room(mapping["room_id"])
+            if not room:
+                return
+            task = room.get_task(mapping["task_id"])
+            if not task:
+                return
+            new_status = "done" if status == "ok" else "blocked"
+            room.update_task_status(task.id, new_status)
+            task.metadata["last_result"] = (result or "")[:2000]
+            manager._save_room(room)
+            self._log_task_event(mapping["room_id"], "status", task, extra={"status": new_status})
+        except Exception as e:
+            logger.warning(f"Failed to update room task for invocation {invocation_id}: {e}")
+
+    def _log_task_event(self, room_id: str, action: str, task: Any, reason: str | None = None,
+                        extra: dict[str, Any] | None = None) -> None:
+        if not self._memory_store:
+            return
+        try:
+            import uuid
+            from datetime import datetime
+
+            from nanofolks.memory.models import Event
+            from nanofolks.utils.ids import room_to_session_id
+
+            metadata = {
+                "task_id": task.id,
+                "action": action,
+                "owner": task.owner,
+                "status": task.status,
+                "priority": task.priority,
+                "due_date": task.due_date,
+            }
+            if reason:
+                metadata["reason"] = reason
+            if extra:
+                metadata.update(extra)
+
+            content = (
+                f"Task {action}: {task.title} "
+                f"(owner: {task.owner}, status: {task.status})"
+            )
+
+            event = Event(
+                id=str(uuid.uuid4()),
+                timestamp=datetime.now(),
+                channel="internal",
+                direction="internal",
+                event_type="task",
+                content=content,
+                session_key=room_to_session_id(room_id),
+                metadata=metadata,
+            )
+            self._memory_store.save_event(event)
+        except Exception:
+            return
 
     def _get_team_name(self) -> str:
         """Get current team name from config (cached)."""
@@ -365,6 +452,7 @@ Focus only on your domain expertise and provide a helpful response.
         system_prompt: str,
         user_message: str,
         session_id: str,
+        room_id: str | None = None,
     ) -> str:
         """Call LLM with bot's context and execute tools if needed.
 
@@ -379,6 +467,10 @@ Focus only on your domain expertise and provide a helpful response.
         # Create tool registry for this bot
         tool_registry = self._create_bot_tool_registry(bot_role)
         tool_definitions = tool_registry.get_definitions()
+        if room_id:
+            room_task_tool = tool_registry.get("room_task")
+            if room_task_tool and hasattr(room_task_tool, "set_context"):
+                room_task_tool.set_context(room_id)
 
         # Build initial messages
         messages = [

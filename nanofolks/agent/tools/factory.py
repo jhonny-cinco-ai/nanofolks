@@ -109,6 +109,7 @@ def create_default_registry(
         WriteFileTool,
     )
     from nanofolks.agent.tools.shell import ExecTool
+    from nanofolks.agent.tools.room_tasks import RoomTaskTool
     from nanofolks.agent.tools.web import WebFetchTool, WebSearchTool
 
     # File tools
@@ -144,6 +145,9 @@ def create_default_registry(
     if brave_api_key:
         registry.register(WebSearchTool(api_key=brave_api_key))
     registry.register(WebFetchTool())
+
+    # Room task tool (task ownership & handoffs)
+    registry.register(RoomTaskTool())
 
     # Message tool (if provider/bus available)
     if provider:

@@ -11,6 +11,8 @@ Uses typer and rich for interactive prompts and rich terminal output.
 """
 
 import asyncio
+import os
+import sys
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -55,12 +57,37 @@ class OnboardingWizard:
         "7": ("gemini", "Gemini - Google AI models"),
     }
 
-    def __init__(self):
+    def __init__(self, non_interactive: bool = False):
         """Initialize the onboarding wizard."""
         self.team_manager = TeamManager()
         self.selected_team: Optional[str] = None
         self.soul_manager: Optional[SoulManager] = None
         self.config_result: Dict = {}
+        self._non_interactive = non_interactive
+
+    def _is_non_interactive(self) -> bool:
+        env_flag = os.getenv("NANOFOLKS_ONBOARD_NONINTERACTIVE")
+        if env_flag:
+            return env_flag.lower() in {"1", "true", "yes", "on"}
+        if self._non_interactive:
+            return True
+        return not sys.stdin.isatty()
+
+    def _prompt(self, text: str, **kwargs) -> str:
+        if self._is_non_interactive():
+            default = kwargs.get("default")
+            if default is not None:
+                return str(default)
+            choices = kwargs.get("choices")
+            if choices:
+                return str(choices[0])
+            return ""
+        return Prompt.ask(text, **kwargs)
+
+    def _confirm(self, text: str, **kwargs) -> bool:
+        if self._is_non_interactive():
+            return bool(kwargs.get("default", False))
+        return Confirm.ask(text, **kwargs)
 
     def run(self, workspace_path: Optional[Path] = None) -> Dict:
         """Run the complete onboarding wizard.
@@ -201,12 +228,14 @@ class OnboardingWizard:
 
         if info.needs_setup:
             console.print("[yellow]⚠ Headless Linux server detected[/yellow]")
-            init_keyring = Confirm.ask(
-                "Initialize GNOME keyring now? (required for secure API key storage)", default=True
+            init_default = False if self._is_non_interactive() else True
+            init_keyring = self._confirm(
+                "Initialize GNOME keyring now? (required for secure API key storage)",
+                default=init_default,
             )
 
             if init_keyring:
-                password = Prompt.ask("Enter a password to unlock the keyring", password=True)
+                password = self._prompt("Enter a password to unlock the keyring", password=True)
                 if password:
                     console.print("\n[cyan]Initializing GNOME keyring...[/cyan]")
                     
@@ -237,7 +266,7 @@ class OnboardingWizard:
             console.print(f"  [{key}] {desc}")
         console.print("  [b] Back to welcome")
 
-        provider_choice = Prompt.ask(
+        provider_choice = self._prompt(
             "\nSelect provider", choices=list(self.PROVIDERS.keys()) + ["b"], default="1"
         )
         
@@ -249,7 +278,7 @@ class OnboardingWizard:
         # Get API key - allow pasting by default
         console.print(f"\n[dim]{provider_desc}[/dim]")
         console.print("[dim]Tip: You can paste your API key (Ctrl+V or Cmd+V)[/dim]")
-        api_key = Prompt.ask(f"Enter your {provider_name.title()} API key", password=False)
+        api_key = self._prompt(f"Enter your {provider_name.title()} API key", password=False)
 
         if api_key:
             key_preview = api_key[:12] + "..." if len(api_key) > 12 else api_key
@@ -281,7 +310,7 @@ class OnboardingWizard:
         console.print("  [c] Custom model")
         console.print("  [b] Back")
 
-        model_choice = Prompt.ask(
+        model_choice = self._prompt(
             "\nSelect model",
             choices=[str(i) for i in range(1, min(6, len(models) + 1))] + ["c", "b"],
             default="1",
@@ -291,7 +320,7 @@ class OnboardingWizard:
             return self._configure_provider()
         
         if model_choice == "c":
-            primary_model = Prompt.ask("Enter custom model name")
+            primary_model = self._prompt("Enter custom model name")
         else:
             primary_model = models[int(model_choice) - 1]
 
@@ -352,7 +381,7 @@ class OnboardingWizard:
         # Ask about Tailscale installation
         console.print()
         if not tailscale_ip:
-            install_tailscale = Confirm.ask(
+            install_tailscale = self._confirm(
                 "Install Tailscale for private network access?", default=False
             )
             if install_tailscale:
@@ -539,9 +568,10 @@ Then restart nanofolks for secure access.
         console.print()
 
         # Let user select
-        choice = Prompt.ask(
+        choice = self._prompt(
             "Select crew team",
             choices=[str(i) for i in range(1, len(teams) + 1)] + ["b"],
+            default="1",
         )
 
         if choice == "b":
@@ -555,7 +585,7 @@ Then restart nanofolks for secure access.
 
         # Confirm with option to go back
         console.print()
-        confirm = Confirm.ask(f"✓ Confirm {selected_team['display_name']} crew?", default=True)
+        confirm = self._confirm(f"✓ Confirm {selected_team['display_name']} crew?", default=True)
 
         if confirm:
             self.team_manager.select_team(self.selected_team)
@@ -625,7 +655,7 @@ Then restart nanofolks for secure access.
         console.print(summary_table)
         console.print()
 
-        if Confirm.ask("🚀 Launch your crew?", default=True):
+        if self._confirm("🚀 Launch your crew?", default=True):
             console.print("\n[green]✓ Setup complete![/green]\n")
             console.print("Your AI crew is ready!")
             console.print("\n[bold]Get started:[/bold]")

@@ -68,20 +68,23 @@ class SummaryTreeManager:
             self.store.create_summary_node(root)
             logger.info("Created root summary node")
 
-    def increment_staleness(self, channel: str, entity_ids: list[str] = None):
+    def increment_staleness(self, room_id: str, entity_ids: list[str] = None):
         """
         Increment staleness counter for relevant nodes after new events.
 
         Args:
-            channel: Channel where events occurred
+            room_id: Room where events occurred
             entity_ids: List of entity IDs mentioned in events
         """
-        # Get or create channel node
-        channel_node = self._get_or_create_channel_node(channel)
+        if not room_id:
+            return
+
+        # Get or create room node
+        room_node = self._get_or_create_room_node(room_id)
 
         # Increment staleness
-        channel_node.events_since_update += 1
-        self.store.update_summary_node(channel_node)
+        room_node.events_since_update += 1
+        self.store.update_summary_node(room_node)
 
         # Increment for specific entities
         if entity_ids:
@@ -91,7 +94,7 @@ class SummaryTreeManager:
                     entity_node.events_since_update += 1
                     self.store.update_summary_node(entity_node)
 
-        logger.debug(f"Incremented staleness for channel {channel}")
+        logger.debug(f"Incremented staleness for room {room_id}")
 
     def get_stale_nodes(self, min_staleness: int = None) -> list[SummaryNode]:
         """
@@ -130,8 +133,14 @@ class SummaryTreeManager:
 
         try:
             # Generate new summary based on node type
-            if node.node_type == "channel":
-                new_summary = self._generate_channel_summary(node.key.replace("channel:", ""))
+            if node.node_type in {"room", "channel"}:
+                from nanofolks.utils.ids import session_to_room_id
+
+                if node.node_type == "channel":
+                    room_id = node.key.replace("channel:", "")
+                else:
+                    room_id = session_to_room_id(node.key)
+                new_summary = self._generate_room_summary(room_id)
             elif node.node_type == "entity":
                 entity_id = node.key.replace("entity:", "")
                 new_summary = self._generate_entity_summary(entity_id)
@@ -186,37 +195,39 @@ class SummaryTreeManager:
 
         return results
 
-    def _get_or_create_channel_node(self, channel: str) -> SummaryNode:
-        """Get or create a channel summary node."""
-        node_key = f"channel:{channel}"
+    def _get_or_create_room_node(self, room_id: str) -> SummaryNode:
+        """Get or create a room summary node."""
+        node_key = room_to_session_id(room_id)
         node = self.store.get_summary_node(node_key)
 
         if not node:
             node = SummaryNode(
                 id=node_key,
-                node_type="channel",
+                node_type="room",
                 key=node_key,
                 parent_id="root",
-                summary=f"Summary for {channel} conversations",
+                summary=f"Summary for room {room_id}",
             )
             self.store.create_summary_node(node)
-            logger.info(f"Created channel summary node: {channel}")
+            logger.info(f"Created room summary node: {room_id}")
 
         return node
 
-    def _generate_channel_summary(self, channel: str) -> str:
-        """Generate summary for a channel."""
-        # Get recent events for this channel
-        events = self.store.get_events_for_channel(channel, limit=50)
+    def _generate_room_summary(self, room_id: str) -> str:
+        """Generate summary for a room."""
+        session_key = room_to_session_id(room_id)
+
+        # Get recent events for this room
+        events = self.store.get_events_for_session(session_key, limit=50)
 
         if not events:
-            return f"No recent activity in {channel}."
+            return f"No recent activity in {room_id}."
 
         # Get entity counts
-        entities = self.store.get_entities_for_channel(channel, limit=20)
+        entities = self.store.get_entities_for_session(session_key, limit=20)
 
         summary_parts = [
-            f"Channel: {channel}",
+            f"Room: {room_id}",
             f"Recent events: {len(events)}",
             f"Active entities: {len(entities)}",
         ]

@@ -752,7 +752,7 @@ A **room** is a conversation context where:
 
 ### Room Tasks
 
-Each room can track **tasks** so your crew’s work stays organized. Tasks belong to a room, have an owner and status, and can be listed or updated from the CLI. When the Leader assigns a bot, Nanofolks also creates a matching room task automatically so progress stays visible.
+Each room can track **tasks** so your crew’s work stays organized. Tasks belong to a room, have an owner and status, and include **handoff history** when ownership changes. When the Leader assigns a bot, Nanofolks also creates a matching room task automatically so progress stays visible.
 
 ### Room-Centric Architecture
 
@@ -1008,9 +1008,12 @@ nanofolks room list                  # List all your rooms
 
 ```bash
 nanofolks room task list --room project-alpha
+nanofolks room task list --room project-alpha --owner researcher
 nanofolks room task add --room project-alpha --owner coder --priority high --due 2025-01-15 "Ship landing page"
 nanofolks room task status --room project-alpha <task_id> done
-nanofolks room task assign --room project-alpha <task_id> researcher
+nanofolks room task assign --room project-alpha <task_id> researcher --reason "Needs deep research"
+nanofolks room task handoff --room project-alpha <task_id> creative --reason "Shift to design phase"
+nanofolks room task history --room project-alpha <task_id>
 ```
 
 

@@ -69,7 +69,29 @@ class RoomTask:
     updated_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    def add_handoff(self, from_owner: str, to_owner: str, reason: str | None = None) -> None:
+        """Record a handoff event for this task."""
+        handoffs = self.metadata.setdefault("handoffs", [])
+        handoffs.append(
+            {
+                "from": from_owner,
+                "to": to_owner,
+                "reason": reason or "",
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
+
+    def set_owner(self, new_owner: str, reason: str | None = None, from_owner: str | None = None) -> None:
+        """Assign a new owner and record a handoff."""
+        previous = from_owner or self.owner
+        if previous != new_owner:
+            self.add_handoff(previous, new_owner, reason)
+        self.owner = new_owner
+        self.updated_at = datetime.now()
+
     def to_dict(self) -> Dict[str, Any]:
+        if "handoffs" not in self.metadata:
+            self.metadata["handoffs"] = []
         return {
             "id": self.id,
             "title": self.title,
@@ -86,6 +108,9 @@ class RoomTask:
     def from_dict(cls, data: Dict[str, Any]) -> "RoomTask":
         created_at = datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.now()
         updated_at = datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else created_at
+        metadata = data.get("metadata", {}) or {}
+        if "handoffs" not in metadata:
+            metadata["handoffs"] = []
         return cls(
             id=data.get("id") or uuid.uuid4().hex,
             title=data.get("title", ""),
@@ -95,7 +120,7 @@ class RoomTask:
             due_date=data.get("due_date"),
             created_at=created_at,
             updated_at=updated_at,
-            metadata=data.get("metadata", {}) or {},
+            metadata=metadata,
         )
 
 
@@ -243,21 +268,46 @@ class Room:
         self.updated_at = datetime.now()
         return True
 
-    def assign_task(self, task_id: str, owner: str) -> bool:
+    def assign_task(
+        self,
+        task_id: str,
+        owner: str,
+        reason: str | None = None,
+        from_owner: str | None = None,
+    ) -> bool:
         """Assign a task to an owner."""
         task = self.get_task(task_id)
         if not task:
             return False
-        task.owner = owner
-        task.updated_at = datetime.now()
+        task.set_owner(owner, reason=reason, from_owner=from_owner)
         self.updated_at = datetime.now()
         return True
 
-    def list_tasks(self, status: Optional[str] = None) -> List[RoomTask]:
+    def handoff_task(
+        self,
+        task_id: str,
+        new_owner: str,
+        reason: str | None = None,
+        from_owner: str | None = None,
+    ) -> bool:
+        """Handoff a task to a new owner with a reason."""
+        task = self.get_task(task_id)
+        if not task:
+            return False
+        task.set_owner(new_owner, reason=reason, from_owner=from_owner)
+        self.updated_at = datetime.now()
+        return True
+
+    def list_tasks(
+        self, status: Optional[str] = None, owner: Optional[str] = None
+    ) -> List[RoomTask]:
         """List tasks, optionally filtered by status."""
-        if status is None:
-            return list(self.tasks)
-        return [task for task in self.tasks if task.status == status]
+        tasks = list(self.tasks)
+        if status is not None:
+            tasks = [task for task in tasks if task.status == status]
+        if owner is not None:
+            tasks = [task for task in tasks if task.owner == owner]
+        return tasks
 
     def add_participant(self, bot_name: str) -> None:
         """Add bot to room.

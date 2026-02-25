@@ -224,6 +224,13 @@ class AgentLoop:
 
             self.memory_store = TurboMemoryStore(memory_config, workspace)
 
+            # Initialize summary manager
+            self.summary_manager = create_summary_manager(
+                self.memory_store,
+                staleness_threshold=memory_config.summary.staleness_threshold,
+                max_refresh_batch=memory_config.summary.max_refresh_batch,
+            )
+
             # Initialize activity tracker for background processing
             self.activity_tracker = ActivityTracker(
                 quiet_threshold_seconds=memory_config.background.quiet_threshold_seconds
@@ -233,14 +240,8 @@ class AgentLoop:
             self.background_processor = BackgroundProcessor(
                 memory_store=self.memory_store,
                 activity_tracker=self.activity_tracker,
+                summary_manager=self.summary_manager,
                 interval_seconds=memory_config.background.interval_seconds,
-            )
-
-            # Initialize summary manager
-            self.summary_manager = create_summary_manager(
-                self.memory_store,
-                staleness_threshold=memory_config.summary.staleness_threshold,
-                max_refresh_batch=memory_config.summary.max_refresh_batch,
             )
 
             # Initialize context assembler
@@ -368,6 +369,7 @@ class AgentLoop:
             workspace=workspace,
             bus=bus,
             work_log_manager=self.work_log_manager,
+            memory_store=self.memory_store,
             model=self.model,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
@@ -1261,12 +1263,18 @@ class AgentLoop:
                     set_context(msg.channel, msg.chat_id, msg.room_id)
                 except TypeError:
                     set_context(msg.channel, msg.chat_id)
+            set_memory_store = getattr(invoke_tool, "set_memory_store", None)
+            if set_memory_store and callable(set_memory_store):
+                set_memory_store(self.memory_store)
 
         room_task_tool = self.tools.get("room_task")
         if room_task_tool:
             set_context = getattr(room_task_tool, "set_context", None)
             if set_context and callable(set_context):
                 set_context(msg.room_id or self._current_room_id)
+            set_memory_store = getattr(room_task_tool, "set_memory_store", None)
+            if set_memory_store and callable(set_memory_store):
+                set_memory_store(self.memory_store)
 
         routines_tool = self.tools.get("routines")
         if isinstance(routines_tool, RoutinesTool):
@@ -1351,6 +1359,7 @@ class AgentLoop:
                 relevant_entities = self.context_assembler.get_relevant_entities(
                     query=sanitized_content,
                     channel=msg.channel,
+                    room_id=msg.room_id,
                     limit=5,
                 )
                 entity_ids = [e.id for e in relevant_entities]
@@ -1759,12 +1768,18 @@ class AgentLoop:
                     set_context(origin_channel, origin_chat_id, msg.room_id)
                 except TypeError:
                     set_context(origin_channel, origin_chat_id)
+            set_memory_store = getattr(invoke_tool, "set_memory_store", None)
+            if set_memory_store and callable(set_memory_store):
+                set_memory_store(self.memory_store)
 
         room_task_tool = self.tools.get("room_task")
         if room_task_tool:
             set_context = getattr(room_task_tool, "set_context", None)
             if set_context and callable(set_context):
                 set_context(msg.room_id or self._current_room_id)
+            set_memory_store = getattr(room_task_tool, "set_memory_store", None)
+            if set_memory_store and callable(set_memory_store):
+                set_memory_store(self.memory_store)
 
         routines_tool = self.tools.get("routines")
         if isinstance(routines_tool, RoutinesTool):

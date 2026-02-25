@@ -982,6 +982,7 @@ Nanofolks also respects these env vars:
 ```bash
 nanofolks memory status       # Show memory statistics
 nanofolks memory search "query"  # Search memories
+nanofolks memory rebuild-index   # Rebuild semantic search index
 nanofolks session status     # Show context usage
 nanofolks session compact    # Manual compaction
 ```

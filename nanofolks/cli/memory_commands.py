@@ -110,6 +110,23 @@ def memory_status():
         memory_store.close()
 
 
+@memory_app.command("rebuild-index")
+def memory_rebuild_index():
+    """Rebuild the semantic search index from stored event embeddings."""
+    memory_store = _get_memory_store()
+    if not memory_store:
+        return
+
+    try:
+        with console.status("[cyan]Rebuilding vector index...[/cyan]", spinner="dots"):
+            count = memory_store.rebuild_vector_index()
+        console.print(f"[green]Rebuilt vector index with {count} embeddings[/green]")
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/red]")
+    finally:
+        memory_store.close()
+
+
 @memory_app.command("search")
 def memory_search(query: str, limit: int = typer.Option(10, "--limit", "-l")):
     """Search memory content."""

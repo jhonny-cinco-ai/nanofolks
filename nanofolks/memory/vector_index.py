@@ -87,6 +87,32 @@ class VectorIndex:
             M=self.M
         )
         logger.info(f"Created new vector index (dim={self.dimension})")
+
+    def reset(self):
+        """Reset the index on disk and in memory."""
+        self._index = None
+        self._id_map = {}
+        self._reverse_map = {}
+        if self.index_path.exists():
+            try:
+                self.index_path.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to remove index file {self.index_path}: {e}")
+        if self.id_mapping_path.exists():
+            try:
+                self.id_mapping_path.unlink()
+            except Exception as e:
+                logger.warning(f"Failed to remove id map {self.id_mapping_path}: {e}")
+
+    def rebuild(self, items: list[tuple[str, list[float]]]) -> int:
+        """Rebuild the index from a full vector list."""
+        self.reset()
+        self._create_new_index()
+        if not items:
+            return 0
+        self.add_vectors_batch(items)
+        self.save()
+        return len(items)
     
     def _load_id_mapping(self):
         """Load ID mapping from disk."""

@@ -694,7 +694,10 @@ class AgentLoop:
         try:
             if self.context_assembler:
                 room_id = msg.room_id or self._current_room_id or "general"
-                memory_context = self.context_assembler.assemble_context(room_id=room_id)
+                memory_context = self.context_assembler.assemble_context(
+                    room_id=room_id,
+                    query=msg.content,
+                )
         except Exception as e:
             logger.warning(f"Could not assemble memory context for multi-bot: {e}")
 
@@ -1370,6 +1373,7 @@ class AgentLoop:
                     room_id=room_id_for_context,
                     entity_ids=entity_ids,
                     include_preferences=True,
+                    query=sanitized_content,
                 )
 
                 mem_duration_ms = int((time.time() - mem_start_time) * 1000)

@@ -384,6 +384,34 @@ class TurboMemoryStore:
 
         return [self._row_to_event(row) for row in rows]
 
+    def iter_event_embeddings(self, batch_size: int = 500):
+        """Iterate over event embeddings for index rebuild."""
+        conn = self._get_connection()
+        offset = 0
+        while True:
+            rows = conn.execute(
+                """
+                SELECT id, content_embedding FROM events
+                WHERE content_embedding IS NOT NULL
+                ORDER BY timestamp ASC
+                LIMIT ? OFFSET ?
+                """,
+                (batch_size, offset)
+            ).fetchall()
+
+            if not rows:
+                break
+
+            for row in rows:
+                blob = row["content_embedding"]
+                if not blob:
+                    continue
+                dim = len(blob) // 4
+                embedding = struct.unpack(f'{dim}f', blob)
+                yield row["id"], list(embedding)
+
+            offset += batch_size
+
     def get_pending_events(self, limit: int = 20) -> list[Event]:
         """
         Get events awaiting extraction processing.
@@ -423,6 +451,14 @@ class TurboMemoryStore:
         conn.commit()
 
         logger.debug(f"Event {event_id} marked as {status}")
+
+    def rebuild_vector_index(self) -> int:
+        """Rebuild the vector index from stored event embeddings."""
+        vector_index = self._get_vector_index()
+        items = list(self.iter_event_embeddings())
+        count = vector_index.rebuild(items)
+        logger.info(f"Rebuilt vector index with {count} embeddings")
+        return count
 
     def _row_to_event(self, row: sqlite3.Row) -> Event:
         """Convert a database row to an Event object."""

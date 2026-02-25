@@ -11,7 +11,8 @@ into a context string that fits within the LLM's token budget.
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from datetime import datetime
+from typing import Iterable, Optional
 
 from loguru import logger
 
@@ -88,6 +89,7 @@ class ContextAssembler:
         entity_ids: list[str] = None,
         recent_event_ids: list[str] = None,
         include_preferences: bool = True,
+        query: str | None = None,
     ) -> str:
         """
         Assemble memory context from summaries.
@@ -120,7 +122,11 @@ class ContextAssembler:
 
         # Section 3: Entity Context (prioritized by relevance)
         if entity_ids:
-            entity_context = self._get_entity_context(entity_ids[:5])  # Top 5
+            entity_context = self._get_entity_context(
+                entity_ids=entity_ids,
+                query=query,
+                max_tokens=budget.entities,
+            )
             if entity_context:
                 sections.append(("ENTITIES", entity_context, budget.entities))
                 remaining_budget -= budget.entities
@@ -133,11 +139,16 @@ class ContextAssembler:
                 remaining_budget -= budget.preferences
 
         # Section 5: Recent Events
-        if recent_event_ids:
-            recent_context = self._get_recent_context(recent_event_ids[:10])  # Top 10
-            if recent_context:
-                sections.append(("RECENT", recent_context, budget.recent))
-                remaining_budget -= budget.recent
+        recent_context = self._get_recent_context(
+            event_ids=recent_event_ids,
+            room_id=room_id,
+            query=query,
+            entity_ids=entity_ids,
+            max_tokens=budget.recent,
+        )
+        if recent_context:
+            sections.append(("RECENT", recent_context, budget.recent))
+            remaining_budget -= budget.recent
 
         # Section 6: Knowledge (general summaries)
         if remaining_budget > 0:
@@ -167,22 +178,38 @@ Use this context to provide personalized and informed responses."""
             return f"Room: {room_id}\n{room_node.summary}"
         return ""
 
-    def _get_entity_context(self, entity_ids: list[str]) -> str:
-        """Get context for specific entities."""
-        contexts = []
+    def _get_entity_context(
+        self,
+        entity_ids: list[str],
+        query: str | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        """Get context for specific entities (relevance-scored)."""
+        if not entity_ids:
+            return ""
+
+        query_terms = self._tokenize_query(query)
+        scored_items: list[tuple[float, str]] = []
 
         for entity_id in entity_ids:
-            # Get entity summary from tree
+            entity = self.store.get_entity(entity_id)
+            if not entity:
+                continue
+
+            # Get entity summary from tree (preferred)
             entity_node = self.store.get_summary_node(f"entity:{entity_id}")
             if entity_node and entity_node.summary:
-                contexts.append(f"{entity_node.summary}")
+                text = entity_node.summary
             else:
-                # Fallback: generate from entity directly
-                entity = self.store.get_entity(entity_id)
-                if entity:
-                    contexts.append(f"{entity.name} ({entity.entity_type})")
+                text = f"{entity.name} ({entity.entity_type})"
 
-        return "\n\n".join(contexts) if contexts else ""
+            score = float(entity.event_count or 0)
+            score *= self._recency_boost(entity.last_seen)
+            score += self._match_boost(text, query_terms) + self._match_boost(entity.name, query_terms)
+
+            scored_items.append((score, text))
+
+        return self._join_scored(scored_items, max_tokens)
 
     def _get_preferences_context(self) -> str:
         """Get user preferences context."""
@@ -191,18 +218,108 @@ Use this context to provide personalized and informed responses."""
             return prefs_node.summary
         return ""
 
-    def _get_recent_context(self, event_ids: list[str]) -> str:
-        """Get context from recent events."""
-        events = []
-        for event_id in event_ids:
-            # Get event from store
-            event = self.store.get_event(event_id)
-            if event:
-                events.append(f"- {event.content[:100]}")  # Truncate long content
+    def _get_recent_context(
+        self,
+        event_ids: list[str] | None,
+        room_id: str,
+        query: str | None = None,
+        entity_ids: list[str] | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        """Get context from recent events (relevance-scored)."""
+        query_terms = self._tokenize_query(query)
+        entity_names: list[str] = []
+        if entity_ids:
+            for entity_id in entity_ids:
+                entity = self.store.get_entity(entity_id)
+                if entity:
+                    entity_names.append(entity.name.lower())
 
-        if events:
-            return "Recent conversation:\n" + "\n".join(events)
+        events: list = []
+        if event_ids:
+            for event_id in event_ids:
+                event = self.store.get_event(event_id)
+                if event:
+                    events.append(event)
+        else:
+            session_key = room_to_session_id(room_id)
+            events = self.store.get_events_for_session(session_key, limit=50)
+
+        scored_items: list[tuple[float, str]] = []
+        for event in events:
+            content = event.content or ""
+            score = self._recency_boost(event.timestamp)
+            score += self._match_boost(content, query_terms)
+            for name in entity_names:
+                if name and name in content.lower():
+                    score += 1.0
+            snippet = content[:160]
+            if snippet:
+                scored_items.append((score, f"- {snippet}"))
+
+        if not scored_items:
+            return ""
+
+        joined = self._join_scored(scored_items, max_tokens)
+        if joined:
+            return "Recent conversation:\n" + joined
         return ""
+
+    def _join_scored(
+        self,
+        scored_items: Iterable[tuple[float, str]],
+        max_tokens: int | None,
+    ) -> str:
+        if not scored_items:
+            return ""
+        items = sorted(scored_items, key=lambda x: x[0], reverse=True)
+        if not max_tokens:
+            return "\n\n".join([text for _, text in items])
+
+        remaining = max_tokens
+        selected: list[str] = []
+        for _, text in items:
+            cost = self._estimate_tokens(text)
+            if cost > remaining:
+                continue
+            selected.append(text)
+            remaining -= cost
+            if remaining <= 0:
+                break
+        return "\n\n".join(selected)
+
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        return max(1, len(text) // 4)
+
+    @staticmethod
+    def _tokenize_query(query: str | None) -> list[str]:
+        if not query:
+            return []
+        return [term for term in query.lower().split() if len(term) > 2]
+
+    @staticmethod
+    def _match_boost(text: str, query_terms: list[str]) -> float:
+        if not text or not query_terms:
+            return 0.0
+        text_lower = text.lower()
+        return sum(1.0 for term in query_terms if term in text_lower)
+
+    @staticmethod
+    def _recency_boost(ts) -> float:
+        if not ts:
+            return 1.0
+        try:
+            days = max(0.0, (datetime.now() - ts).total_seconds() / 86400.0)
+        except Exception:
+            return 1.0
+        if days <= 1:
+            return 3.0
+        if days <= 7:
+            return 2.0
+        if days <= 30:
+            return 1.2
+        return 1.0
 
     def _get_knowledge_context(self, max_tokens: int) -> str:
         """Get general knowledge from summary tree."""

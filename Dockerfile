@@ -22,7 +22,7 @@ COPY pyproject.toml README.md LICENSE ./
 
 # Build dependency wheels from pyproject (cacheable)
 RUN python -c "import tomllib; from pathlib import Path; data = tomllib.loads(Path('pyproject.toml').read_text()); deps = data.get('project', {}).get('dependencies', []); Path('requirements.txt').write_text('\\n'.join(deps) + '\\n')" \
-    && pip wheel -r requirements.txt --wheel-dir /wheels
+    && pip wheel -r requirements.txt --wheel-dir /wheels/deps
 
 # Copy source code
 COPY nanofolks/ nanofolks/
@@ -31,7 +31,7 @@ COPY nanofolks/ nanofolks/
 RUN mkdir -p bridge && touch bridge/.gitkeep
 
 # Build wheel for the package only (no deps)
-RUN pip wheel . --no-deps --wheel-dir /wheels
+RUN pip wheel . --no-deps --wheel-dir /wheels/app
 
 # =============================================================================
 # Stage 2: WhatsApp Bridge Builder
@@ -74,10 +74,16 @@ RUN apt-get update && \
 # Create config directory
 RUN mkdir -p /root/.nanofolks
 
-# Copy and install Python wheel with all dependencies
-COPY --from=python-builder /wheels/*.whl /tmp/
-RUN pip install --no-cache-dir /tmp/*.whl && \
-    rm /tmp/*.whl && \
+# Copy and install dependency wheels (stable between code changes)
+COPY --from=python-builder /wheels/deps/*.whl /tmp/deps/
+RUN pip install --no-cache-dir /tmp/deps/*.whl && \
+    rm -rf /tmp/deps && \
+    rm -rf /root/.cache/pip
+
+# Copy and install app wheel (changes when code changes)
+COPY --from=python-builder /wheels/app/*.whl /tmp/app/
+RUN pip install --no-cache-dir /tmp/app/*.whl && \
+    rm -rf /tmp/app && \
     rm -rf /root/.cache/pip
 
 # Copy WhatsApp bridge runtime files only

@@ -1549,6 +1549,18 @@ class TurboMemoryStore:
         ).fetchone()[0]
         stats['pending_extractions'] = pending
 
+        # Pending embeddings
+        pending_embeddings = conn.execute(
+            "SELECT COUNT(*) FROM events WHERE content_embedding IS NULL"
+        ).fetchone()[0]
+        stats['pending_embeddings'] = pending_embeddings
+
+        # Database file size
+        try:
+            stats['db_size_bytes'] = self.db_path.stat().st_size
+        except OSError:
+            stats['db_size_bytes'] = 0
+
         return stats
 
     # =========================================================================

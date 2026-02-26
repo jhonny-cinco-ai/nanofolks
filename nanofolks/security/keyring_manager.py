@@ -232,11 +232,14 @@ def init_gnome_keyring(password: str) -> bool:
                 return False
 
             for match in re.finditer(r"(\w+)=([^;\n]+);", dbus.stdout):
-                os.environ[match.group(1)] = match.group(2)
+                # dbus-launch --sh-syntax may wrap values in quotes.
+                os.environ[match.group(1)] = match.group(2).strip("'\"")
 
-        # Initialize the keyring in the current DBus session (non-interactive)
+        # Initialize/replace keyring daemon in current DBus session (non-interactive).
+        # --replace is important after prior failed SecretService calls, which may have
+        # already auto-started a locked daemon.
         proc = subprocess.run(
-            ["gnome-keyring-daemon", "--unlock", "--components=secrets", "--daemonize"],
+            ["gnome-keyring-daemon", "--unlock", "--replace", "--components=secrets", "--daemonize"],
             input=password + "\n",
             capture_output=True,
             text=True,

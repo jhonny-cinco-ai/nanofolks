@@ -237,6 +237,8 @@ class OnboardingWizard:
             if init_keyring:
                 password = self._prompt("Enter a password to unlock the keyring", password=True)
                 if password:
+                    console.print("[green]✓ Password captured[/green]")
+                if password:
                     console.print("\n[bright_magenta]Initializing GNOME keyring...[/bright_magenta]")
                     
                     with Progress(
@@ -264,15 +266,11 @@ class OnboardingWizard:
 
         for key, (name, desc) in self.PROVIDERS.items():
             console.print(f"  [{key}] {desc}")
-        console.print("  [b] Back to welcome")
 
         provider_choice = self._prompt(
-            "\nSelect provider", choices=list(self.PROVIDERS.keys()) + ["b"], default="1"
+            "\nSelect provider", choices=list(self.PROVIDERS.keys()), default="1"
         )
-        
-        if provider_choice == "b":
-            return "back"
-            
+
         provider_name, provider_desc = self.PROVIDERS[provider_choice]
 
         # Get API key - allow pasting by default

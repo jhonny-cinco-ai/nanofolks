@@ -14,8 +14,8 @@ fi
 if [ "$1" != "bridge" ] && [ "$1" != "shell" ]; then
     if [ -n "$NANOFOLKS_KEYRING_PASSWORD" ]; then
         echo "Initializing container keyring..."
-        # Start gnome-keyring-daemon, unlock it, and export session variables
-        eval $(echo "$NANOFOLKS_KEYRING_PASSWORD" | gnome-keyring-daemon --unlock --components=secrets --daemonize)
+        # Start/replace gnome-keyring-daemon, unlock it, and export session variables
+        eval $(echo "$NANOFOLKS_KEYRING_PASSWORD" | gnome-keyring-daemon --unlock --replace --components=secrets --daemonize)
         export GNOME_KEYRING_CONTROL
         export GNOME_KEYRING_PID
     else

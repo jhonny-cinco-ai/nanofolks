@@ -72,6 +72,9 @@ class DashboardService:
     def __init__(
         self,
         manager: Optional[Any] = None,
+        channel_manager: Optional[Any] = None,
+        broker_manager: Optional[Any] = None,
+        memory_store: Optional[Any] = None,
         port: int = 9090,
         host: str = "localhost",
         update_interval: float = 5.0,  # seconds
@@ -85,6 +88,9 @@ class DashboardService:
             update_interval: Interval for metrics collection (seconds)
         """
         self.manager = manager
+        self.channel_manager = channel_manager
+        self.broker_manager = broker_manager
+        self.memory_store = memory_store
         self.port = port
         self.host = host
         self.update_interval = update_interval
@@ -161,6 +167,9 @@ class DashboardService:
                 "bots": health.bots,
                 "alerts": health.alerts,
                 "internal_metrics": internal_metrics,
+                "channels": self._get_channels_status(),
+                "broker": self._get_broker_stats(),
+                "memory": self._get_memory_stats(),
             }
         except Exception as e:
             logger.error(f"Error collecting metrics: {e}")
@@ -174,7 +183,39 @@ class DashboardService:
                 "bots": {},
                 "alerts": [f"Error collecting metrics: {str(e)}"],
                 "internal_metrics": {"counters": {}, "gauges": {}},
+                "channels": {},
+                "broker": {},
+                "memory": {},
             }
+
+    def _get_channels_status(self) -> Dict[str, Any]:
+        if not self.channel_manager:
+            return {}
+        try:
+            return self.channel_manager.get_status()
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _get_broker_stats(self) -> Dict[str, Any]:
+        if not self.broker_manager:
+            return {}
+        try:
+            return self.broker_manager.get_stats()
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _get_memory_stats(self) -> Dict[str, Any]:
+        if not self.memory_store:
+            return {}
+        try:
+            stats = self.memory_store.get_stats()
+            stats["embedding_ready"] = bool(
+                getattr(self.memory_store, "embedding_provider", None)
+                and self.memory_store.embedding_provider.is_ready()
+            )
+            return stats
+        except Exception as e:
+            return {"error": str(e)}
 
     async def _broadcast_to_clients(self, metrics: Dict[str, Any]) -> None:
         """Broadcast metrics to all connected WebSocket clients."""
@@ -659,6 +700,27 @@ class DashboardService:
                     </div>
                 </div>
 
+                <div class="grid">
+                    <div class="card">
+                        <h2>Channels</h2>
+                        <div class="system-metrics">
+                            ${renderChannels(metrics.channels || {})}
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h2>Broker Queues</h2>
+                        <div class="system-metrics">
+                            ${renderBroker(metrics.broker || {})}
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h2>Memory</h2>
+                        <div class="system-metrics">
+                            ${renderMemory(metrics.memory || {})}
+                        </div>
+                    </div>
+                </div>
+
                 ${metrics.alerts && metrics.alerts.length > 0 ? `
                     <div class="alerts">
                         <h3>⚠️ Alerts</h3>
@@ -714,6 +776,57 @@ class DashboardService:
 
             items.sort((a, b) => a[0].localeCompare(b[0]));
             return items.slice(0, 12).map(([name, value]) => `
+                <div class="metric-row">
+                    <div class="metric-name">${name}</div>
+                    <div class="metric-value">${value}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderChannels(channels) {
+            if (channels.error) {
+                return `<div class="metric-empty">${channels.error}</div>`;
+            }
+            const items = Object.entries(channels || {});
+            if (!items.length) {
+                return '<div class="metric-empty">No channels</div>';
+            }
+            return items.map(([name, info]) => `
+                <div class="metric-row">
+                    <div class="metric-name">${name}</div>
+                    <div class="metric-value">${info.running ? 'running' : 'stopped'}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderBroker(broker) {
+            if (broker.error) {
+                return `<div class="metric-empty">${broker.error}</div>`;
+            }
+            const items = Object.entries(broker || {});
+            if (!items.length) {
+                return '<div class="metric-empty">No active rooms</div>';
+            }
+            return items.map(([room, info]) => `
+                <div class="metric-row">
+                    <div class="metric-name">${room}</div>
+                    <div class="metric-value">q:${info.queue_depth || 0}</div>
+                </div>
+            `).join('');
+        }
+
+        function renderMemory(memory) {
+            if (memory.error) {
+                return `<div class="metric-empty">${memory.error}</div>`;
+            }
+            const sizeMb = memory.db_size_bytes ? (memory.db_size_bytes / 1024 / 1024).toFixed(1) : '0.0';
+            const items = [
+                ['db', `${sizeMb} MB`],
+                ['pending_extractions', memory.pending_extractions || 0],
+                ['pending_embeddings', memory.pending_embeddings || 0],
+                ['embedding_ready', memory.embedding_ready ? 'yes' : 'no'],
+            ];
+            return items.map(([name, value]) => `
                 <div class="metric-row">
                     <div class="metric-name">${name}</div>
                     <div class="metric-value">${value}</div>

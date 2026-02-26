@@ -1029,10 +1029,16 @@ def gateway(
     executor = RoutineExecutor(agent=agent, bus=bus, config=config, multi_manager=multi_manager)
     scheduler.on_job = executor.handle_job
 
+    # Create channel manager
+    channels = ChannelManager(config, bus)
+
     # Create dashboard service for real-time monitoring
     try:
         dashboard_service = DashboardService(
             manager=multi_manager,
+            channel_manager=channels,
+            broker_manager=broker_manager,
+            memory_store=getattr(agent, "memory_store", None),
             port=9090,
             update_interval=5.0,  # Update every 5 seconds
         )
@@ -1046,9 +1052,6 @@ def gateway(
         logger.warning(f"Failed to initialize dashboard: {e}")
         dashboard_service = None
         dashboard_server = None
-
-    # Create channel manager
-    channels = ChannelManager(config, bus)
 
     if channels.enabled_channels:
         console.print(f"[green]✓[/green] Channels enabled: {', '.join(channels.enabled_channels)}")

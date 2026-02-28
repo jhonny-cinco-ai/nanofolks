@@ -20,6 +20,7 @@ class WhatsAppConfig(Base):
     For secure defaults (Tailscale IP + random port), leave bridge_url empty
     and it will be auto-configured on first run.
     """
+
     enabled: bool = False
     bridge_url: str = ""  # Auto-configured if empty: uses Tailscale/LAN IP + random port
     bridge_token: str = ""  # Shared token for bridge auth (required)
@@ -65,22 +66,28 @@ class WhatsAppConfig(Base):
 
 class TelegramConfig(Base):
     """Telegram channel configuration."""
+
     enabled: bool = False
     token: str = ""  # Bot token from @BotFather
     allow_from: list[str] = Field(default_factory=list)  # Allowed user IDs or usernames
-    proxy: str | None = None  # HTTP/SOCKS5 proxy URL, e.g. "http://127.0.0.1:7890" or "socks5://127.0.0.1:1080"
+    proxy: str | None = (
+        None  # HTTP/SOCKS5 proxy URL, e.g. "http://127.0.0.1:7890" or "socks5://127.0.0.1:1080"
+    )
 
 
 class DiscordConfig(Base):
     """Discord channel configuration."""
+
     enabled: bool = False
     token: str = ""  # Bot token from Discord Developer Portal
     allow_from: list[str] = Field(default_factory=list)  # Allowed user IDs
     gateway_url: str = "wss://gateway.discord.gg/?v=10&encoding=json"
     intents: int = 37377  # GUILDS + GUILD_MESSAGES + DIRECT_MESSAGES + MESSAGE_CONTENT
 
+
 class EmailConfig(Base):
     """Email channel configuration (IMAP inbound + SMTP outbound)."""
+
     enabled: bool = False
     consent_granted: bool = False  # Explicit owner permission to access mailbox data
 
@@ -102,7 +109,9 @@ class EmailConfig(Base):
     from_address: str = ""
 
     # Behavior
-    auto_reply_enabled: bool = True  # If false, inbound email is read but no automatic reply is sent
+    auto_reply_enabled: bool = (
+        True  # If false, inbound email is read but no automatic reply is sent
+    )
     poll_interval_seconds: int = 30
     mark_seen: bool = True
     max_body_chars: int = 12000
@@ -112,6 +121,7 @@ class EmailConfig(Base):
 
 class SlackDMConfig(Base):
     """Slack DM policy configuration."""
+
     enabled: bool = True
     policy: str = "open"  # "open" or "allowlist"
     allow_from: list[str] = Field(default_factory=list)  # Allowed Slack user IDs
@@ -119,6 +129,7 @@ class SlackDMConfig(Base):
 
 class SlackConfig(Base):
     """Slack channel configuration."""
+
     enabled: bool = False
     mode: str = "socket"  # "socket" supported
     webhook_path: str = "/slack/events"
@@ -132,6 +143,7 @@ class SlackConfig(Base):
 
 class ChannelsConfig(Base):
     """Configuration for chat channels."""
+
     whatsapp: WhatsAppConfig = Field(default_factory=WhatsAppConfig)
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
     discord: DiscordConfig = Field(default_factory=DiscordConfig)
@@ -141,6 +153,7 @@ class ChannelsConfig(Base):
 
 class AgentDefaults(Base):
     """Default agent configuration."""
+
     workspace: str = "~/.nanofolks/workspace"
     model: str = "anthropic/claude-opus-4-5"
     max_tokens: int = 8192
@@ -152,6 +165,7 @@ class AgentDefaults(Base):
 
 class SidekickConfig(Base):
     """Sidekick helper configuration."""
+
     enabled: bool = True
     max_sidekicks_per_bot: int = 3
     max_sidekicks_per_room: int = 6
@@ -162,12 +176,14 @@ class SidekickConfig(Base):
 
 class AgentsConfig(Base):
     """Agent configuration."""
+
     defaults: AgentDefaults = Field(default_factory=AgentDefaults)
     sidekicks: SidekickConfig = Field(default_factory=SidekickConfig)
 
 
 class LLMRequestConfig(Base):
     """LLM request resilience configuration."""
+
     timeout_seconds: int = 60
     retry_attempts: int = 2
     retry_delay_s: float = 1.0
@@ -179,6 +195,7 @@ class LLMRequestConfig(Base):
 
 class ProviderConfig(Base):
     """LLM provider configuration."""
+
     api_key: str = ""
     api_base: str | None = None
     extra_headers: dict[str, str] | None = None  # Custom headers (e.g. APP-Code for AiHubMix)
@@ -186,6 +203,7 @@ class ProviderConfig(Base):
 
 class ProvidersConfig(Base):
     """Configuration for LLM providers."""
+
     anthropic: ProviderConfig = Field(default_factory=ProviderConfig)
     openai: ProviderConfig = Field(default_factory=ProviderConfig)
     openrouter: ProviderConfig = Field(default_factory=ProviderConfig)
@@ -202,18 +220,21 @@ class ProvidersConfig(Base):
 
 class GatewayConfig(Base):
     """Gateway/server configuration."""
+
     host: str = "0.0.0.0"
     port: int = 18790
 
 
 class WebSearchConfig(Base):
     """Web search tool configuration."""
+
     api_key: str = ""  # Brave Search API key
     max_results: int = 5
 
 
 class WebToolsConfig(Base):
     """Web tools configuration."""
+
     search: WebSearchConfig = Field(default_factory=WebSearchConfig)
     scrapling_enabled: bool = True
     scrapling_min_chars: int = 800
@@ -222,6 +243,7 @@ class WebToolsConfig(Base):
 
 class BrowserToolsConfig(Base):
     """Browser automation tool configuration."""
+
     enabled: bool = True
     allowlist: list[str] = Field(default_factory=list)
     binary: str = "agent-browser"
@@ -229,6 +251,7 @@ class BrowserToolsConfig(Base):
 
 class DocumentToolsConfig(Base):
     """Local document parsing configuration."""
+
     auto_parse_pdf: bool = True
     max_pages: int = 30
     max_chars: int = 200000
@@ -238,36 +261,52 @@ class DocumentToolsConfig(Base):
 
 class ExecToolConfig(Base):
     """Shell exec tool configuration."""
+
     timeout: int = 60
 
 
 class MCPServerConfig(Base):
     """MCP server connection configuration (stdio or HTTP)."""
+
     command: str = ""  # Stdio: command to run (e.g. "npx")
     args: list[str] = Field(default_factory=list)  # Stdio: command arguments
     env: dict[str, str] = Field(default_factory=dict)  # Stdio: extra env vars
     url: str = ""  # HTTP: streamable HTTP endpoint URL
-    headers: dict[str, str] = Field(default_factory=dict)  # HTTP: Custom HTTP Headers (supports {{symbolic_ref}})
+    headers: dict[str, str] = Field(
+        default_factory=dict
+    )  # HTTP: Custom HTTP Headers (supports {{symbolic_ref}})
     description: str = ""  # Description for agent discovery
     auto_connect: bool = True  # If true, connect automatically on startup/message
 
 
 class ToolsConfig(Base):
     """Tools configuration."""
+
     web: WebToolsConfig = Field(default_factory=WebToolsConfig)
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
     browser: BrowserToolsConfig = Field(default_factory=BrowserToolsConfig)
     documents: DocumentToolsConfig = Field(default_factory=DocumentToolsConfig)
     restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
-    evolutionary: bool = True  # If true, use allowed_paths whitelist instead of restrict_to_workspace
-    allowed_paths: list[str] = Field(default_factory=list)  # Paths allowed when evolutionary mode is enabled (e.g., ["/projects/nanofolks-turbo", "~/.nanofolks"])
-    protected_paths: list[str] = Field(default_factory=lambda: ["~/.nanofolks/config.json"])  # Paths that are always blocked, even within allowed_paths (e.g., config files with secrets)
-    mcp_servers: dict[str, MCPServerConfig] = Field(default_factory=dict)  # Global MCP server configurations (shared by all bots)
-    bot_mcp_servers: dict[str, dict[str, MCPServerConfig]] = Field(default_factory=dict)  # Per-bot MCP servers: {"bot_name": {"server_name": {...}}}
+    evolutionary: bool = (
+        True  # If true, use allowed_paths whitelist instead of restrict_to_workspace
+    )
+    allowed_paths: list[str] = Field(
+        default_factory=list
+    )  # Paths allowed when evolutionary mode is enabled (e.g., ["/projects/nanofolks-turbo", "~/.nanofolks"])
+    protected_paths: list[str] = Field(
+        default_factory=lambda: ["~/.nanofolks/config.json"]
+    )  # Paths that are always blocked, even within allowed_paths (e.g., config files with secrets)
+    mcp_servers: dict[str, MCPServerConfig] = Field(
+        default_factory=dict
+    )  # Global MCP server configurations (shared by all bots)
+    bot_mcp_servers: dict[str, dict[str, MCPServerConfig]] = Field(
+        default_factory=dict
+    )  # Per-bot MCP servers: {"bot_name": {"server_name": {...}}}
 
 
 class RoutingTierConfig(Base):
     """Configuration for a routing tier."""
+
     model: str
     cost_per_mtok: float = 1.0
     secondary_model: str | None = None  # Fallback if primary fails
@@ -275,31 +314,38 @@ class RoutingTierConfig(Base):
 
 class RoutingTiersConfig(Base):
     """Configuration for all routing tiers."""
-    simple: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
-        model="deepseek/deepseek-chat-v3-0324",
-        cost_per_mtok=0.27,
-        secondary_model="deepseek/deepseek-chat-v3.1"
-    ))
-    medium: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
-        model="openai/gpt-4.1-mini",
-        cost_per_mtok=0.40,
-        secondary_model="openai/gpt-4o-mini"
-    ))
-    complex: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
-        model="anthropic/claude-sonnet-4.5",
-        cost_per_mtok=3.0,
-        secondary_model="anthropic/claude-sonnet-4"
-    ))
-    reasoning: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
-        model="openai/o3",
-        cost_per_mtok=2.0,
-        secondary_model="openai/gpt-4o"
-    ))
-    coding: RoutingTierConfig = Field(default_factory=lambda: RoutingTierConfig(
-        model="moonshotai/kimi-k2.5",
-        cost_per_mtok=0.45,
-        secondary_model="anthropic/claude-sonnet-4"
-    ))
+
+    simple: RoutingTierConfig = Field(
+        default_factory=lambda: RoutingTierConfig(
+            model="deepseek/deepseek-chat-v3-0324",
+            cost_per_mtok=0.27,
+            secondary_model="deepseek/deepseek-chat-v3.1",
+        )
+    )
+    medium: RoutingTierConfig = Field(
+        default_factory=lambda: RoutingTierConfig(
+            model="openai/gpt-4.1-mini", cost_per_mtok=0.40, secondary_model="openai/gpt-4o-mini"
+        )
+    )
+    complex: RoutingTierConfig = Field(
+        default_factory=lambda: RoutingTierConfig(
+            model="anthropic/claude-sonnet-4.5",
+            cost_per_mtok=3.0,
+            secondary_model="anthropic/claude-sonnet-4",
+        )
+    )
+    reasoning: RoutingTierConfig = Field(
+        default_factory=lambda: RoutingTierConfig(
+            model="openai/o3", cost_per_mtok=2.0, secondary_model="openai/gpt-4o"
+        )
+    )
+    coding: RoutingTierConfig = Field(
+        default_factory=lambda: RoutingTierConfig(
+            model="moonshotai/kimi-k2.5",
+            cost_per_mtok=0.45,
+            secondary_model="anthropic/claude-sonnet-4",
+        )
+    )
 
 
 # Provider-specific routing tier mappings
@@ -308,9 +354,15 @@ class RoutingTiersConfig(Base):
 ROUTING_TIER_MAPPINGS: dict[str, dict[str, dict[str, str]]] = {
     # OpenRouter - gateway, can route anywhere (keep original defaults)
     "openrouter": {
-        "simple": {"model": "deepseek/deepseek-chat-v3-0324", "secondary": "deepseek/deepseek-chat-v3.1"},
+        "simple": {
+            "model": "deepseek/deepseek-chat-v3-0324",
+            "secondary": "deepseek/deepseek-chat-v3.1",
+        },
         "medium": {"model": "openai/gpt-4.1-mini", "secondary": "openai/gpt-4o-mini"},
-        "complex": {"model": "anthropic/claude-sonnet-4.5", "secondary": "anthropic/claude-sonnet-4"},
+        "complex": {
+            "model": "anthropic/claude-sonnet-4.5",
+            "secondary": "anthropic/claude-sonnet-4",
+        },
         "reasoning": {"model": "openai/o3", "secondary": "openai/gpt-4o"},
         "coding": {"model": "moonshotai/kimi-k2.5", "secondary": "anthropic/claude-sonnet-4"},
     },
@@ -412,52 +464,60 @@ def get_routing_tiers_for_provider(provider: str) -> RoutingTiersConfig:
         simple=RoutingTierConfig(
             model=mapping["simple"]["model"],
             cost_per_mtok=0.3,
-            secondary_model=mapping["simple"].get("secondary")
+            secondary_model=mapping["simple"].get("secondary"),
         ),
         medium=RoutingTierConfig(
             model=mapping["medium"]["model"],
             cost_per_mtok=0.5,
-            secondary_model=mapping["medium"].get("secondary")
+            secondary_model=mapping["medium"].get("secondary"),
         ),
         complex=RoutingTierConfig(
             model=mapping["complex"]["model"],
             cost_per_mtok=2.0,
-            secondary_model=mapping["complex"].get("secondary")
+            secondary_model=mapping["complex"].get("secondary"),
         ),
         reasoning=RoutingTierConfig(
             model=mapping["reasoning"]["model"],
             cost_per_mtok=2.0,
-            secondary_model=mapping["reasoning"].get("secondary")
+            secondary_model=mapping["reasoning"].get("secondary"),
         ),
         coding=RoutingTierConfig(
             model=mapping["coding"]["model"],
             cost_per_mtok=1.0,
-            secondary_model=mapping["coding"].get("secondary")
+            secondary_model=mapping["coding"].get("secondary"),
         ),
     )
 
 
 class ClientClassifierConfig(Base):
     """Configuration for client-side classifier."""
+
     min_confidence: float = 0.85
 
 
 class LLMClassifierConfig(Base):
     """Configuration for LLM-assisted classifier."""
+
     model: str = "gpt-4o-mini"
     timeout_ms: int = 500
     # Optional secondary model to use if the primary LLM classifier fails
     secondary_model: str | None = None
+    # Experimental: Use local Apple Foundation Model instead of API
+    use_local_model: bool = True  # Experimental: use local Apple Foundation Model
+    # If local model fails or unavailable, fallback to API
+    local_fallback_to_api: bool = True
 
 
 class StickyRoutingConfig(Base):
     """Configuration for sticky routing behavior."""
+
     context_window: int = 5
     downgrade_confidence: float = 0.9
 
 
 class AutoCalibrationConfig(Base):
     """Configuration for auto-calibration."""
+
     enabled: bool = True
     interval: str = "24h"
     min_classifications: int = 50
@@ -467,6 +527,7 @@ class AutoCalibrationConfig(Base):
 
 class RoutingConfig(Base):
     """Configuration for smart routing."""
+
     enabled: bool = True  # Enabled by default - editable via configure
     tiers: RoutingTiersConfig = Field(default_factory=RoutingTiersConfig)
     client_classifier: ClientClassifierConfig = Field(default_factory=ClientClassifierConfig)
@@ -479,53 +540,59 @@ class RoutingConfig(Base):
 
 class BackgroundConfig(Base):
     """Background processing configuration for memory system."""
+
     enabled: bool = True
-    interval_seconds: int = 60          # Check every 60s
-    quiet_threshold_seconds: int = 30   # User inactive for 30s = safe to run
+    interval_seconds: int = 60  # Check every 60s
+    quiet_threshold_seconds: int = 30  # User inactive for 30s = safe to run
 
 
 class EmbeddingConfig(Base):
     """Embedding provider configuration."""
-    provider: str = "local"             # "local" or "api"
+
+    provider: str = "local"  # "local" or "api"
     local_model: str = "BAAI/bge-small-en-v1.5"
     api_model: str = "qwen/qwen3-embedding-0.6b"
-    api_fallback: bool = True           # Fall back to API if local fails
+    api_fallback: bool = True  # Fall back to API if local fails
     cache_embeddings: bool = True
-    lazy_load: bool = True              # Download models on first use
+    lazy_load: bool = True  # Download models on first use
 
 
 class ExtractionConfig(Base):
     """Entity extraction configuration."""
+
     enabled: bool = True
-    provider: str = "gliner2"           # "gliner2" (only option now)
+    provider: str = "gliner2"  # "gliner2" (only option now)
     gliner2_model: str = "fastino/gliner2-base-v1"
     interval_seconds: int = 60
     batch_size: int = 20
-    api_fallback: bool = False          # Use LLM for complex extractions
-    api_model: str = ""                 # Uses LLM classifier model if empty
+    api_fallback: bool = False  # Use LLM for complex extractions
+    api_model: str = ""  # Uses LLM classifier model if empty
 
 
 class SummaryConfig(Base):
     """Summary node configuration."""
-    staleness_threshold: int = 10       # Events before refresh
-    max_refresh_batch: int = 20         # Max nodes to refresh per cycle
-    model: str = ""                     # Uses LLM classifier model if empty
-    min_confidence: float = 0.3         # Minimum confidence to keep/use summaries
-    max_age_days: int = 90              # Prune summaries older than this (if low confidence)
-    max_staleness: int = 200            # Prune summaries with high staleness (if low confidence)
+
+    staleness_threshold: int = 10  # Events before refresh
+    max_refresh_batch: int = 20  # Max nodes to refresh per cycle
+    model: str = ""  # Uses LLM classifier model if empty
+    min_confidence: float = 0.3  # Minimum confidence to keep/use summaries
+    max_age_days: int = 90  # Prune summaries older than this (if low confidence)
+    max_staleness: int = 200  # Prune summaries with high staleness (if low confidence)
 
 
 class LearningConfig(Base):
     """Learning and preferences configuration."""
+
     enabled: bool = True
-    decay_days: int = 14                # Half-life for learning relevance
-    max_learnings: int = 200             # Max active learnings
-    relevance_decay_rate: float = 0.05   # 5% per day
+    decay_days: int = 14  # Half-life for learning relevance
+    max_learnings: int = 200  # Max active learnings
+    relevance_decay_rate: float = 0.05  # 5% per day
 
 
 class ContextConfig(Base):
     """Context assembly configuration."""
-    total_budget: int = 4000            # Total token budget for memory context
+
+    total_budget: int = 4000  # Total token budget for memory context
     always_include_preferences: bool = True
 
 
@@ -541,16 +608,17 @@ class SessionCompactionConfig(Base):
     - token-limit: Hard truncation at safe boundaries (emergency)
     - off: Disable auto-compaction (manual only)
     """
+
     enabled: bool = True
-    mode: str = "summary"               # summary | token-limit | off
-    threshold_percent: float = 0.8      # Trigger at 80% (proactive, not reactive)
-    target_tokens: int = 3000           # Target session history size
-    min_messages: int = 10                # Always keep at least 10
-    max_messages: int = 100             # Hard limit
-    preserve_recent: int = 20           # Keep last N messages verbatim
-    preserve_tool_chains: bool = True   # NEVER break tool_use → tool_result pairs
-    summary_chunk_size: int = 10        # Summarize N messages at a time
-    enable_memory_flush: bool = True    # Allow pre-compaction memory sync
+    mode: str = "summary"  # summary | token-limit | off
+    threshold_percent: float = 0.8  # Trigger at 80% (proactive, not reactive)
+    target_tokens: int = 3000  # Target session history size
+    min_messages: int = 10  # Always keep at least 10
+    max_messages: int = 100  # Hard limit
+    preserve_recent: int = 20  # Keep last N messages verbatim
+    preserve_tool_chains: bool = True  # NEVER break tool_use → tool_result pairs
+    summary_chunk_size: int = 10  # Summarize N messages at a time
+    enable_memory_flush: bool = True  # Allow pre-compaction memory sync
 
 
 class EnhancedContextConfig(Base):
@@ -560,18 +628,19 @@ class EnhancedContextConfig(Base):
     Provides accurate token counting, budget allocation, and
     context percentage visibility (context=X%).
     """
+
     # Budget allocation
-    max_context_tokens: int = 8000      # Total model context window
-    response_buffer: int = 1000         # Reserve for model response
-    memory_budget_percent: float = 0.35   # 35% for memory context
+    max_context_tokens: int = 8000  # Total model context window
+    response_buffer: int = 1000  # Reserve for model response
+    memory_budget_percent: float = 0.35  # 35% for memory context
     history_budget_percent: float = 0.35  # 35% for session history
-    system_budget_percent: float = 0.20   # 20% for system prompt
+    system_budget_percent: float = 0.20  # 20% for system prompt
 
     # Real-time monitoring
     enable_real_time_tracking: bool = True
     show_context_percentage: bool = True  # Show context=65% in status
-    warning_threshold: float = 0.70       # Warn at 70%
-    compaction_threshold: float = 0.80    # Compact at 80%
+    warning_threshold: float = 0.70  # Warn at 70%
+    compaction_threshold: float = 0.80  # Compact at 80%
 
     # Priority truncation
     enable_priority_truncation: bool = True
@@ -581,36 +650,48 @@ class EnhancedContextConfig(Base):
 
 class PrivacyConfig(Base):
     """Privacy and security configuration."""
+
     auto_redact_pii: bool = True
     auto_redact_credentials: bool = True
-    excluded_patterns: list[str] = Field(default_factory=lambda: [
-        "password", "api_key", "secret", "token", "credential"
-    ])
+    excluded_patterns: list[str] = Field(
+        default_factory=lambda: ["password", "api_key", "secret", "token", "credential"]
+    )
 
 
 class SecurityConfig(Base):
     """Security and skill scanning configuration."""
+
     enabled: bool = True  # Enable security scanning
     strict_mode: bool = False  # Block on MEDIUM severity (not just CRITICAL/HIGH)
     block_on_critical: bool = True  # Always block critical issues
     block_on_high: bool = True  # Always block high severity issues
     scan_on_install: bool = True  # Scan skills when installing
     scan_on_load: bool = False  # Scan skills when loading (performance impact)
-    allowed_shell_commands: list[str] = Field(default_factory=lambda: [
-        "git", "npm", "node", "python", "python3", "pip", "pnpm", "yarn"
-    ])
-    blocked_patterns: list[str] = Field(default_factory=lambda: [
-        "curl.*\\|.*bash", "curl.*\\|.*sh", "wget.*\\|.*bash", "wget.*\\|.*sh",
-        "sudo", "rm -rf /", "rm -rf /*", "> /etc/", "> ~/.ssh/"
-    ])
+    allowed_shell_commands: list[str] = Field(
+        default_factory=lambda: ["git", "npm", "node", "python", "python3", "pip", "pnpm", "yarn"]
+    )
+    blocked_patterns: list[str] = Field(
+        default_factory=lambda: [
+            "curl.*\\|.*bash",
+            "curl.*\\|.*sh",
+            "wget.*\\|.*bash",
+            "wget.*\\|.*sh",
+            "sudo",
+            "rm -rf /",
+            "rm -rf /*",
+            "> /etc/",
+            "> ~/.ssh/",
+        ]
+    )
     allow_network_installs: bool = False  # Allow curl/wget during skill install
     sandbox_skills: bool = False  # Run skills in sandbox (future feature)
 
 
 class MemoryConfig(Base):
     """Memory system configuration."""
+
     enabled: bool = True
-    db_path: str = "memory/memory.db"   # Relative to workspace
+    db_path: str = "memory/memory.db"  # Relative to workspace
 
     background: BackgroundConfig = Field(default_factory=BackgroundConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
@@ -627,12 +708,14 @@ class MemoryConfig(Base):
 
 class WorkLogsConfig(Base):
     """Work logs configuration."""
+
     enabled: bool = True
     retention_days: int = 30
 
 
 class StorageConfig(Base):
     """Storage configuration."""
+
     use_cas_storage: bool = True  # Enable CAS (Compare-And-Set) for conflict-free concurrent writes
     show_in_response: bool = False  # Include in agent responses
     default_mode: str = "summary"  # "summary", "detailed", "debug"
@@ -646,6 +729,7 @@ class StorageConfig(Base):
 
 class Config(BaseSettings):
     """Root configuration for nanofolks."""
+
     agents: AgentsConfig = Field(default_factory=AgentsConfig)
     channels: ChannelsConfig = Field(default_factory=ChannelsConfig)
     providers: ProvidersConfig = Field(default_factory=ProvidersConfig)
@@ -663,9 +747,12 @@ class Config(BaseSettings):
         """Get expanded workspace path."""
         return Path(self.agents.defaults.workspace).expanduser()
 
-    def _match_provider(self, model: str | None = None) -> tuple["ProviderConfig | None", str | None]:
+    def _match_provider(
+        self, model: str | None = None
+    ) -> tuple["ProviderConfig | None", str | None]:
         """Match provider config and its registry name. Returns (config, spec_name)."""
         from nanofolks.providers.registry import PROVIDERS
+
         model_lower = (model or self.agents.defaults.model).lower()
 
         # Match by keyword (order follows PROVIDERS registry)
@@ -699,6 +786,7 @@ class Config(BaseSettings):
     def get_api_base(self, model: str | None = None) -> str | None:
         """Get API base URL for the given model. Applies default URLs for known gateways."""
         from nanofolks.providers.registry import find_by_name
+
         p, name = self._match_provider(model)
         if p and p.api_base:
             return p.api_base
@@ -711,7 +799,4 @@ class Config(BaseSettings):
                 return spec.default_api_base
         return None
 
-    model_config = ConfigDict(
-        env_prefix="NANOFOLKS_",
-        env_nested_delimiter="__"
-    )
+    model_config = ConfigDict(env_prefix="NANOFOLKS_", env_nested_delimiter="__")

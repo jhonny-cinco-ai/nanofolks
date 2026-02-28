@@ -6,6 +6,7 @@ from nanofolks.session.manager import Session
 
 from .classifier import ClientSideClassifier
 from .llm_router import LLMRouter
+from .local_router import LocalRouter
 from .models import ClassificationScores, RoutingDecision, RoutingTier
 
 
@@ -19,11 +20,15 @@ class StickyRouter:
         self,
         client_classifier: ClientSideClassifier,
         llm_router: Optional[LLMRouter] = None,
+        local_router: Optional[LocalRouter] = None,
+        local_fallback_to_api: bool = True,
         context_window: int = 5,
         downgrade_confidence: float = 0.9,
     ):
         self.client_classifier = client_classifier
         self.llm_router = llm_router
+        self.local_router = local_router
+        self.local_fallback_to_api = local_fallback_to_api
         self.context_window = context_window
         self.downgrade_confidence = downgrade_confidence
 
@@ -49,7 +54,7 @@ class StickyRouter:
             )
 
         # Layer 2: LLM-assisted fallback (if available)
-        if self.llm_router:
+        if self.local_router or self.llm_router:
             # Build context from Layer 1 for Layer 2
             from .llm_router import ClassificationContext
 
@@ -61,20 +66,31 @@ class StickyRouter:
                 question_type=client_decision.metadata.get("question_type"),
             )
 
-            # Pass context to LLM router
-            llm_decision = await self.llm_router.classify(content, context=context)
+            # Try local model first if available
+            if self.local_router and self.local_router.is_available():
+                local_decision = await self.local_router.classify(content)
+                if local_decision:
+                    self._record_feedback(content, client_decision, local_decision)
+                    return self._apply_sticky_logic(
+                        content, session, local_decision, scores, layer="local"
+                    )
+                elif not self.local_fallback_to_api:
+                    # Local failed and we shouldn't fallback to API
+                    return self._apply_sticky_logic(
+                        content, session, client_decision, scores, layer="client"
+                    )
 
-            # Learn: Record comparison for feedback loop
-            self._record_feedback(content, client_decision, llm_decision)
+            # Fall back to API LLM if local is not available or failed
+            if self.llm_router:
+                llm_decision = await self.llm_router.classify(content, context=context)
 
-            return self._apply_sticky_logic(
-                content, session, llm_decision, scores, layer="llm"
-            )
+                # Learn: Record comparison for feedback loop
+                self._record_feedback(content, client_decision, llm_decision)
+
+                return self._apply_sticky_logic(content, session, llm_decision, scores, layer="llm")
 
         # No LLM fallback - use client decision even if low confidence
-        return self._apply_sticky_logic(
-            content, session, client_decision, scores, layer="client"
-        )
+        return self._apply_sticky_logic(content, session, client_decision, scores, layer="client")
 
     def _apply_sticky_logic(
         self,
@@ -103,7 +119,9 @@ class StickyRouter:
             # Keep the original tier in metadata for context continuity
             # but force this message to use SIMPLE
             decision.metadata["sticky_override"] = "always_simple"
-            decision.metadata["session_tier_preserved"] = session.metadata.get("routing_tier", "unknown")
+            decision.metadata["session_tier_preserved"] = session.metadata.get(
+                "routing_tier", "unknown"
+            )
             return decision
 
         # Get recent conversation context
@@ -111,8 +129,7 @@ class StickyRouter:
 
         # Check if conversation has been complex recently
         has_recent_complex = any(
-            tier in [RoutingTier.COMPLEX, RoutingTier.REASONING]
-            for tier in recent_tiers
+            tier in [RoutingTier.COMPLEX, RoutingTier.REASONING] for tier in recent_tiers
         )
 
         if not has_recent_complex:
@@ -143,7 +160,7 @@ class StickyRouter:
         tiers = []
 
         # Get last N messages
-        recent_messages = session.messages[-self.context_window:]
+        recent_messages = session.messages[-self.context_window :]
 
         for msg in recent_messages:
             tier_str = msg.get("metadata", {}).get("routing_tier")
@@ -168,8 +185,14 @@ class StickyRouter:
         word_count = len(content.split())
 
         # Check explicit markers
-        simple_markers = ["quick question", "just wondering", "simple question",
-                         "one more thing", "by the way", "unrelated"]
+        simple_markers = [
+            "quick question",
+            "just wondering",
+            "simple question",
+            "one more thing",
+            "by the way",
+            "unrelated",
+        ]
         content_lower = content.lower()
         has_simple_marker = any(marker in content_lower for marker in simple_markers)
 
@@ -179,11 +202,13 @@ class StickyRouter:
         high_simple_score = scores.simple_indicators > 0.7
 
         # Allow downgrade if multiple conditions met
-        conditions_met = sum([
-            has_simple_marker,
-            is_very_short and no_technical,
-            high_simple_score and no_technical,
-        ])
+        conditions_met = sum(
+            [
+                has_simple_marker,
+                is_very_short and no_technical,
+                high_simple_score and no_technical,
+            ]
+        )
 
         return conditions_met >= 2
 

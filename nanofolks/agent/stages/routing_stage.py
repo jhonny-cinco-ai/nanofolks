@@ -3,6 +3,8 @@
 from pathlib import Path
 from typing import Any, Optional
 
+from loguru import logger
+
 from nanofolks.config.schema import RoutingConfig
 from nanofolks.providers.base import LLMProvider
 from nanofolks.session.manager import Session
@@ -10,6 +12,7 @@ from nanofolks.session.manager import Session
 from ..router.calibration import CalibrationManager
 from ..router.classifier import ClientSideClassifier
 from ..router.llm_router import LLMRouter
+from ..router.local_router import LocalRouter
 from ..router.models import RoutingDecision
 from ..router.sticky import StickyRouter
 
@@ -99,10 +102,25 @@ class RoutingStage:
                 secondary_model=self.config.llm_classifier.secondary_model,
             )
 
+        # Local router (experimental - uses Apple Foundation Model)
+        self.local_router: Optional[LocalRouter] = None
+        if self.config.llm_classifier.use_local_model:
+            self.local_router = LocalRouter(
+                fallback_to_api=self.config.llm_classifier.local_fallback_to_api,
+            )
+            if self.local_router.is_available():
+                logger.info("Local model routing enabled")
+            else:
+                logger.warning(
+                    "Local model routing enabled but Apple Foundation Model not available"
+                )
+
         # Sticky router (combines both layers)
         self.sticky_router = StickyRouter(
             client_classifier=self.client_classifier,
             llm_router=self.llm_router,
+            local_router=self.local_router,
+            local_fallback_to_api=self.config.llm_classifier.local_fallback_to_api,
             context_window=self.config.sticky.context_window,
             downgrade_confidence=self.config.sticky.downgrade_confidence,
         )
@@ -148,10 +166,12 @@ class RoutingStage:
         # Skip throttling if user has scheduled a calibration routine
         # (avoids redundant checks when scheduled calibration is active)
         self._calibration_check_counter += 1
-        if (self._calibration_check_counter % self._calibration_check_interval == 0 and
-            self.calibration and
-            not self._has_scheduled_calibration_job() and  # Skip if routine exists
-            self.calibration.should_calibrate()):
+        if (
+            self._calibration_check_counter % self._calibration_check_interval == 0
+            and self.calibration
+            and not self._has_scheduled_calibration_job()  # Skip if routine exists
+            and self.calibration.should_calibrate()
+        ):
             self._run_calibration()
 
         return ctx
@@ -181,7 +201,9 @@ class RoutingStage:
         # Calculate code presence from content
         content = ctx.message.content.lower()
         code_indicators = ["```", "function", "class", "def ", "import ", "code"]
-        code_presence = sum(1 for indicator in code_indicators if indicator in content) / len(code_indicators)
+        code_presence = sum(1 for indicator in code_indicators if indicator in content) / len(
+            code_indicators
+        )
 
         # Determine question type
         question_type = self._determine_question_type(ctx.message.content)
@@ -202,13 +224,15 @@ class RoutingStage:
 
         # Add comparison data if available
         if comparison:
-            record.update({
-                "client_tier": comparison.get("client_tier"),
-                "client_confidence": comparison.get("client_confidence"),
-                "llm_tier": comparison.get("llm_tier"),
-                "llm_confidence": comparison.get("llm_confidence"),
-                "match": comparison.get("match"),
-            })
+            record.update(
+                {
+                    "client_tier": comparison.get("client_tier"),
+                    "client_confidence": comparison.get("client_confidence"),
+                    "llm_tier": comparison.get("llm_tier"),
+                    "llm_confidence": comparison.get("llm_confidence"),
+                    "match": comparison.get("match"),
+                }
+            )
 
         # Fire-and-forget recording
         asyncio.create_task(self._async_record(record))
@@ -224,11 +248,45 @@ class RoutingStage:
                 return f"{word}_question"
 
         # Check for yes/no questions
-        if content_lower.startswith(("is ", "are ", "can ", "do ", "does ", "will ", "would ", "could ", "should ", "has ", "have ", "did ", "was ", "were ")):
+        if content_lower.startswith(
+            (
+                "is ",
+                "are ",
+                "can ",
+                "do ",
+                "does ",
+                "will ",
+                "would ",
+                "could ",
+                "should ",
+                "has ",
+                "have ",
+                "did ",
+                "was ",
+                "were ",
+            )
+        ):
             return "yes_no_question"
 
         # Check for commands/imperatives
-        imperative_starters = ["write", "create", "build", "make", "generate", "implement", "add", "fix", "update", "delete", "remove", "refactor", "explain", "show", "tell", "give"]
+        imperative_starters = [
+            "write",
+            "create",
+            "build",
+            "make",
+            "generate",
+            "implement",
+            "add",
+            "fix",
+            "update",
+            "delete",
+            "remove",
+            "refactor",
+            "explain",
+            "show",
+            "tell",
+            "give",
+        ]
         first_word = content_lower.split()[0] if content_lower else ""
         if first_word in imperative_starters:
             return "imperative"
@@ -268,21 +326,28 @@ class RoutingStage:
         try:
             # Check if we can access the routines service
             # This is set during agent initialization
-            if hasattr(self, '_cron_service') and self._cron_service:
+            if hasattr(self, "_cron_service") and self._cron_service:
                 jobs = self._cron_service.list_jobs()
                 for job in jobs:
-                    if job.payload.routine == "calibration" or job.payload.message == "CALIBRATE_ROUTING":
+                    if (
+                        job.payload.routine == "calibration"
+                        or job.payload.message == "CALIBRATE_ROUTING"
+                    ):
                         return True
 
             # Alternative: check via workspace file
             # Routines jobs are stored in ~/.nanofolks/routines/jobs.json
             import json
+
             routines_file = self.workspace / "routines" / "jobs.json"
             if routines_file.exists():
                 data = json.loads(routines_file.read_text())
                 for job in data.get("jobs", []):
                     payload = job.get("payload", {})
-                    if payload.get("routine") == "calibration" or payload.get("message") == "CALIBRATE_ROUTING":
+                    if (
+                        payload.get("routine") == "calibration"
+                        or payload.get("message") == "CALIBRATE_ROUTING"
+                    ):
                         return True
 
             return False
@@ -316,7 +381,9 @@ class RoutingStage:
             info["calibration"] = {
                 "enabled": self.config.auto_calibration.enabled,
                 "interval": self.config.auto_calibration.interval,
-                "last_run": self.calibration._last_calibration.isoformat() if self.calibration._last_calibration else None,
+                "last_run": self.calibration._last_calibration.isoformat()
+                if self.calibration._last_calibration
+                else None,
                 "total_classifications": len(self.calibration._classifications),
             }
 

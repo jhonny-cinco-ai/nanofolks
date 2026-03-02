@@ -639,6 +639,19 @@ class AgentLoop:
 
         # Check onboarding state
         if onboarding.state in [OnboardingState.NOT_STARTED, OnboardingState.IN_PROGRESS]:
+            # Transition from NOT_STARTED to IN_PROGRESS after first message
+            if onboarding.state == OnboardingState.NOT_STARTED:
+                onboarding.state = OnboardingState.IN_PROGRESS
+                logger.debug("Onboarding state transitioned to IN_PROGRESS")
+
+            # Process the answer to advance question counter and save state
+            # This ensures we track which questions have been asked
+            question_before = onboarding.current_question
+            onboarding.process_answer(user_message)
+            logger.debug(
+                f"Onboarding advanced from question {question_before} to {onboarding.current_question}"
+            )
+
             # Use LLM to handle onboarding conversationally
             logger.debug(f"Processing onboarding message: {user_message[:50]}...")
 
@@ -655,6 +668,14 @@ class AgentLoop:
             if soul_file.exists():
                 soul_content = soul_file.read_text()
 
+            # Get the next question to ask
+            next_question = onboarding.get_next_question()
+            next_question_text = (
+                next_question["question"]
+                if next_question
+                else "Ask if they want to meet the team or have any questions."
+            )
+
             # Build system prompt
             system_prompt = f"""You are {profile.bot_name if profile else "the leader"}, {profile.bot_title if profile else "Captain"}.
 
@@ -668,13 +689,14 @@ Information you need to collect (ask naturally in conversation):
 - What they are working on: {onboarding.answers.work or "not collected yet"}
 - How you can help: {onboarding.answers.help or "not collected yet"}
 
+CRITICAL - Your next question MUST be: {next_question_text}
+
 Guidelines:
 - Speak in your natural character voice (pirate, rock star, executive, etc.)
 - Be warm and welcoming
-- Ask for information conversationally, not like a form
-- CRITICAL: If the user's name is "not collected yet", ALWAYS ask for their name first before asking anything else.
-- If they already told you something, acknowledge it and ask for what's missing
-- Keep responses brief and engaging
+- Acknowledge what they just told you
+- Ask the next question naturally as part of conversation
+- Keep responses brief and engaging (2-3 sentences max)
 - CRITICAL: Never use stage directions, actions, or emotes in your response (e.g. do NOT output *adjusts hat* or *leans forward*). Just write the dialogue.
 
 Current conversation history:

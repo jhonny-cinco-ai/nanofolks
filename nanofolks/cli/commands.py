@@ -1534,7 +1534,17 @@ def chat(
 
     system_timezone = get_user_timezone(config.workspace_path)
 
+    # Get leader bot name from team profile for display
+    from nanofolks.teams import TeamManager
+
+    team_manager = TeamManager(workspace_path=config.workspace_path)
+    leader_profile = team_manager.get_bot_team_profile("leader")
+    leader_bot_name = (
+        leader_profile.bot_name if leader_profile and leader_profile.bot_name else "leader"
+    )
+
     agent_loop = AgentLoop(
+        bot_name=leader_bot_name,
         bus=bus,
         provider=provider,
         workspace=config.workspace_path,

@@ -644,13 +644,25 @@ class AgentLoop:
                 onboarding.state = OnboardingState.IN_PROGRESS
                 logger.debug("Onboarding state transitioned to IN_PROGRESS")
 
-            # Process the answer to advance question counter and save state
-            # This ensures we track which questions have been asked
-            question_before = onboarding.current_question
-            onboarding.process_answer(user_message)
-            logger.debug(
-                f"Onboarding advanced from question {question_before} to {onboarding.current_question}"
+            # Check if this message was already processed (returning user)
+            # by looking at session history
+            message_already_processed = any(
+                m.get("role") == "user" and m.get("content") == user_message
+                for m in session.messages[-3:]  # Check last 3 messages
             )
+
+            if not message_already_processed:
+                # Process the answer to advance question counter and save state
+                # This ensures we track which questions have been asked
+                question_before = onboarding.current_question
+                onboarding.process_answer(user_message)
+                logger.debug(
+                    f"Onboarding advanced from question {question_before} to {onboarding.current_question}"
+                )
+            else:
+                logger.debug(
+                    f"Message already processed, continuing from question {onboarding.current_question}"
+                )
 
             # Use LLM to handle onboarding conversationally
             logger.debug(f"Processing onboarding message: {user_message[:50]}...")

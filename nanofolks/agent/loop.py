@@ -651,6 +651,14 @@ class AgentLoop:
                 for m in session.messages[-3:]  # Check last 3 messages
             )
 
+            # Detect if this is a returning user continuing onboarding
+            # (in-progress state + has answered questions + no recent messages)
+            is_returning_to_onboarding = (
+                onboarding.state == OnboardingState.IN_PROGRESS
+                and onboarding.current_question > 0
+                and len(session.messages) <= 1  # Only current message or empty
+            )
+
             if not message_already_processed:
                 # Process the answer to advance question counter and save state
                 # This ensures we track which questions have been asked
@@ -688,12 +696,21 @@ class AgentLoop:
                 else "Ask if they want to meet the team or have any questions."
             )
 
+            # Build welcome back message for returning users
+            welcome_back = ""
+            if is_returning_to_onboarding:
+                answered_count = sum(1 for v in onboarding.answers.__dict__.values() if v)
+                welcome_back = f"""
+IMPORTANT: This user is returning to continue onboarding. They have already answered {answered_count} questions.
+Give them a brief, warm welcome back (1 sentence) and then ask the next question.
+"""
+
             # Build system prompt
             system_prompt = f"""You are {profile.bot_name if profile else "the leader"}, {profile.bot_title if profile else "Captain"}.
 
 {soul_content[:1000] if soul_content else "Lead the team with confidence and personality."}
 
-You are in ONBOARDING mode. Your job is to get to know a new user who just joined.
+You are in ONBOARDING mode. Your job is to get to know a new user who just joined.{welcome_back}
 
 Information you need to collect (ask naturally in conversation):
 - Name: {onboarding.answers.name or "not collected yet"}

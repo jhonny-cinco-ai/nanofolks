@@ -1784,7 +1784,21 @@ def chat(
                 console.print(f"  {emoji} {name} - {title} - {role}")
 
         console.print("\n[dim]Type /help for commands.[/dim]")
-        console.print(f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n")
+        
+        # Check onboarding status for conditional greeting
+        try:
+            from nanofolks.agent.chat_onboarding import ChatOnboarding
+            onboarding = ChatOnboarding(workspace_path=config.workspace_path, team_manager=team_manager)
+            onboarding.load_from_user_md()
+            
+            if onboarding.check_if_needed():
+                if onboarding.has_any_answers():
+                    console.print(f"\n[bold yellow]👉 Welcome back! Just say hi to {leader_name} to continue.[/bold yellow]\n")
+                else:
+                    console.print(f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n")
+        except Exception as e:
+            # Fallback to default if check fails
+            console.print(f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n")
 
         def _exit_on_sigint(signum, frame):
             _restore_terminal()

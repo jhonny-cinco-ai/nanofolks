@@ -10,6 +10,7 @@ that happens when the user first talks to the agent.
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
+from typing import Dict, List, Optional
 
 from rich.console import Console
 from rich.table import Table
@@ -138,16 +139,40 @@ class ChatOnboarding:
 
         content = user_file.read_text()
 
-        # Check if user has filled in real info (not placeholders)
-        placeholders = ["(your name)", "(your location)", "(what you're working on)"]
-        has_real_data = not any(p in content for p in placeholders)
+        # Check for ANY placeholders in the required fields
+        placeholders = [
+            "(your name)", 
+            "(your location)", 
+            "(preferred language)",
+            "(default from team)",
+            "(what you're working on)",
+            "(what you want help with)",
+            "(tools and software)"
+        ]
+        has_placeholders = any(p in content for p in placeholders)
 
-        return not has_real_data
+        return has_placeholders
+
+    def has_any_answers(self) -> bool:
+        """Check if we have at least one real answer (not from session, but from profile)."""
+        # Iterate through fields and check if they have non-placeholder values
+        # We can just check the instance answers since load_from_user_md handles placeholders
+        for q in self.QUESTIONS:
+            val = getattr(self.answers, q["key"])
+            if val and not isinstance(val, bool):
+                return True
+        return False
 
     def get_next_question(self) -> dict | None:
         """Get the next question in the flow."""
         while self.current_question < len(self.QUESTIONS):
             q = self.QUESTIONS[self.current_question]
+            field_name = q["key"]
+
+            # Skip if field already has a value (unless it's more_details which we toggle)
+            if field_name != "more_details" and getattr(self.answers, field_name):
+                self.current_question += 1
+                continue
 
             # Check skip condition
             skip_fn = q.get("skip_if")
@@ -158,6 +183,64 @@ class ChatOnboarding:
             return q
 
         return None
+
+    def load_from_user_md(self) -> None:
+        """Load answers from USER.md if it exists."""
+        user_file = self.workspace_path / "USER.md"
+        if not user_file.exists():
+            return
+
+        content = user_file.read_text()
+        
+        # Simple extraction for each field
+        patterns = {
+            "name": r"\*\*Name\*\*: ([^\n]+)",
+            "location": r"\*\*Location\*\*: ([^\n]+)",
+            "language": r"\*\*Language\*\*: ([^\n]+)",
+            "team_name": r"\*\*Team Name\*\*: ([^\n]+)",
+            "work": r"\*\*Current Focus\*\*: ([^\n]+)",
+            "help": r"\*\*How We Should Help\*\*: ([^\n]+)",
+            "tools": r"\*\*Tools You Use\*\*: ([^\n]+)",
+        }
+        
+        import re
+        for key, pattern in patterns.items():
+            match = re.search(pattern, content)
+            if match:
+                value = match.group(1).strip()
+                # Check for placeholders
+                placeholders = [
+                    "(your name)", "(your location)", "(preferred language)", 
+                    "(default from team)", "(what you're working on)",
+                    "(what you want help with)", "(tools and software)"
+                ]
+                if value and value not in placeholders:
+                    setattr(self.answers, key, value)
+        
+        # Determine if more_details was already answered
+        # If tools is filled, more_details must have been Yes
+        if getattr(self.answers, "tools"):
+            self.answers.more_details = True
+
+    def get_uncollected_fields(self) -> List[Dict[str, str]]:
+        """Get list of fields that still need to be collected."""
+        uncollected = []
+        for q in self.QUESTIONS:
+            field_name = q["key"]
+            # Skip if already has value
+            if getattr(self.answers, field_name):
+                continue
+            
+            # Skip if the question itself should be skipped based on current answers
+            skip_fn = q.get("skip_if")
+            if skip_fn and skip_fn(self.answers):
+                continue
+                
+            uncollected.append({
+                "field": q["field"],
+                "question": q["question"]
+            })
+        return uncollected
 
     def process_answer(self, user_message: str) -> str:
         """Process user's answer and return leader's response."""
@@ -172,6 +255,18 @@ class ChatOnboarding:
         field_name = question["key"]
         normalized = user_message.strip()
         skip_inputs = {"skip", "skip for now", "pass", "n/a"}
+        
+        # Universal Greeting Guard: don't accept greetings as ANY field answer
+        # if it's a simple one-word greeting.
+        greetings = {"hi", "hello", "hey", "yo", "ahoy", "greeting", "hi!", "hello!"}
+        if normalized.lower() in greetings:
+            # Treat as if they haven't answered yet, don't advance
+            return ""
+        
+        # Specific guard for name length
+        if field_name == "name" and len(normalized) <= 1:
+            return ""
+
         if normalized.lower() in skip_inputs:
             if field_name == "more_details":
                 setattr(self.answers, field_name, False)
@@ -181,7 +276,25 @@ class ChatOnboarding:
             yes_inputs = {"y", "yes", "yeah", "yep", "sure", "ok", "okay"}
             setattr(self.answers, field_name, normalized.lower() in yes_inputs)
         else:
-            setattr(self.answers, field_name, user_message)
+            if field_name == "name":
+                # Try to extract name from pattern first
+                import re
+                name_patterns = [
+                    r"i['\']?m\s+(\w+)",
+                    r"my name is\s+(\w+)",
+                    r"call me\s+(\w+)",
+                    r"name['\']?s?\s+(\w+)",
+                ]
+                extracted_name = None
+                for pattern in name_patterns:
+                    match = re.search(pattern, normalized.lower())
+                    if match:
+                        extracted_name = match.group(1).capitalize()
+                        break
+                
+                setattr(self.answers, field_name, extracted_name or normalized)
+            else:
+                setattr(self.answers, field_name, user_message)
 
         # Save to USER.md
         self._save_to_user_md()
@@ -470,8 +583,12 @@ They can: {capabilities}
             for pattern in name_patterns:
                 match = re.search(pattern, message_lower)
                 if match:
-                    self.answers.name = match.group(1).capitalize()
-                    break
+                    name = match.group(1).capitalize()
+                    # Basic guard: Don't treat common greetings or tiny words as names
+                    greetings = {"Hi", "Hello", "Hey", "Yo", "Ahoy"}
+                    if name not in greetings and len(name) > 1:
+                        self.answers.name = name
+                        break
 
         # Extract location - look for "from [place]" or "in [place]"
         if not self.answers.location:
@@ -526,7 +643,12 @@ They can: {capabilities}
 
     def has_all_required_info(self) -> bool:
         """Check if we have all the minimum required information."""
-        # Required: name, location, work, help
+        # Core onboarding is done when we've gone through the basic flow: 
+        # Name, Location, Language, Work, Help
         return bool(
-            self.answers.name and self.answers.location and self.answers.work and self.answers.help
+            self.answers.name 
+            and self.answers.location 
+            and self.answers.language 
+            and self.answers.work 
+            and self.answers.help
         )

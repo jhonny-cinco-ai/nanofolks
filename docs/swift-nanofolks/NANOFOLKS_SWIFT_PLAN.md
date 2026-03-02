@@ -723,6 +723,8 @@ class NanofolksApp: App {
 
 ## Porting Strategy
 
+> **Design Philosophy**: CLI-first approach. Build a solid command-line core before adding UI, external channels, or backend dependencies. The CLI serves as the foundation that everything else builds upon.
+
 ### Phase 0: Control Plane MVP (Weeks 0-1)
 - [ ] Choose backend hosting (Railway/Vercel/VPS) and DB (Supabase/Convex)
 - [ ] Implement OpenAuth login flow + session issuance
@@ -730,44 +732,80 @@ class NanofolksApp: App {
 - [ ] Implement `/llm/chat` proxy (single model) + usage ledger
 - [ ] Minimal admin UI/pages (user lookup + status + usage + revoke device)
 
-### Phase 1: Walking Skeleton App (Weeks 1-2)
-- [ ] Project setup with Swift Package Manager
-- [ ] Backend client + auth (Keychain-stored refresh token, device registration)
-- [ ] Minimal chat UI (send → stream/receive) wired to `/llm/chat`
-- [ ] Local persistence (rooms + messages) with SQLite
-- [ ] Logging and error handling
-
-### Phase 2: Core Agent (Weeks 3-4)
+### Phase 1: Core CLI Foundation (Weeks 1-3)
+- [ ] Swift CLI project setup (not app target - pure command-line)
 - [ ] Agent loop implementation
-- [ ] Intent detection
-- [ ] Context building
-- [ ] Tool registry and base tools
+- [ ] Intent detection & routing
+- [ ] Basic LLM integration (direct providers - no backend yet)
+- [ ] Simple REPL-style CLI interface
+- [ ] Room/session management (in-memory + SQLite)
+- [ ] Basic logging and error handling
 
-### Phase 3: System Integration (Weeks 5-6)
-- [ ] Filesystem tools (NSWorkspace)
-- [ ] Shell execution
-- [ ] Browser automation
-- [ ] Notifications
+### Phase 2: Core Tools & System Integration (Weeks 4-5)
+- [ ] Tool registry & base protocol
+- [ ] Filesystem tools (FileManager, NSWorkspace)
+- [ ] Shell execution (Process/NSTask)
+- [ ] Browser automation basics (Safari + AppleScript)
+- [ ] System notifications (UserNotifications)
+- [ ] Tool permissions system
 
-### Phase 4: Memory & Knowledge (Weeks 7-8)
-- [ ] Memory store
-- [ ] Embedding calls to LLM providers
-- [ ] Retrieval and summarization
+### Phase 3: Memory & Knowledge (Weeks 6-7)
+- [ ] Memory store with SQLite (SwiftData or SQLite.swift)
+- [ ] Embedding generation (swift-embeddings with bge-small-en-v1.5)
+- [ ] Vector index & retrieval
+- [ ] Context building & summarization
 - [ ] Session compaction
 
-### Phase 5: UI & Polish (Weeks 9-10)
-- [ ] SwiftUI views
-- [ ] Menu bar integration
-- [ ] Settings and preferences
-- [ ] Testing and polish
+### Phase 4: Multi-Bot & Coordination (Weeks 8-9)
+- [ ] Bot definitions & registry
+- [ ] Multi-bot coordination
+- [ ] Message broker (per-room FIFO)
+- [ ] DM rooms between bots
+- [ ] Bot reasoning configs
 
-### Phase 6: Providers, Billing UX, Hardening (Weeks 11-12)
-- [ ] LLM provider integrations
-- [ ] Model allowlist UI (5–10 curated models) + cost/usage messaging
-- [ ] Billing UX (plan/usage/upgrade) + enforced limits + overage behavior
-- [ ] Auto-update + notarization pipeline for direct distribution
-- [ ] MCP client
-- [ ] Security layer
+### Phase 5: CLI Channel (Weeks 10-11)
+- [ ] Formalize CLI as a first-class channel
+- [ ] Channel manager & base protocol
+- [ ] CLI input/output handling
+- [ ] Command parsing & routing
+- [ ] Channel-to-room mapping
+
+### Phase 6: Desktop App UI (Weeks 12-14)
+- [ ] Convert CLI project → macOS app target
+- [ ] SwiftUI views (chat, rooms, settings)
+- [ ] Menu bar integration
+- [ ] Settings & preferences UI
+- [ ] Polish & UX refinement
+- [ ] Testing
+
+### Phase 7: Hardening & Distribution (Weeks 15-16)
+- [ ] Security layer (Keychain, sanitization, credential detection)
+- [ ] MCP client implementation
+- [ ] Auto-update mechanism (Sparkle)
+- [ ] Notarization & hardened runtime
+- [ ] Documentation
+- [ ] Final testing
+
+### Phase 8: External Channels (Weeks 17-18)
+- [ ] WhatsApp connector (via existing Node.js bridge or native Swift)
+- [ ] iMessage connector (Apple Business Chat or local Messages.app)
+- [ ] Channel authentication & session management
+- [ ] Message format normalization
+
+### Phase 9: Backend Integration (Weeks 19-20)
+- [ ] Auth client & session management
+- [ ] LLM proxy integration (switch from direct providers)
+- [ ] Entitlements & usage tracking
+- [ ] Billing UX & enforcement
+- [ ] Graceful degradation when backend unavailable
+
+### Future Phases (Post-v1)
+- [ ] Telegram connector
+- [ ] Discord connector
+- [ ] Slack connector
+- [ ] Email channel (IMAP/SMTP)
+- [ ] Additional LLM providers
+- [ ] Team/enterprise features
 
 ---
 
@@ -820,4 +858,59 @@ class NanofolksApp: App {
 ---
 
 **Status**: Planning  
-**Next Step**: Confirm backend stack (hosting + DB + billing) and implement Phase 0 + Phase 1 walking skeleton
+**Next Step**: Confirm backend stack (hosting + DB + billing) and implement Phase 0, then begin Phase 1 CLI foundation
+
+---
+
+## Architecture Clarification: Channels vs. UI App
+
+### Channels
+External platforms where users interact with the agent:
+- **WhatsApp** - Users message from their phone via WhatsApp
+- **iMessage** - Users message from iPhone/Mac
+- **Telegram/Discord/Slack** - Other messaging platforms (future)
+- **CLI** - Terminal interface (built into the core)
+
+### UI App (macOS Desktop App)
+- NOT a channel - it's the native "home base" interface
+- Talks directly to the agent core (no external APIs)
+- Everything else (CLI, WhatsApp, iMessage) are "entrances" that feed into the same agent
+
+```
+┌─────────────────────────────────────┐
+│         Agent Core (Swift)          │
+├─────────────────────────────────────┤
+│  macOS UI App (direct access)       │
+│  CLI (direct access)                │
+│  WhatsApp Channel (via bridge)      │
+│  iMessage Channel (via API)         │
+└─────────────────────────────────────┘
+```
+
+### WhatsApp Bridge (Current Implementation)
+The Python project uses a Node.js bridge for WhatsApp:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         YOUR COMPUTER                                │
+├─────────────────────────────────────────────────────────────────────┤
+│   ┌──────────────────┐         WebSocket         ┌────────────────┐ │
+│   │   Python/Swift   │ ◄─────────────────────────►│  Node.js       │ │
+│   │   App            │      ws://127.0.0.1:3001   │  Bridge        │ │
+│   │                  │                            │  (Baileys)     │ │
+│   └──────────────────┘                            └───────┬────────┘ │
+│                                                           │          │
+│                                                    ┌──────▼──────┐   │
+│                                                    │  WhatsApp   │   │
+│                                                    │  Servers    │   │
+│                                                    └─────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Why a bridge?** WhatsApp has no official API for personal accounts. Baileys (Node.js) implements the WhatsApp Web protocol.
+
+**Swift options:**
+1. Keep the Node.js bridge (Swift WebSocket client to existing bridge)
+2. Create a Swift-native bridge (more work, single binary)
+
+**Recommendation**: Start with Option 1 (keep bridge), evaluate Option 2 post-v1.

@@ -520,7 +520,15 @@ class AgentLoop:
         user_file = self.workspace / "USER.md"
         if user_file.exists():
             content = user_file.read_text()
-            placeholders = ["(your name)", "(your location)", "(what you're working on)"]
+            placeholders = [
+                "(your name)", 
+                "(your location)", 
+                "(preferred language)",
+                "(default from team)",
+                "(what you're working on)",
+                "(what you want help with)",
+                "(tools and software)"
+            ]
             if not any(p in content for p in placeholders):
                 return False
 
@@ -545,6 +553,9 @@ class AgentLoop:
             )
 
         onboarding = self._chat_onboarding
+        
+        # Load any existing data from USER.md first
+        onboarding.load_from_user_md()
 
         # Load onboarding state from session metadata if available
         onboarding_data = session.metadata.get("_chat_onboarding")
@@ -652,10 +663,9 @@ class AgentLoop:
             )
 
             # Detect if this is a returning user continuing onboarding
-            # (in-progress state + has answered questions + no recent messages)
+            # (has answered questions in profile + no recent messages)
             is_returning_to_onboarding = (
-                onboarding.state == OnboardingState.IN_PROGRESS
-                and onboarding.current_question > 0
+                onboarding.has_any_answers()
                 and len(session.messages) <= 1  # Only current message or empty
             )
 
@@ -688,6 +698,10 @@ class AgentLoop:
             if soul_file.exists():
                 soul_content = soul_file.read_text()
 
+            # Get missing fields for the prompt
+            uncollected = onboarding.get_uncollected_fields()
+            missing_info_str = "\n".join([f"- {item['field']}: {getattr(onboarding.answers, item['field']) or 'not collected yet'}" for item in onboarding.QUESTIONS])
+            
             # Get the next question to ask
             next_question = onboarding.get_next_question()
             next_question_text = (
@@ -713,10 +727,7 @@ Give them a brief, warm welcome back (1 sentence) and then ask the next question
 You are in ONBOARDING mode. Your job is to get to know a new user who just joined.{welcome_back}
 
 Information you need to collect (ask naturally in conversation):
-- Name: {onboarding.answers.name or "not collected yet"}
-- Location: {onboarding.answers.location or "not collected yet"}
-- What they are working on: {onboarding.answers.work or "not collected yet"}
-- How you can help: {onboarding.answers.help or "not collected yet"}
+{missing_info_str}
 
 CRITICAL - Your next question MUST be: {next_question_text}
 
@@ -761,8 +772,8 @@ Current conversation history:
                 # Extract information from user message
                 onboarding.extract_info_from_message(user_message)
 
-                # Check if we have all required info
-                if onboarding.has_all_required_info():
+                # Check if we have finished all questions
+                if onboarding.get_next_question() is None:
                     onboarding.state = OnboardingState.TEAM_INTRO
                     onboarding.complete()
 

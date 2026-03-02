@@ -516,17 +516,17 @@ class AgentLoop:
             if state in [OnboardingState.COMPLETED.value, OnboardingState.TEAM_INTRO.value]:
                 return False
 
-        # If session already has messages, user is returning
-        if session.messages and len(session.messages) > 2:
-            return False
-
-        # Check USER.md for placeholders
+        # Check USER.md for placeholders - onboarding complete if all filled
         user_file = self.workspace / "USER.md"
         if user_file.exists():
             content = user_file.read_text()
             placeholders = ["(your name)", "(your location)", "(what you're working on)"]
             if not any(p in content for p in placeholders):
                 return False
+
+        # Onboarding is needed if we have onboarding data showing it's in progress
+        if onboarding_data:
+            return True
 
         return True
 

@@ -21,12 +21,23 @@ def create_bot_registry(
     workspace: Path,
     bot_name: str,
     provider: Optional[Any] = None,
+    bus: Optional[Any] = None,
+    invoker: Optional[Any] = None,
     brave_api_key: Optional[str] = None,
     web_config: Optional[Any] = None,
     browser_config: Optional[Any] = None,
     exec_config: Optional[ExecToolConfig] = None,
     restrict_to_workspace: bool = False,
     base_registry: Optional[ToolRegistry] = None,
+    evolutionary: bool = False,
+    allowed_paths: Optional[list[str]] = None,
+    protected_paths: Optional[list[str]] = None,
+    content_store: Optional[Any] = None,
+    cron_service: Optional[Any] = None,
+    system_timezone: str = "UTC",
+    memory_store: Optional[Any] = None,
+    memory_retrieval: Optional[Any] = None,
+    canceller: Optional[callable] = None,
 ) -> ToolRegistry:
     """Create a tool registry for a specialist bot.
 
@@ -38,11 +49,24 @@ def create_bot_registry(
     Args:
         workspace: Path to workspace
         bot_name: Name of the bot
-        provider: LLM provider (for message tool)
+        provider: LLM provider
+        bus: Message bus
+        invoker: Bot invoker
         brave_api_key: API key for web search
+        web_config: Configuration for web tools
+        browser_config: Configuration for browser tool
         exec_config: Execution config for shell tool
         restrict_to_workspace: Whether to restrict file ops to workspace
         base_registry: Optional pre-created registry to filter
+        evolutionary: Whether evolutionary mode is enabled
+        allowed_paths: Allowed paths for evolutionary mode
+        protected_paths: Protected paths for evolutionary mode
+        content_store: Store for fetched content
+        cron_service: Service for scheduled routines
+        system_timezone: Timezone for routines
+        memory_store: Memory store for context retrieval
+        memory_retrieval: Memory retrieval system
+        canceller: Callback to cancel room tasks
 
     Returns:
         Filtered ToolRegistry for the bot
@@ -59,22 +83,44 @@ def create_bot_registry(
         return create_default_registry(
             workspace=workspace,
             provider=provider,
+            bus=bus,
+            invoker=invoker,
             brave_api_key=brave_api_key,
             web_config=web_config,
             browser_config=browser_config,
             exec_config=exec_config,
             restrict_to_workspace=restrict_to_workspace,
+            evolutionary=evolutionary,
+            allowed_paths=allowed_paths,
+            protected_paths=protected_paths,
+            content_store=content_store,
+            cron_service=cron_service,
+            system_timezone=system_timezone,
+            memory_store=memory_store,
+            memory_retrieval=memory_retrieval,
+            canceller=canceller,
         )
 
     # Create base registry and filter
     base = base_registry or create_default_registry(
         workspace=workspace,
         provider=provider,
+        bus=bus,
+        invoker=invoker,
         brave_api_key=brave_api_key,
         web_config=web_config,
         browser_config=browser_config,
         exec_config=exec_config,
         restrict_to_workspace=restrict_to_workspace,
+        evolutionary=evolutionary,
+        allowed_paths=allowed_paths,
+        protected_paths=protected_paths,
+        content_store=content_store,
+        cron_service=cron_service,
+        system_timezone=system_timezone,
+        memory_store=memory_store,
+        memory_retrieval=memory_retrieval,
+        canceller=canceller,
     )
 
     return filter_registry(base, permissions)
@@ -83,6 +129,8 @@ def create_bot_registry(
 def create_default_registry(
     workspace: Path,
     provider: Optional[Any] = None,
+    bus: Optional[Any] = None,
+    invoker: Optional[Any] = None,
     brave_api_key: Optional[str] = None,
     web_config: Optional[Any] = None,
     browser_config: Optional[Any] = None,
@@ -91,18 +139,34 @@ def create_default_registry(
     evolutionary: bool = False,
     allowed_paths: Optional[list[str]] = None,
     protected_paths: Optional[list[str]] = None,
+    content_store: Optional[Any] = None,
+    cron_service: Optional[Any] = None,
+    system_timezone: str = "UTC",
+    memory_store: Optional[Any] = None,
+    memory_retrieval: Optional[Any] = None,
+    canceller: Optional[callable] = None,
 ) -> ToolRegistry:
     """Create a default tool registry with all standard tools.
 
     Args:
         workspace: Path to workspace
-        provider: LLM provider (for message tool)
+        provider: LLM provider
+        bus: Message bus for message tool
+        invoker: Bot invoker for delegation
         brave_api_key: API key for web search
+        web_config: Configuration for web tools
+        browser_config: Configuration for browser tool
         exec_config: Execution config for shell tool
         restrict_to_workspace: Whether to restrict file ops to workspace
         evolutionary: Whether evolutionary mode is enabled
         allowed_paths: Allowed paths for evolutionary mode
         protected_paths: Protected paths for evolutionary mode
+        content_store: Store for fetched content
+        cron_service: Service for scheduled routines
+        system_timezone: Timezone for routines
+        memory_store: Memory store for context retrieval
+        memory_retrieval: Memory retrieval system
+        canceller: Callback to cancel room tasks
 
     Returns:
         ToolRegistry with default tools
@@ -120,14 +184,17 @@ def create_default_registry(
     from nanofolks.agent.tools.room_tasks import RoomTaskTool
     from nanofolks.agent.tools.web import WebFetchTool, WebSearchTool
     from nanofolks.agent.tools.browser import AgentBrowserTool
+    from nanofolks.agent.tools.message import MessageTool
+    from nanofolks.agent.tools.update_config import UpdateConfigTool
+    from nanofolks.agent.tools.routines import RoutinesTool
 
     # File tools
-    allowed_dir = workspace if restrict_to_workspace else None
+    default_protected = [str(Path.home() / ".nanofolks" / "config.json")]
+    all_protected = list(set((protected_paths or []) + default_protected))
+    protected_dirs = [Path(p).expanduser().resolve() for p in all_protected]
 
     if evolutionary and allowed_paths:
         allowed_dirs = [Path(p).expanduser().resolve() for p in allowed_paths]
-        protected_dirs = [Path(p).expanduser().resolve() for p in (protected_paths or [])]
-
         registry.register(ReadFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
         registry.register(WriteFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
         registry.register(EditFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
@@ -139,10 +206,11 @@ def create_default_registry(
             allowed_paths=allowed_paths,
         ))
     else:
-        registry.register(ReadFileTool(allowed_dir=allowed_dir))
-        registry.register(WriteFileTool(allowed_dir=allowed_dir))
-        registry.register(EditFileTool(allowed_dir=allowed_dir))
-        registry.register(ListDirTool(allowed_dir=allowed_dir))
+        allowed_dir = workspace if restrict_to_workspace else None
+        registry.register(ReadFileTool(allowed_dir=allowed_dir, protected_paths=protected_dirs))
+        registry.register(WriteFileTool(allowed_dir=allowed_dir, protected_paths=protected_dirs))
+        registry.register(EditFileTool(allowed_dir=allowed_dir, protected_paths=protected_dirs))
+        registry.register(ListDirTool(allowed_dir=allowed_dir, protected_paths=protected_dirs))
 
         registry.register(ExecTool(
             working_dir=str(workspace),
@@ -151,30 +219,65 @@ def create_default_registry(
         ))
 
     # Web tools
-    if brave_api_key:
-        registry.register(WebSearchTool(api_key=brave_api_key))
+    registry.register(WebSearchTool(api_key=brave_api_key))
     registry.register(WebFetchTool(
         scrapling_enabled=bool(getattr(web_config, "scrapling_enabled", False)),
         scrapling_min_chars=int(getattr(web_config, "scrapling_min_chars", 800)),
         scrapling_mode=str(getattr(web_config, "scrapling_mode", "auto")),
+        content_store=content_store,
     ))
 
+    # Markdown conversion
+    from nanofolks.agent.tools.markdown_convert import MarkdownNewTool
+    registry.register(MarkdownNewTool())
+
+    # Content access tool
+    from nanofolks.agent.tools.content import ReadFetchedContentTool
+    registry.register(ReadFetchedContentTool(content_store=content_store))
+
+    # Browser tool
     if getattr(browser_config, "enabled", False):
         registry.register(AgentBrowserTool(
             binary=getattr(browser_config, "binary", "agent-browser"),
             allowlist=getattr(browser_config, "allowlist", []),
         ))
 
-    # Room task tool (task ownership & handoffs)
-    registry.register(RoomTaskTool())
+    # Message tool
+    if bus:
+        registry.register(MessageTool(send_callback=bus.publish_outbound))
 
-    # Message tool (if provider/bus available)
-    if provider:
-        # We'll handle this differently - message tool needs bus
-        pass
+    # Invoke tool
+    if invoker:
+        from nanofolks.agent.tools.invoke import InvokeTool
+        registry.register(InvokeTool(invoker=invoker))
 
-    # Invoke tool (for invoking other bots)
-    # Note: invoker will be set later
+    # Room task tool
+    room_task_tool = RoomTaskTool()
+    if canceller:
+        room_task_tool.set_canceller(canceller)
+    registry.register(room_task_tool)
+
+    # Routines tool
+    if cron_service:
+        registry.register(RoutinesTool(cron_service, default_timezone=system_timezone))
+
+    # Config update
+    registry.register(UpdateConfigTool())
+
+    # Memory tools
+    if memory_store and memory_retrieval:
+        from nanofolks.agent.tools.memory import create_memory_tools
+        memory_tools = create_memory_tools(memory_store, memory_retrieval)
+        for tool in memory_tools:
+            registry.register(tool)
+
+    # Security tools
+    from nanofolks.agent.tools.security import create_security_tools
+    security_tools = create_security_tools()
+    for tool in security_tools:
+        registry.register(tool)
+
+    return registry
 
     return registry
 

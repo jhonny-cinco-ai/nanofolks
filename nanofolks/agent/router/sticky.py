@@ -39,23 +39,39 @@ class StickyRouter:
     ) -> RoutingDecision:
         """
         Classify with sticky routing logic.
-
-        Sticky behavior: If recent messages were complex, stay complex
-        unless current message is explicitly simple.
+        Tiered priority:
+        1. Trie Exact Match (Instant)
+        2. Local Model (Primary Intelligence)
+        3. Regex/Heuristics (Fallback/Pre-filter)
+        4. Remote LLM (Last resort)
         """
-        # Layer 1: Client-side classification
+        # Layer 1: Client-side classification (includes Trie and Regex)
         client_decision, scores = self.client_classifier.classify(content)
 
-        # Check if we should use client-side result
-        if client_decision.confidence >= self.client_classifier.min_confidence:
-            # Check sticky routing context
+        # Layer 1a: Instant Trie match should always wins (0.01ms)
+        if client_decision.metadata.get("match_type") == "exact_trie":
             return self._apply_sticky_logic(
                 content, session, client_decision, scores, layer="client"
             )
 
-        # Layer 2: LLM-assisted fallback (if available)
-        if self.local_router or self.llm_router:
-            # Build context from Layer 1 for Layer 2
+        # Layer 2: Local Model as the primary intelligent filter
+        if self.local_router and self.local_router.is_available():
+            local_decision = await self.local_router.classify(content)
+            # Use local result if confident
+            if local_decision and local_decision.confidence >= 0.7:
+                self._record_feedback(content, client_decision, local_decision)
+                return self._apply_sticky_logic(
+                    content, session, local_decision, scores, layer="local"
+                )
+
+        # Layer 3: Fallback to high-confidence Regex if local failed or unavailable
+        if client_decision.confidence >= self.client_classifier.min_confidence:
+            return self._apply_sticky_logic(
+                content, session, client_decision, scores, layer="client"
+            )
+
+        # Layer 4: Final Fallback to Remote LLM
+        if self.llm_router:
             from .llm_router import ClassificationContext
 
             context = ClassificationContext(
@@ -65,31 +81,11 @@ class StickyRouter:
                 has_code_blocks=scores.code_presence > 0.7,
                 question_type=client_decision.metadata.get("question_type"),
             )
+            llm_decision = await self.llm_router.classify(content, context=context)
+            self._record_feedback(content, client_decision, llm_decision)
+            return self._apply_sticky_logic(content, session, llm_decision, scores, layer="llm")
 
-            # Try local model first if available
-            if self.local_router and self.local_router.is_available():
-                local_decision = await self.local_router.classify(content)
-                if local_decision:
-                    self._record_feedback(content, client_decision, local_decision)
-                    return self._apply_sticky_logic(
-                        content, session, local_decision, scores, layer="local"
-                    )
-                elif not self.local_fallback_to_api:
-                    # Local failed and we shouldn't fallback to API
-                    return self._apply_sticky_logic(
-                        content, session, client_decision, scores, layer="client"
-                    )
-
-            # Fall back to API LLM if local is not available or failed
-            if self.llm_router:
-                llm_decision = await self.llm_router.classify(content, context=context)
-
-                # Learn: Record comparison for feedback loop
-                self._record_feedback(content, client_decision, llm_decision)
-
-                return self._apply_sticky_logic(content, session, llm_decision, scores, layer="llm")
-
-        # No LLM fallback - use client decision even if low confidence
+        # No further fallbacks
         return self._apply_sticky_logic(content, session, client_decision, scores, layer="client")
 
     def _apply_sticky_logic(

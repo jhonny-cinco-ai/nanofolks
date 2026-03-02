@@ -13,7 +13,8 @@ class MessageTool(Tool):
         self,
         send_callback: Callable[[MessageEnvelope], Awaitable[None]] | None = None,
         default_channel: str = "",
-        default_chat_id: str = ""
+        default_chat_id: str = "",
+        default_message_id: str = ""
     ):
         self._send_callback = send_callback
         self._default_channel = default_channel

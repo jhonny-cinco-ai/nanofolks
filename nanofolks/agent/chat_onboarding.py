@@ -90,39 +90,14 @@ class ChatOnboarding:
             "skip_if": lambda a: not a.name,
         },
         {
-            "field": "work",
-            "key": "work",
-            "question": "What are you working on these days? (You can say 'skip')",
-        },
-        {
-            "field": "help",
-            "key": "help",
-            "question": "How should we help you most right now? (You can say 'skip')",
-            "skip_if": lambda a: not a.work,
-        },
-        {
-            "field": "more_details",
-            "key": "more_details",
-            "question": "Want to add a few more details (tools, topics, team name)? (yes/no)",
-            "skip_if": lambda a: not a.name,
-        },
-        {
-            "field": "tools",
-            "key": "tools",
-            "question": "What tools do you use? (Optional)",
-            "skip_if": lambda a: not a.more_details,
-        },
-        {
-            "field": "topics",
-            "key": "topics",
-            "question": "Any topics you're into? (Optional)",
-            "skip_if": lambda a: not a.more_details,
-        },
-        {
             "field": "team_name",
             "key": "team_name",
-            "question": "Want to name your team? (Optional)",
-            "skip_if": lambda a: not a.more_details,
+            "question": "What should we call our team? (Optional, you can say 'skip')",
+        },
+        {
+            "field": "work",
+            "key": "work",
+            "question": "Finally, items what are you working on these days? (You can say 'skip' to finish up)",
         },
     ]
 
@@ -145,9 +120,7 @@ class ChatOnboarding:
             "(your location)", 
             "(preferred language)",
             "(default from team)",
-            "(what you're working on)",
-            "(what you want help with)",
-            "(tools and software)"
+            "(what you're working on)"
         ]
         has_placeholders = any(p in content for p in placeholders)
 
@@ -566,8 +539,19 @@ They can: {capabilities}
 
         return onboarding
 
-    def extract_info_from_message(self, message: str) -> None:
-        """Extract user information from their message using simple heuristics."""
+    def extract_info_from_message(self, message: str, extracted_data: dict | None = None) -> None:
+        """Extract user information. 
+        
+        If extracted_data is provided (from structured output), use it.
+        Otherwise, fall back to simple heuristics.
+        """
+        if extracted_data:
+            for key, value in extracted_data.items():
+                if value and value != "skip" and hasattr(self.answers, key):
+                    setattr(self.answers, key, value)
+            self._save_to_user_md()
+            return
+
         message_lower = message.lower()
 
         # Extract name - look for patterns like "I'm Rick", "My name is Rick", "Call me Rick"
@@ -626,29 +610,41 @@ They can: {capabilities}
                             break
                     break
 
-        # Extract help needed
-        if not self.answers.help:
-            help_keywords = ["help", "need", "want", "looking for", "trying to"]
-            for keyword in help_keywords:
-                if keyword in message_lower:
-                    sentences = message.split(".")
-                    for sentence in sentences:
-                        if keyword in sentence.lower() and len(sentence.strip()) > 10:
-                            self.answers.help = sentence.strip()
-                            break
-                    break
-
         # Save to USER.md if we got new info
         self._save_to_user_md()
 
     def has_all_required_info(self) -> bool:
         """Check if we have all the minimum required information."""
         # Core onboarding is done when we've gone through the basic flow: 
-        # Name, Location, Language, Work, Help
+        # Name, Location, Language, Team Name, Work
         return bool(
             self.answers.name 
             and self.answers.location 
             and self.answers.language 
-            and self.answers.work 
-            and self.answers.help
+            and self.answers.team_name 
+            and self.answers.work
         )
+
+    def get_extraction_schema(self) -> dict:
+        """Get JSON schema for structured onboarding extraction."""
+        return {
+            "type": "object",
+            "properties": {
+                "response": {
+                    "type": "string", 
+                    "description": "Your conversational response in character"
+                },
+                "extracted_data": {
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "The user's name if mentioned"},
+                        "location": {"type": "string", "description": "The user's location if mentioned"},
+                        "language": {"type": "string", "description": "The user's preferred language if mentioned"},
+                        "team_name": {"type": "string", "description": "The proposed team name if mentioned"},
+                        "work": {"type": "string", "description": "What the user is working on if mentioned"}
+                    }
+                }
+            },
+            "required": ["response", "extracted_data"],
+            "additionalProperties": False
+        }

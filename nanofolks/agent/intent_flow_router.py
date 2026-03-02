@@ -140,6 +140,21 @@ class IntentFlowRouter:
         if intent.flow_type == FlowType.SIMULTANEOUS and not allow_simultaneous:
             return self.FlowState.PASS_THROUGH
         if intent.flow_type == FlowType.QUICK:
+            # Check for follow-up heuristics in ongoing conversations
+            # If we have history, we favor the AgentLoop (SIMULTANEOUS/PASS_THROUGH)
+            # as it has better memory/history integration than QuickFlow.
+            history = state_manager.state.discovery_log if hasattr(state_manager.state, "discovery_log") else []
+            has_history = len(state_manager.state.discovery_log) > 0 or (hasattr(state_manager, "get_history") and len(state_manager.get_history()) > 0)
+            
+            # Simple heuristic: if we have history AND the message looks like a question about it
+            msg_content = state_manager.state.user_goal.lower() if hasattr(state_manager.state, "user_goal") else ""
+            follow_up_sigs = ["what", "who", "where", "how", "tell", "show", "did", "was", "last", "previous", "previously", "about it", "find"]
+            is_potential_follow_up = any(sig in msg_content for sig in follow_up_sigs)
+            
+            if is_potential_follow_up and state_manager.get_quick_flow_state() is None:
+                logger.info("Potential follow-up detected with quick intent, passing to AgentLoop for better context")
+                return self.FlowState.PASS_THROUGH
+                
             return self.FlowState.QUICK
         if intent.flow_type == FlowType.FULL:
             return self.FlowState.FULL_START if allow_full_start else self.FlowState.PASS_THROUGH
@@ -173,12 +188,41 @@ class IntentFlowRouter:
         return None
 
     async def detect_intent(self, content: str) -> Intent:
-        """Detect intent with LLM fallback for low-confidence cases."""
+        """
+        Detect intent using a tiered approach:
+        1. Phrase/Regex (Fastest - for 1.0 confidence matches)
+        2. Local Model (Primary - intelligent, fast, private)
+        3. Remote LLM (Fallback - for complex/unhandled cases)
+        """
         intent = self.intent_detector.detect(content)
 
+        # 1. Short-circuit if we have 100% confidence from regex/keywords
+        if intent.confidence >= 1.0:
+            return intent
+
+        # 2. Try local model as the primary intelligence layer
+        local_router = getattr(self.agent, "routing_stage", None)
+        if local_router and hasattr(local_router, "local_router") and local_router.local_router:
+            if local_router.local_router.is_available():
+                local_result = await local_router.local_router.classify_intent(content)
+                # If local model is confident, use its decision
+                if local_result and local_result.get("confidence", 0) >= 0.7:
+                    logger.info(
+                        f"Primary local intent: {local_result['intent']} "
+                        f"({local_result['confidence']:.2f}) - replacing regex "
+                        f"({intent.type.value}:{intent.confidence:.2f})"
+                    )
+                    return self.intent_detector.make_intent(
+                        intent_type=IntentType(local_result["intent"]),
+                        confidence=local_result["confidence"],
+                        entities=intent.entities,  # Keep entities extracted by regex
+                    )
+
+        # 3. If local unavailable or low confidence, check phrase matching threshold
         if intent.confidence >= self.LLM_INTENT_FALLBACK_THRESHOLD:
             return intent
 
+        # 4. Final Fallback to remote LLM
         if not getattr(self.agent, "provider", None):
             return intent
 
@@ -190,24 +234,47 @@ class IntentFlowRouter:
         prompt = (
             "Classify the user's intent into one of: "
             "build, explore, advice, research, chat, task.\n"
-            "Return JSON only with keys: intent_type, confidence.\n"
-            "Example: {\"intent_type\": \"research\", \"confidence\": 0.72}\n\n"
             f"User message: {content}"
         )
+
+        schema = {
+            "type": "object",
+            "properties": {
+                "intent_type": {
+                    "type": "string",
+                    "enum": ["build", "explore", "advice", "research", "chat", "task"]
+                },
+                "confidence": {"type": "number"}
+            },
+            "required": ["intent_type", "confidence"],
+            "additionalProperties": False
+        }
+
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "intent_classification",
+                "strict": True,
+                "schema": schema
+            }
+        }
 
         try:
             response = await self.agent.provider.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=self.agent.model,
                 temperature=0.0,
-                max_tokens=120,
+                max_tokens=150,
+                response_format=response_format
             )
-            raw = (response.content or "").strip()
-            data = self._parse_llm_json(raw)
-            if not data:
-                return None
+            
+            data = json.loads(response.content or "{}")
             intent_type = data.get("intent_type")
             confidence = float(data.get("confidence", 0.5))
+            
+            if not intent_type:
+                return None
+                
             intent_enum = IntentType(intent_type)
             return self.intent_detector.make_intent(
                 intent_type=intent_enum,
@@ -260,6 +327,8 @@ class IntentFlowRouter:
             channel=msg.channel,
             chat_id=msg.chat_id,
             content="Okay, cancelled. Let me know if you need anything else.",
+            bot_name=self.agent.bot_name,
+            sender_role="bot",
             metadata={'cancelled': True, 'phase': 'idle'}
         )
 
@@ -318,6 +387,8 @@ class IntentFlowRouter:
                     channel=msg.channel,
                     chat_id=msg.chat_id,
                     content="Sorry, I couldn't start the quick flow. Please try again.",
+                    bot_name=self.agent.bot_name,
+                    sender_role="bot",
                     metadata={'phase': 'error', 'intent': intent.intent_type.value}
                 )
 
@@ -336,6 +407,8 @@ class IntentFlowRouter:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=question,
+                bot_name=self.agent.bot_name,
+                sender_role="bot",
                 metadata={
                     'phase': 'quick_discovery',
                     'questions_asked': quick_state.questions_asked,
@@ -352,6 +425,8 @@ class IntentFlowRouter:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=answer,
+                bot_name=self.agent.bot_name,
+                sender_role="bot",
                 metadata={
                     'phase': 'complete',
                     'intent': intent.intent_type.value,
@@ -411,6 +486,8 @@ class IntentFlowRouter:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=question,
+                bot_name=self.agent.bot_name,
+                sender_role="bot",
                 metadata={
                     'phase': 'discovery',
                     'bot': first_bot,
@@ -536,6 +613,8 @@ class IntentFlowRouter:
             channel=msg.channel,
             chat_id=msg.chat_id,
             content="I'm not sure what to do next. Let's start fresh!",
+            bot_name=self.agent.bot_name,
+            sender_role="bot",
             metadata={'phase': 'idle'}
         )
 
@@ -561,6 +640,8 @@ class IntentFlowRouter:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=formatted,
+                bot_name=self.agent.bot_name,
+                sender_role="bot",
                 metadata={'phase': 'approval'}
             )
 
@@ -573,6 +654,8 @@ class IntentFlowRouter:
             channel=msg.channel,
             chat_id=msg.chat_id,
             content=question,
+            bot_name=self.agent.bot_name,
+            sender_role="bot",
             metadata={'phase': 'discovery', 'bot': next_bot}
         )
 
@@ -596,6 +679,8 @@ class IntentFlowRouter:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=execution_content,
+                bot_name=self.agent.bot_name,
+                sender_role="bot",
                 metadata={'phase': 'execution'}
             )
         else:
@@ -610,6 +695,8 @@ class IntentFlowRouter:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=question,
+                bot_name=self.agent.bot_name,
+                sender_role="bot",
                 metadata={'phase': 'discovery'}
             )
 
@@ -628,6 +715,8 @@ class IntentFlowRouter:
             channel=msg.channel,
             chat_id=msg.chat_id,
             content="All tasks complete! Ready for review. Let me know if anything needs changes.",
+            bot_name=self.agent.bot_name,
+            sender_role="bot",
             metadata={'phase': 'review'}
         )
 
@@ -644,12 +733,14 @@ class IntentFlowRouter:
             channel=msg.channel,
             chat_id=msg.chat_id,
             content="Great work! Let me know if you need anything else.",
+            bot_name="leader",
+            sender_role="bot",
             metadata={'phase': 'idle'}
         )
 
     async def _generate_quick_question_llm(self, intent: Intent, state: Any) -> str:
         """Generate a quick clarifying question using LLM."""
-        user_goal = getattr(state, 'user_goal', state.get('user_goal', ''))
+        user_goal = state.user_goal if not isinstance(state, dict) else state.get('user_goal', '')
 
         prompt = f"""You are a helpful assistant. The user wants to {intent.intent_type.value.lower()}.
 
@@ -686,8 +777,8 @@ Question:"""
         user_context: str
     ) -> str:
         """Generate a quick answer after clarification using LLM."""
-        user_goal = getattr(state, 'user_goal', state.get('user_goal', ''))
-        user_answers = getattr(state, 'user_answers', state.get('user_answers', []))
+        user_goal = state.user_goal if not isinstance(state, dict) else state.get('user_goal', '')
+        user_answers = state.user_answers if not isinstance(state, dict) else state.get('user_answers', [])
 
         answers = "\n".join(f"- {a}" for a in user_answers)
 
@@ -773,52 +864,63 @@ User's Original Goal: {state.user_goal}
 Discovery Conversation:
 """
         for entry in state.discovery_log:
-            "❓" if entry.get('is_question', True) else "💬"
             prompt += f"- @{entry['bot']}: {entry['content']}\n"
 
-        prompt += """
-Create a structured project brief in JSON format:
+        schema = {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "A concise title for the project"},
+                "goal": {"type": "string", "description": "One sentence summarizing what will be built"},
+                "scope": {
+                    "type": "object",
+                    "properties": {
+                        "included": {"type": "array", "items": {"type": "string"}},
+                        "excluded": {"type": "array", "items": {"type": "string"}}
+                    },
+                    "required": ["included", "excluded"]
+                },
+                "constraints": {
+                    "type": "object",
+                    "properties": {
+                        "budget": {"type": "string"},
+                        "timeline": {"type": "string"},
+                        "platform": {"type": "string"}
+                    }
+                },
+                "next_steps": {
+                    "type": "object",
+                    "properties": {
+                        "leader": {"type": "string"},
+                        "researcher": {"type": "string"},
+                        "creative": {"type": "string"},
+                        "coder": {"type": "string"},
+                        "social": {"type": "string"},
+                        "auditor": {"type": "string"}
+                    }
+                }
+            },
+            "required": ["title", "goal", "scope", "next_steps"],
+            "additionalProperties": False
+        }
 
-```json
-{{
-  "title": "Project name",
-  "goal": "One sentence on what to build",
-  "scope": {{
-    "included": ["list of features"],
-    "excluded": ["explicitly out of scope"]
-  }},
-  "constraints": {{
-    "budget": "budget if mentioned",
-    "timeline": "timeline if mentioned",
-    "platform": "platform/tech if mentioned"
-  }},
-  "next_steps": {{
-    "leader": "coordination task",
-    "researcher": "research task",
-    "creative": "design task",
-    "coder": "implementation task",
-    "social": "outreach task",
-    "auditor": "review task"
-  }}
-}}
-```
-
-Generate ONLY the JSON, no other text."""
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "project_brief",
+                "strict": True,
+                "schema": schema
+            }
+        }
 
         try:
             response = await self.agent.provider.chat(
                 messages=[{"role": "user", "content": prompt}],
                 model=self.agent.model,
                 temperature=0.5,
-                max_tokens=800,
+                max_tokens=1000,
+                response_format=response_format
             )
-            import json
-            content = response.content.strip()
-            if '```json' in content:
-                content = content.split('```json')[1].split('```')[0]
-            elif '```' in content:
-                content = content.split('```')[1].split('```')[0]
-            return json.loads(content.strip())
+            return json.loads(response.content or "{}")
         except Exception as e:
             logger.warning(f"LLM synthesis generation failed: {e}")
             return self._fallback_synthesis(state_manager)

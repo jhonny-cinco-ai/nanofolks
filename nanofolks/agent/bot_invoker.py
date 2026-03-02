@@ -89,6 +89,11 @@ class BotInvoker:
         routing_config: "RoutingConfig | None" = None,
         web_config: "WebToolsConfig | None" = None,
         browser_config: "BrowserToolsConfig | None" = None,
+        content_store: Any = None,
+        cron_service: Any = None,
+        system_timezone: str = "UTC",
+        memory_retrieval: Any = None,
+        canceller: Optional[callable] = None,
     ):
         self.provider = provider
         self.workspace = workspace
@@ -106,6 +111,12 @@ class BotInvoker:
         self.routing_config = routing_config
         self.web_config = web_config
         self.browser_config = browser_config
+        self._memory_store = memory_store
+        self._content_store = content_store
+        self._cron_service = cron_service
+        self._system_timezone = system_timezone
+        self._memory_retrieval = memory_retrieval
+        self._canceller = canceller
         self.routing_stage: RoutingStage | None = None
         if routing_config and routing_config.enabled:
             self.routing_stage = RoutingStage(
@@ -528,11 +539,23 @@ Focus only on your domain expertise and provide a helpful response.
         registry = create_bot_registry(
             workspace=self.workspace,
             bot_name=bot_role,
+            provider=self.provider,
+            bus=self.bus,
+            invoker=self,
             brave_api_key=self.brave_api_key,
             web_config=self.web_config,
             browser_config=self.browser_config,
             exec_config=self.exec_config,
             restrict_to_workspace=self.restrict_to_workspace,
+            evolutionary=self.evolutionary,
+            allowed_paths=self.allowed_paths,
+            protected_paths=self.protected_paths,
+            content_store=self._content_store,
+            cron_service=self._cron_service,
+            system_timezone=self._system_timezone,
+            memory_store=self._memory_store,
+            memory_retrieval=self._memory_retrieval,
+            canceller=self._canceller,
         )
         if allow_sidekicks and self.sidekick_config.enabled:
             try:

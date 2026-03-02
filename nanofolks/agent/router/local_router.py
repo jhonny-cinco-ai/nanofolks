@@ -8,7 +8,17 @@ from loguru import logger
 from .models import RoutingDecision, RoutingTier
 
 
-LOCAL_CLASSIFICATION_PROMPT = """Classify this message into one tier:
+LOCAL_UNIFIED_PROMPT = """Classify the user's message for a multi-agent AI system:
+
+1. INTENT:
+- build: creating or developing something new
+- explore: brainstorming, monetization, or business ideas
+- advice: how-to questions, recommendations, or help
+- research: finding information, learning about a topic
+- task: specific actions like writing, summarizing, or analyzing
+- chat: general conversation, greetings, or follow-up questions
+
+2. TIER (Complexity):
 - SIMPLE: quick facts, greetings, thanks, simple questions
 - MEDIUM: explanations, searches, simple tasks
 - CODING: code writing, debugging, implementations
@@ -16,7 +26,7 @@ LOCAL_CLASSIFICATION_PROMPT = """Classify this message into one tier:
 - REASONING: proofs, logic, math
 
 Respond with only JSON:
-{{"tier": "SIMPLE|MEDIUM|CODING|COMPLEX|REASONING", "reasoning": "why", "needs_tools": true|false}}
+{{"intent": "build|explore|advice|research|task|chat", "tier": "SIMPLE|MEDIUM|CODING|COMPLEX|REASONING", "confidence": 0.0-1.0, "reasoning": "..."}}
 
 Message: {content}
 """
@@ -37,6 +47,8 @@ class LocalRouter:
         self.fallback_to_api = fallback_to_api
         self._model = None
         self._available = None
+        self._last_content = None
+        self._last_result = None
         self._check_availability()
 
     def _check_availability(self) -> None:
@@ -60,67 +72,99 @@ class LocalRouter:
             self._available = False
             logger.warning(f"Failed to initialize Apple Foundation Model: {e}")
 
-    def is_available(self) -> bool:
-        """Check if local model is available."""
-        return self._available is True
-
-    async def classify(
+    async def classify_unified(
         self,
         content: str,
-    ) -> Optional[RoutingDecision]:
+    ) -> Optional[dict[str, Any]]:
         """
-        Classify content using local Apple Foundation Model.
-
-        Args:
-            content: The message/content to classify
-
-        Returns:
-            RoutingDecision if successful, None if should fallback to API
+        Run unified classification (Intent + Tier) using local model.
+        Caches result to avoid redundant on-device inference.
         """
         if not self.is_available():
             return None
 
+        # Check cache
+        if content == self._last_content and self._last_result:
+            return self._last_result
+
         try:
             import apple_fm_sdk as fm
 
-            prompt = LOCAL_CLASSIFICATION_PROMPT.format(content=content)
+            prompt = LOCAL_UNIFIED_PROMPT.format(content=content)
 
             session = fm.LanguageModelSession()
             response = await session.respond(prompt)
-            logger.debug(f"Local model raw response: {response}")
+            logger.debug(f"Local unified classification raw response: {response}")
 
-            result = self._parse_response(response)
-            logger.debug(f"Local model parsed result: {result}")
+            result = self._parse_json_robust(response)
+            
+            # 1. Parse Intent
+            raw_intent = result.get("intent")
+            valid_intents = ["build", "explore", "advice", "research", "task", "chat"]
+            cleaned_intent = None
+            if raw_intent:
+                cleaned_intent = str(raw_intent).lower()
+                if "|" in cleaned_intent:
+                    cleaned_intent = cleaned_intent.split("|")[0].strip()
+                if cleaned_intent not in valid_intents:
+                    cleaned_intent = None
+            if not cleaned_intent:
+                for valid in valid_intents:
+                    if valid in response.lower():
+                        cleaned_intent = valid
+                        break
+            if not cleaned_intent:
+                cleaned_intent = "chat"
 
-            # Use .get() with fallback to avoid KeyError like '"tier"'
-            tier_str = result.get("tier", "medium").lower()
+            # 2. Parse Tier
+            raw_tier = result.get("tier")
+            valid_tiers = ["SIMPLE", "MEDIUM", "CODING", "COMPLEX", "REASONING"]
+            cleaned_tier = None
+            if raw_tier:
+                cleaned_tier = str(raw_tier).upper()
+                if "|" in cleaned_tier:
+                    cleaned_tier = cleaned_tier.split("|")[0].strip()
+                if cleaned_tier not in valid_tiers:
+                    cleaned_tier = None
+            if not cleaned_tier:
+                for valid in valid_tiers:
+                    if f'"{valid}"' in response.upper() or f"'{valid}'" in response.upper():
+                        cleaned_tier = valid
+                        break
+            if not cleaned_tier:
+                cleaned_tier = "MEDIUM"
 
-            return RoutingDecision(
-                tier=RoutingTier(tier_str),
-                model="apple-on-device",
-                confidence=result.get("confidence", 0.8),
-                layer="local",
-                reasoning=result.get("reasoning", "Local model classification"),
-                estimated_tokens=self._estimate_tokens(content),
-                needs_tools=result.get("needs_tools", True),
-                metadata={
-                    "local_model": "apple-foundation",
-                    "raw_response": response,
-                },
-            )
+            unified_result = {
+                "intent": cleaned_intent,
+                "tier": cleaned_tier,
+                "confidence": result.get("confidence", 0.7),
+                "reasoning": result.get("reasoning", "Unified local classification"),
+                "needs_tools": cleaned_tier not in ["SIMPLE"],
+                "model": "apple-on-device"
+            }
 
-        except ImportError:
-            logger.warning("apple-fm-sdk not installed")
-            return None
+            self._last_content = content
+            self._last_result = unified_result
+            return unified_result
+
         except Exception as e:
-            logger.error(f"Local model classification failed: {e}")
+            logger.error(f"Local unified classification failed: {e}")
             return None
 
-    def _parse_response(self, response: str) -> dict[str, Any]:
-        """Parse the model's JSON response with robust cleaning."""
+    def is_available(self) -> bool:
+        """Check if local model is available."""
+        return self._available is True
+
+    async def classify_intent(
+        self,
+        content: str,
+    ) -> Optional[dict[str, Any]]:
+        """Backwards compatibility for intent-only classification."""
+        return await self.classify_unified(content)
+
+    def _parse_json_robust(self, response: str) -> dict[str, Any]:
+        """Generic robust JSON parser for local model responses."""
         content = response.strip()
-        
-        # 1. Handle markdown JSON blocks
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:
@@ -128,29 +172,38 @@ class LocalRouter:
 
         try:
             result = json.loads(content)
-            
-            # Ensure it's a dictionary
             if not isinstance(result, dict):
-                return self._fallback_parse(content)
-
-            # 2. Key cleaning: remove accidental quotes from keys (e.g. '"tier"' -> 'tier')
-            cleaned_result = {}
-            for k, v in result.items():
-                if isinstance(k, str):
-                    cleaned_key = k.strip().strip('"').strip("'")
-                    cleaned_result[cleaned_key] = v
-                else:
-                    cleaned_result[k] = v
-
-            return {
-                "tier": str(cleaned_result.get("tier", "medium")).upper(),
-                "confidence": cleaned_result.get("confidence", 0.8),
-                "reasoning": cleaned_result.get("reasoning", "Classified by local model"),
-                "needs_tools": cleaned_result.get("needs_tools", True),
-            }
+                return {}
+            
+            # Clean keys
+            return {k.strip().strip('"').strip("'"): v for k, v in result.items()}
         except Exception:
-            # If JSON parsing fails at any level, use fallback text search
-            return self._fallback_parse(response)
+            return {}
+
+    async def classify(
+        self,
+        content: str,
+    ) -> Optional[RoutingDecision]:
+        """
+        Classify content using local Apple Foundation Model (Unified check).
+        """
+        unified = await self.classify_unified(content)
+        if not unified:
+            return None
+
+        return RoutingDecision(
+            tier=RoutingTier(unified["tier"].lower()),
+            model="apple-on-device",
+            confidence=unified["confidence"],
+            layer="local",
+            reasoning=unified["reasoning"],
+            estimated_tokens=self._estimate_tokens(content),
+            needs_tools=unified["needs_tools"],
+            metadata={
+                "local_model": "apple-foundation",
+                "unified": True
+            },
+        )
 
     def _fallback_parse(self, response: str) -> dict[str, Any]:
         """Fallback parsing when JSON is not valid (case-insensitive)."""

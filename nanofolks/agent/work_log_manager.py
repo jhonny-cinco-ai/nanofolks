@@ -16,7 +16,7 @@ from nanofolks.agent.learning_exchange import (
     LearningExchange,
     LearningPackage,
 )
-from nanofolks.agent.work_log import LogLevel, WorkLog, WorkLogEntry, WorkspaceType
+from nanofolks.agent.work_log import LogLevel, RoomType, WorkLog, WorkLogEntry
 from nanofolks.config.loader import get_data_dir
 from nanofolks.utils.ids import normalize_room_id
 
@@ -155,8 +155,8 @@ the current active log.
             """)
 
     def start_session(self, session_id: str, query: str,
-                       workspace_id: str = "general",
-                       workspace_type: Optional[WorkspaceType] = None,
+                       room_id: str = "general",
+                       room_type: Optional[RoomType] = None,
                        participants: Optional[list] = None,
                        coordinator: Optional[str] = None) -> WorkLog:
         """Start a new work log session.
@@ -164,15 +164,15 @@ the current active log.
         Args:
             session_id: Unique identifier for this session
             query: The user's original query/message
-            workspace_id: Workspace identifier (e.g., "#project-alpha")
-            workspace_type: Type of workspace (OPEN, PROJECT, DIRECT, COORDINATION)
-            participants: List of bot names in this workspace
+            room_id: Room identifier (e.g., "#project-alpha")
+            room_type: Type of room (OPEN, PROJECT, DIRECT, COORDINATION)
+            participants: List of bot names in this room
             coordinator: Name of coordinator bot (if in coordinator mode)
 
         Returns:
             The created WorkLog instance
         """
-        normalized_workspace_id = normalize_room_id(workspace_id) or "general"
+        normalized_room_id = normalize_room_id(room_id) or "general"
 
         if not self.enabled:
             # Return a dummy log that doesn't store anything
@@ -180,8 +180,8 @@ the current active log.
                 session_id=session_id,
                 query=query,
                 start_time=datetime.now(),
-                workspace_id=normalized_workspace_id,
-                workspace_type=workspace_type or WorkspaceType.OPEN,
+                room_id=normalized_room_id,
+                room_type=room_type or RoomType.OPEN,
                 participants=participants or ["leader"],
                 coordinator=coordinator
             )
@@ -189,15 +189,15 @@ the current active log.
         # Initialize Learning Exchange for this session
         self.learning_exchange = LearningExchange(
             bot_name=self.bot_name,
-            workspace_id=normalized_workspace_id
+            room_id=normalized_room_id
         )
 
         self.current_log = WorkLog(
             session_id=session_id,
             query=query,
             start_time=datetime.now(),
-            workspace_id=normalized_workspace_id,
-            workspace_type=workspace_type or WorkspaceType.OPEN,
+            room_id=normalized_room_id,
+            room_type=room_type or RoomType.OPEN,
             participants=participants or ["leader"],
             coordinator=coordinator
         )
@@ -210,7 +210,7 @@ the current active log.
                        (id, session_id, query, start_time, workspace_id, workspace_type, participants_json, coordinator)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                     (session_id, session_id, query, self.current_log.start_time.isoformat(),
-                     normalized_workspace_id, (workspace_type or WorkspaceType.OPEN).value,
+                     normalized_room_id, (room_type or RoomType.OPEN).value,
                      json.dumps(participants or ["leader"]), coordinator)
                 )
         except sqlite3.IntegrityError:
@@ -221,7 +221,7 @@ the current active log.
                         """UPDATE work_logs
                            SET workspace_id = ?, workspace_type = ?, participants_json = ?, coordinator = ?
                            WHERE session_id = ?""",
-                        (normalized_workspace_id, (workspace_type or WorkspaceType.OPEN).value,
+                        (normalized_room_id, (room_type or RoomType.OPEN).value,
                          json.dumps(participants or ["leader"]), coordinator, session_id)
                     )
             except Exception:
@@ -373,8 +373,8 @@ the current active log.
                         json.dumps(entry.tool_output, default=str) if entry.tool_output else None,
                         entry.tool_status,
                         # Multi-agent fields
-                        entry.workspace_id,
-                        entry.workspace_type.value,
+                        entry.room_id,
+                        entry.room_type.value,
                         json.dumps(entry.participants),
                         entry.bot_name,
                         entry.bot_role,
@@ -469,15 +469,15 @@ the current active log.
             print(f"Warning: Failed to load work log: {e}")
             return None
 
-    def get_logs_by_workspace(self, workspace_id: str, limit: int = 10) -> List[WorkLog]:
-        """Get work logs for a specific workspace.
+    def get_logs_by_room(self, room_id: str, limit: int = 10) -> List[WorkLog]:
+        """Get work logs for a specific room.
 
         Args:
-            workspace_id: The workspace ID (e.g., "#project-alpha")
+            room_id: The room ID (e.g., "#project-alpha")
             limit: Maximum number of logs to return
 
         Returns:
-            List of WorkLog instances for the workspace
+            List of WorkLog instances for the room
         """
         try:
             with sqlite3.connect(self.db_path, timeout=5.0) as conn:
@@ -487,7 +487,7 @@ the current active log.
                        WHERE workspace_id = ?
                        ORDER BY start_time DESC
                        LIMIT ?""",
-                    (workspace_id, limit)
+                    (room_id, limit)
                 )
 
                 logs = []
@@ -498,15 +498,15 @@ the current active log.
 
                 return logs
         except Exception as e:
-            print(f"Warning: Failed to load workspace logs: {e}")
+            print(f"Warning: Failed to load room logs: {e}")
             return []
 
-    def get_all_logs(self, limit: int = 10, workspace: Optional[str] = None) -> List[WorkLog]:
-        """Get all work logs, optionally filtered by workspace.
+    def get_all_logs(self, limit: int = 10, room: Optional[str] = None) -> List[WorkLog]:
+        """Get all work logs, optionally filtered by room.
 
         Args:
             limit: Maximum number of logs to return
-            workspace: Optional workspace ID to filter by
+            room: Optional room ID to filter by
 
         Returns:
             List of WorkLog instances
@@ -515,13 +515,13 @@ the current active log.
             with sqlite3.connect(self.db_path, timeout=5.0) as conn:
                 conn.row_factory = sqlite3.Row
 
-                if workspace:
+                if room:
                     cursor = conn.execute(
                         """SELECT * FROM work_logs
                            WHERE workspace_id = ?
                            ORDER BY start_time DESC
                            LIMIT ?""",
-                        (workspace, limit)
+                        (room, limit)
                     )
                 else:
                     cursor = conn.execute(
@@ -545,14 +545,14 @@ the current active log.
     def get_recent_handoffs(
         self,
         limit: int = 20,
-        workspace_id: Optional[str] = None,
+        room_id: Optional[str] = None,
         completed_only: bool = True,
     ) -> List[HandoffRecord]:
         """Get recent handoffs aggregated from work log entries.
 
         Args:
             limit: Maximum number of handoff records to return
-            workspace_id: Optional workspace/room filter
+            room_id: Optional room filter
             completed_only: If True, return only completed handoffs
 
         Returns:
@@ -565,8 +565,8 @@ the current active log.
                 params: list[Any] = [LogLevel.HANDOFF.value]
                 where = "level = ?"
 
-                if workspace_id:
-                    normalized = normalize_room_id(workspace_id) or workspace_id
+                if room_id:
+                    normalized = normalize_room_id(room_id) or room_id
                     where += " AND workspace_id = ?"
                     params.append(normalized)
 
@@ -575,7 +575,7 @@ the current active log.
 
                 cursor = conn.execute(
                     f"""SELECT work_log_id, step, timestamp, details_json,
-                               workspace_id, bot_name, triggered_by
+                                workspace_id, bot_name, triggered_by
                         FROM work_log_entries
                         WHERE {where}
                         ORDER BY timestamp DESC
@@ -696,8 +696,8 @@ the current active log.
             end_time=datetime.fromisoformat(row['end_time']) if row['end_time'] else None,
             final_output=row['final_output'],
             # Multi-agent fields from DB
-            workspace_id=row['workspace_id'] if 'workspace_id' in row.keys() else 'general',
-            workspace_type=WorkspaceType(row['workspace_type']) if 'workspace_type' in row.keys() else WorkspaceType.OPEN,
+            room_id=row['workspace_id'] if 'workspace_id' in row.keys() else 'general',
+            room_type=RoomType(row['workspace_type']) if 'workspace_type' in row.keys() else RoomType.OPEN,
             participants=json.loads(row['participants_json']) if 'participants_json' in row.keys() and row['participants_json'] else ['leader'],
             coordinator=row['coordinator'] if 'coordinator' in row.keys() else None
         )
@@ -724,8 +724,8 @@ the current active log.
                 tool_output=json.loads(entry_row['tool_output_json']) if entry_row['tool_output_json'] else None,
                 tool_status=entry_row['tool_status'],
                 # Multi-agent fields - use dict-like access with fallback
-                workspace_id=entry_row['workspace_id'] if 'workspace_id' in entry_row.keys() else 'general',
-                workspace_type=WorkspaceType(entry_row['workspace_type']) if 'workspace_type' in entry_row.keys() else WorkspaceType.OPEN,
+                room_id=entry_row['workspace_id'] if 'workspace_id' in entry_row.keys() else 'general',
+                room_type=RoomType(entry_row['workspace_type']) if 'workspace_type' in entry_row.keys() else RoomType.OPEN,
                 participants=json.loads(entry_row['participants_json']) if 'participants_json' in entry_row.keys() and entry_row['participants_json'] else ['leader'],
                 bot_name=entry_row['bot_name'] if 'bot_name' in entry_row.keys() else 'leader',
                 bot_role=entry_row['bot_role'] if 'bot_role' in entry_row.keys() else 'primary',

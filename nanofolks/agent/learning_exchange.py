@@ -35,9 +35,9 @@ class InsightCategory(Enum):
 
 class ApplicabilityScope(Enum):
     """Scope of insight applicability."""
-    GENERAL = "general"          # Applies to all workspaces (#general)
-    PROJECT = "project"          # Applies to project workspace (#project-*)
-    TEAM = "team"                # Applies to specific team workspace
+    GENERAL = "general"          # Applies to all rooms (e.g. #general)
+    PROJECT = "project"          # Applies to project rooms (#project-*)
+    TEAM = "team"                # Applies to specific team rooms
     BOT_SPECIFIC = "bot_specific"  # Only for specific bot (DM @bot)
 
 
@@ -63,13 +63,13 @@ class LearningPackage:
     package_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
     # Applicability
-    applicable_workspaces: List[str] = field(default_factory=list)
-        # For TEAM/PROJECT scope: which workspaces?
+    applicable_rooms: List[str] = field(default_factory=list)
+        # For TEAM/PROJECT scope: which rooms?
     applicable_bots: List[str] = field(default_factory=list)
         # For BOT_SPECIFIC scope: which bots?
 
     # Source information
-    source_workspace: str = "default"  # Where was this learned?
+    source_room: str = "default"  # Where was this learned?
     created_at: datetime = field(default_factory=datetime.now)
 
     # Content metadata
@@ -106,10 +106,10 @@ class LearningPackage:
             "description": self.description,
             "confidence": self.confidence,
             "scope": self.scope.value,
-            "applicable_workspaces": self.applicable_workspaces,
+            "applicable_rooms": self.applicable_rooms,
             "applicable_bots": self.applicable_bots,
             "source_bot": self.source_bot,
-            "source_workspace": self.source_workspace,
+            "source_room": self.source_room,
             "created_at": self.created_at.isoformat(),
             "queued_at": self.queued_at.isoformat() if self.queued_at else None,
             "evidence": self.evidence,
@@ -127,10 +127,10 @@ class LearningPackage:
             description=data["description"],
             confidence=data["confidence"],
             scope=ApplicabilityScope(data["scope"]),
-            applicable_workspaces=data.get("applicable_workspaces", []),
+            applicable_rooms=data.get("applicable_rooms", data.get("applicable_workspaces", [])),
             applicable_bots=data.get("applicable_bots", []),
             source_bot=data["source_bot"],
-            source_workspace=data.get("source_workspace", "default"),
+            source_room=data.get("source_room", data.get("source_workspace", "default")),
             evidence=data.get("evidence", {}),
             context=data.get("context", {}),
             distributed_to=data.get("distributed_to", []),
@@ -150,7 +150,7 @@ class InsightQueue:
     to be shared with other bot instances.
     """
 
-    workspace_id: str = "default"
+    room_id: str = "default"
     bot_name: str = "leader"
     _queue: List[LearningPackage] = field(default_factory=list)
     _processed: List[str] = field(default_factory=list)
@@ -256,7 +256,7 @@ class InsightQueue:
     def to_dict(self) -> dict:
         """Convert queue state to dictionary."""
         return {
-            "workspace_id": self.workspace_id,
+            "room_id": self.room_id,
             "bot_name": self.bot_name,
             "pending_count": len(self._queue),
             "processed_count": len(self._processed),
@@ -276,33 +276,33 @@ class ApplicabilityRule:
     """
 
     @staticmethod
-    def applies_to_workspace(package: LearningPackage,
-                            target_workspace: str) -> bool:
-        """Check if an insight applies to a specific workspace.
+    def applies_to_room(package: LearningPackage,
+                            target_room: str) -> bool:
+        """Check if an insight applies to a specific room.
 
         Args:
             package: The LearningPackage to evaluate
-            target_workspace: The target workspace ID
+            target_room: The target room ID
 
         Returns:
-            True if insight should be shared with this workspace
+            True if insight should be shared with this room
         """
         if package.scope == ApplicabilityScope.GENERAL:
             return True
 
         if package.scope == ApplicabilityScope.PROJECT:
-            # Project insights apply to #project-* workspaces
-            if target_workspace.startswith("#project-"):
-                # If specified, only apply to listed workspaces
-                if package.applicable_workspaces:
-                    return target_workspace in package.applicable_workspaces
+            # Project insights apply to #project-* rooms
+            if target_room.startswith("#project-"):
+                # If specified, only apply to listed rooms
+                if package.applicable_rooms:
+                    return target_room in package.applicable_rooms
                 return True
             return False
 
         if package.scope == ApplicabilityScope.TEAM:
             # Team insights apply to specific teams
-            if package.applicable_workspaces:
-                return target_workspace in package.applicable_workspaces
+            if package.applicable_rooms:
+                return target_room in package.applicable_rooms
             return False
 
         if package.scope == ApplicabilityScope.BOT_SPECIFIC:
@@ -350,18 +350,18 @@ class LearningExchange:
     """
 
     def __init__(self, bot_name: str = "leader",
-                 workspace_id: str = "default",
+                 room_id: str = "default",
                  store=None):
         """Initialize the Learning Exchange system.
 
         Args:
             bot_name: Name of this bot instance
-            workspace_id: Current workspace ID
+            room_id: Current room ID
             store: Optional InsightStore for persistence (lazy-loaded if None)
         """
         self.bot_name = bot_name
-        self.workspace_id = workspace_id
-        self.queue = InsightQueue(workspace_id=workspace_id, bot_name=bot_name)
+        self.room_id = room_id
+        self.queue = InsightQueue(room_id=room_id, bot_name=bot_name)
         self._store = store  # Will be lazy-loaded from insight_store module if needed
         self._distribution_callbacks: Dict[str, List[Callable]] = {}
 
@@ -393,7 +393,7 @@ class LearningExchange:
     def queue_insight(self, category: InsightCategory, title: str,
                      description: str, confidence: float,
                      scope: ApplicabilityScope = ApplicabilityScope.GENERAL,
-                     applicable_workspaces: Optional[List[str]] = None,
+                     applicable_rooms: Optional[List[str]] = None,
                      applicable_bots: Optional[List[str]] = None,
                      evidence: Optional[Dict] = None,
                      context: Optional[Dict] = None) -> Optional[LearningPackage]:
@@ -408,7 +408,7 @@ class LearningExchange:
             description: Detailed explanation
             confidence: Confidence level (0.0-1.0)
             scope: Who should receive this?
-            applicable_workspaces: Specific workspaces (for TEAM/PROJECT)
+            applicable_rooms: Specific rooms (for TEAM/PROJECT)
             applicable_bots: Specific bots (for TEAM/BOT_SPECIFIC)
             evidence: Supporting data
             context: Additional context
@@ -426,10 +426,10 @@ class LearningExchange:
             description=description,
             confidence=confidence,
             scope=scope,
-            applicable_workspaces=applicable_workspaces or [],
+            applicable_rooms=applicable_rooms or [],
             applicable_bots=applicable_bots or [],
             source_bot=self.bot_name,
-            source_workspace=self.workspace_id,
+            source_room=self.room_id,
             evidence=evidence or {},
             context=context or {},
         )
@@ -572,23 +572,23 @@ class LearningExchange:
             from loguru import logger
             logger.warning(f"Failed to save to Turbo Memory: {e}")
 
-    def get_applicable_insights(self, workspace_id: Optional[str] = None,
+    def get_applicable_insights(self, room_id: Optional[str] = None,
                                bot_name: Optional[str] = None) -> List[LearningPackage]:
         """Get all insights applicable to a specific context.
 
         Args:
-            workspace_id: Target workspace (defaults to current)
+            room_id: Target room (defaults to current)
             bot_name: Target bot (defaults to self.bot_name)
 
         Returns:
             List of applicable LearningPackages
         """
-        workspace_id = workspace_id or self.workspace_id
+        room_id = room_id or self.room_id
         bot_name = bot_name or self.bot_name
 
         applicable = []
         for package in self.queue.get_all_pending():
-            if (ApplicabilityRule.applies_to_workspace(package, workspace_id) and
+            if (ApplicabilityRule.applies_to_room(package, room_id) and
                 ApplicabilityRule.applies_to_bot(package, bot_name)):
                 applicable.append(package)
 
@@ -666,7 +666,7 @@ class LearningExchange:
             last_accessed=None,
             metadata={
                 "source_bot": package.source_bot,
-                "source_workspace": package.source_workspace,
+                "source_room": package.source_room,
                 "category": package.category.value,
                 "scope": package.scope.value,
             },

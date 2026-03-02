@@ -181,7 +181,8 @@ RESEARCHER_REASONING = ReasoningConfig(
 1. What sources did you find? Are they credible?
 2. What gaps exist in the information?
 3. What's the key insight for the user?
-4. What follow-up might be valuable?""",
+4. What follow-up might be valuable?
+Then, provide your final response to the user or your next step.""",
     max_reflection_tokens=200,
 )
 
@@ -193,7 +194,8 @@ CODER_REASONING = ReasoningConfig(
 1. Did the code run successfully? If not, what error occurred?
 2. What does the output/outputs tell you?
 3. What's the next implementation step?
-4. Are there edge cases or issues to address?""",
+4. Are there edge cases or issues to address?
+Then, provide your final response to the user or your next step.""",
     max_reflection_tokens=250,
 )
 
@@ -216,7 +218,8 @@ AUDITOR_REASONING = ReasoningConfig(
 1. What issues were identified? How severe?
 2. Are there compliance violations to address?
 3. What's the recommended remediation?
-4. Any gaps in the audit scope?""",
+4. Any gaps in the audit scope?
+Then, provide your final response to the user or your next step.""",
     max_reflection_tokens=100,
 )
 
@@ -228,7 +231,8 @@ CREATIVE_REASONING = ReasoningConfig(
 1. Does this match the user's intent?
 2. What alternatives could work?
 3. Any improvements to suggest?
-4. Is anything missing?""",
+4. Is anything missing?
+Then, provide your final response to the user or your next step.""",
     max_reflection_tokens=180,
 )
 
@@ -240,7 +244,8 @@ COORDINATOR_REASONING = ReasoningConfig(
 1. What tasks are in progress? Any blockers?
 2. Which bot is best suited for next action?
 3. Any updates needed for the user?
-4. What's the priority order?""",
+4. What's the priority order?
+Then, provide your final response to the user or your next step.""",
     max_reflection_tokens=200,
 )
 
@@ -251,7 +256,8 @@ DEFAULT_REASONING = ReasoningConfig(
 1. Did the action complete successfully?
 2. What does the output tell you?
 3. What's the next step?
-4. Any issues to address?""",
+4. Any issues to address?
+Then, provide your final response to the user or your next step.""",
     max_reflection_tokens=150,
 )
 

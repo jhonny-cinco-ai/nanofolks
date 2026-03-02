@@ -375,6 +375,11 @@ class AgentLoop:
             routing_config=self.routing_config,
             web_config=self.web_config,
             browser_config=self.browser_config,
+            content_store=self.content_store,
+            cron_service=self.cron_service,
+            system_timezone=self.system_timezone,
+            memory_retrieval=self.memory_retrieval,
+            canceller=self.cancel_room_tasks,
         )
 
         # Initialize hybrid flow router for Phase 2 intent detection
@@ -383,6 +388,9 @@ class AgentLoop:
 
         # Ensure team styling is applied to leader SOUL on first agent start
         self._apply_team_if_needed()
+
+        # Register tools (file, web, shell, memory, etc.)
+        self._register_default_tools()
 
     def _strip_think(self, text: str | None) -> str | None:
         """Strip thinking blocks from model content.
@@ -1071,6 +1079,8 @@ Current conversation history:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=combined_content,
+                bot_name=self.bot_name,
+                sender_role="bot",
                 room_id=msg.room_id or self._current_room_id,
                 metadata={
                     "multi_bot": True,
@@ -1085,6 +1095,8 @@ Current conversation history:
                 channel=msg.channel,
                 chat_id=msg.chat_id,
                 content=f"❌ Error generating multi-bot response: {str(e)}",
+                bot_name=self.bot_name,
+                sender_role="bot",
             )
 
     def _apply_team_if_needed(self) -> None:
@@ -1136,139 +1148,35 @@ Current conversation history:
 
     def _register_default_tools(self) -> None:
         """Register the default set of tools."""
-        # Always protect config file (defense in depth)
-        # If protected_paths is empty, at least protect the config file
-        default_protected = [str(Path.home() / ".nanofolks" / "config.json")]
-        all_protected = list(set(self.protected_paths + default_protected))
-        protected_dirs = [Path(p).expanduser().resolve() for p in all_protected]
+        from nanofolks.agent.tools.factory import create_default_registry
 
-        # Determine tool restrictions based on evolutionary mode
-        if self.evolutionary and self.allowed_paths:
-            # Evolutionary mode: use allowed_paths whitelist
-            logger.info(f"Evolutionary mode enabled with allowed paths: {self.allowed_paths}")
-            allowed_dirs = [Path(p).expanduser().resolve() for p in self.allowed_paths]
-            self.tools.register(
-                ReadFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs)
-            )
-            self.tools.register(
-                WriteFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs)
-            )
-            self.tools.register(
-                EditFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs)
-            )
-            self.tools.register(
-                ListDirTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs)
-            )
-
-            # Shell tool with allowed_paths
-            self.tools.register(
-                ExecTool(
-                    working_dir=str(self.workspace),
-                    timeout=self.exec_config.timeout,
-                    allowed_paths=self.allowed_paths,
-                )
-            )
-        else:
-            # Standard mode: use restrict_to_workspace behavior
-            allowed_dir = self.workspace if self.restrict_to_workspace else None
-            self.tools.register(
-                ReadFileTool(allowed_dir=allowed_dir, protected_paths=protected_dirs)
-            )
-            self.tools.register(
-                WriteFileTool(allowed_dir=allowed_dir, protected_paths=protected_dirs)
-            )
-            self.tools.register(
-                EditFileTool(allowed_dir=allowed_dir, protected_paths=protected_dirs)
-            )
-            self.tools.register(
-                ListDirTool(allowed_dir=allowed_dir, protected_paths=protected_dirs)
-            )
-
-            # Shell tool
-            self.tools.register(
-                ExecTool(
-                    working_dir=str(self.workspace),
-                    timeout=self.exec_config.timeout,
-                    restrict_to_workspace=self.restrict_to_workspace,
-                )
-            )
-
-        # Web tools
-        self.tools.register(WebSearchTool(api_key=self.brave_api_key))
-        self.tools.register(
-            WebFetchTool(
-                scrapling_enabled=self.web_config.scrapling_enabled,
-                scrapling_min_chars=self.web_config.scrapling_min_chars,
-                scrapling_mode=self.web_config.scrapling_mode,
-                content_store=self.content_store,
-            )
+        # Use factory to create registry with all standard tools
+        # This harmonizes toolsets for both @leader and specialist bots
+        self.tools = create_default_registry(
+            workspace=self.workspace,
+            provider=self.provider,
+            bus=self.bus,
+            invoker=self.bot_invoker,
+            brave_api_key=self.brave_api_key,
+            web_config=self.web_config,
+            browser_config=self.browser_config,
+            exec_config=self.exec_config,
+            restrict_to_workspace=self.restrict_to_workspace,
+            evolutionary=self.evolutionary,
+            allowed_paths=self.allowed_paths,
+            protected_paths=self.protected_paths,
+            content_store=self.content_store,
+            cron_service=self.cron_service,
+            system_timezone=self.system_timezone,
+            memory_store=self.memory_store,
+            memory_retrieval=self.memory_retrieval,
+            canceller=self.cancel_room_tasks,
         )
 
-        # Markdown conversion tool (for DOCX, XLSX, images, etc.)
-        from nanofolks.agent.tools.markdown_convert import MarkdownNewTool
+        # Register tools that need AgentLoop instance (circular dependency prevention in factory)
+        from nanofolks.agent.tools.mcp import MCPConnectTool
 
-        self.tools.register(MarkdownNewTool())
-
-        # Content access tool (for isolated external content)
-        from nanofolks.agent.tools.content import ReadFetchedContentTool
-
-        self.tools.register(ReadFetchedContentTool(content_store=self.content_store))
-
-        # Agent-browser tool (opt-in)
-        if self.browser_config.enabled:
-            from nanofolks.agent.tools.browser import AgentBrowserTool
-
-            self.tools.register(
-                AgentBrowserTool(
-                    binary=self.browser_config.binary,
-                    allowlist=self.browser_config.allowlist,
-                )
-            )
-
-        # Message tool
-        message_tool = MessageTool(send_callback=self.bus.publish_outbound)
-        self.tools.register(message_tool)
-
-        # Invoke tool (for delegating to specialist bots)
-        from nanofolks.agent.tools.invoke import InvokeTool
-
-        invoke_tool = InvokeTool(invoker=self.bot_invoker)
-        self.tools.register(invoke_tool)
-
-        # Room task tool
-        from nanofolks.agent.tools.room_tasks import RoomTaskTool
-
-        room_task_tool = RoomTaskTool()
-        room_task_tool.set_canceller(self.cancel_room_tasks)
-        self.tools.register(room_task_tool)
-
-        # Cron tool (for scheduling)
-        if self.cron_service:
-            self.tools.register(
-                RoutinesTool(self.cron_service, default_timezone=self.system_timezone)
-            )
-
-        # Config update tool
-        self.tools.register(UpdateConfigTool())
-
-        # Memory tools (if memory system is enabled)
-        if self.memory_store and self.memory_retrieval:
-            from nanofolks.agent.tools.memory import create_memory_tools
-
-            memory_tools = create_memory_tools(self.memory_store, self.memory_retrieval)
-            for tool in memory_tools:
-                self.tools.register(tool)
-            logger.info(f"Registered {len(memory_tools)} memory tools")
-
-        # Security tools (always available)
-        from nanofolks.agent.tools.security import create_security_tools
-
-        security_tools = create_security_tools()
-        for tool in security_tools:
-            self.tools.register(tool)
-        logger.info(f"Registered {len(security_tools)} security tools")
-
-        # Team routines are handled via the routines tool; no team_routines control tool.
+        self.tools.register(MCPConnectTool(self))
 
         # Apply tool permissions based on bot's SOUL.md/AGENTS.md
         self._apply_tool_permissions()
@@ -1988,6 +1896,7 @@ Current conversation history:
         iteration = 0
         final_content = None
         secondary_model = None
+        pending_reflection = False
 
         while iteration < self.max_iterations:
             iteration += 1
@@ -2150,12 +2059,13 @@ Current conversation history:
                             else:
                                 await self._safe_stream(f"✓ {tool_call.name}")
 
-                        # Log successful tool execution
+                        # Log tool execution
+                        status = "error" if result.startswith("Error:") else "success"
                         self.work_log_manager.log_tool(
                             tool_name=tool_call.name,
                             tool_input=tool_call.arguments,
                             tool_output=result,
-                            tool_status="success",
+                            tool_status=status,
                             duration_ms=tool_duration_ms,
                         )
                     except Exception as tool_error:
@@ -2179,11 +2089,21 @@ Current conversation history:
                     if self._should_use_cot(tool_call.name):
                         reflection_prompt = self.reasoning_config.get_reflection_prompt()
                         messages.append({"role": "user", "content": reflection_prompt})
+                        pending_reflection = True
                         logger.debug(f"Added CoT reflection after {tool_call.name}")
             else:
-                # No tool calls, we're done
-                final_content = response.content
-                break
+                if pending_reflection:
+                    # Capture the reflection and continue the loop to get final answer
+                    messages.append({"role": "assistant", "content": response.content})
+                    # Add a nudge to encourage final answer based on reflection
+                    messages.append({"role": "user", "content": "Now, based on your reflection above, provide the final response to the user."})
+                    pending_reflection = False
+                    logger.debug("CoT: reflection received, forcing one more turn for final answer")
+                    continue
+                else:
+                    # No tool calls and not in reflection, we're done
+                    final_content = response.content
+                    break
 
         if final_content is None:
             if iteration >= self.max_iterations:
@@ -2292,8 +2212,9 @@ Current conversation history:
             chat_id=msg.chat_id,
             content=final_content,
             room_id=msg.room_id or self._current_room_id,
-            metadata=response_metadata,  # Includes context usage if enabled
+            metadata=response_metadata,
             bot_name=self.bot_name,
+            sender_role="bot",
         )
 
     async def _process_system_message(self, msg: MessageEnvelope) -> MessageEnvelope | None:

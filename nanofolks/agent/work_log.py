@@ -28,13 +28,7 @@ class LogLevel(Enum):
     COORDINATION = "coordination"  # Coordinator mode decisions
 
 
-class RoomType(Enum):
-    """Types of rooms for multi-agent collaboration."""
-    OPEN = "open"           # #general - casual, all bots
-    PROJECT = "project"     # #project-alpha - focused team
-    DIRECT = "direct"       # DM @researcher - 1-on-1
-    COORDINATION = "coordination"  # leader manages autonomously
-
+from nanofolks.models.room import RoomType
 
 # Legacy alias for backwards compatibility
 WorkspaceType = RoomType
@@ -74,7 +68,7 @@ class WorkLogEntry:
 
     # Workspace context (room-centric: uses "general" as default)
     room_id: str = "general"  # "#general", "#project-refactor", or "general"
-    room_type: WorkspaceType = RoomType.OPEN
+    room_type: RoomType = RoomType.OPEN
     participants: List[str] = field(default_factory=lambda: ["leader"])
 
     # Bot identity (single-bot: always "leader")
@@ -174,7 +168,7 @@ class WorkLog:
 
     # Multi-agent context (room-centric: uses "general" as default)
     room_id: str = "general"  # "#general", "#project-alpha", etc.
-    room_type: WorkspaceType = RoomType.OPEN
+    room_type: RoomType = RoomType.OPEN
     participants: List[str] = field(default_factory=lambda: ["leader"])
     coordinator: Optional[str] = None  # "leader" if in coordinator mode
 

@@ -242,12 +242,27 @@ def _print_agent_response(
     if not content.strip():
         return
 
+    # Resolve display name from profile if only machine name provided
+    display_name = bot_name
+    if bot_name == "leader" or bot_name == "Assistant":
+        try:
+            from nanofolks.bots.appearance_config import get_appearance_config
+            appearance = get_appearance_config().get_bot_appearance("leader")
+            if appearance.get("display_name"):
+                display_name = appearance["display_name"]
+            if not bot_title and appearance.get("title"):
+                bot_title = appearance["title"]
+            if not team_emoji and appearance.get("emoji"):
+                team_emoji = appearance["emoji"]
+        except Exception:
+            pass
+
     # Build bot identifier line with team emoji (unified format like user prompt)
     emoji_prefix = f"{team_emoji} " if team_emoji else ""
-    if bot_name and bot_title:
-        bot_identifier = f"{emoji_prefix}[bold {ACCENT_COLOR}]{bot_name}[/bold {ACCENT_COLOR}] - [bold {ACCENT_COLOR}]{bot_title}[/bold {ACCENT_COLOR}]"
-    elif bot_name:
-        bot_identifier = f"{emoji_prefix}[bold {ACCENT_COLOR}]{bot_name}[/bold {ACCENT_COLOR}]"
+    if display_name and bot_title:
+        bot_identifier = f"{emoji_prefix}[bold {ACCENT_COLOR}]{display_name}[/bold {ACCENT_COLOR}] - [bold {ACCENT_COLOR}]{bot_title}[/bold {ACCENT_COLOR}]"
+    elif display_name:
+        bot_identifier = f"{emoji_prefix}[bold {ACCENT_COLOR}]{display_name}[/bold {ACCENT_COLOR}]"
     else:
         bot_identifier = f"{emoji_prefix}[bold {ACCENT_COLOR}]Bot[/bold {ACCENT_COLOR}]"
 
@@ -380,14 +395,22 @@ async def _show_thinking_logs(
     from nanofolks.cli.ui.thinking_display import ThinkingDisplay
 
     manager = get_work_log_manager()
-    if not manager or not manager.current_log:
+    if not manager:
         return None
 
+    log = manager.current_log
+    if not log:
+        # Fallback to last log if session just ended
+        log = manager.get_last_log()
+    
+    if not log:
+        return None
+        
     # Create the thinking display
-    display = ThinkingDisplay(manager.current_log, bot_name=bot_name)
+    display = ThinkingDisplay(log, bot_name=bot_name)
 
     # Check for errors and auto-expand if present
-    errors = manager.current_log.get_errors()
+    errors = log.get_errors()
     if errors:
         # Show error banner above thinking
         error_count = len(errors)
@@ -1626,27 +1649,42 @@ def chat(
 
         return "Thinking..."
 
+    status_obj = None
+
     def _thinking_ctx():
+        nonlocal status_obj
         if logs:
             from contextlib import nullcontext
-
             return nullcontext()
         # Animated spinner is safe to use with prompt_toolkit input handling
         loader_text = _get_loader_text()
-        return console.status(f"[dim]{loader_text}[/dim]", spinner="dots")
+        status_obj = console.status(f"[dim]{loader_text}[/dim]", spinner="dots")
+        return status_obj
 
     # Streaming callback for real-time chunk display
     streaming_content = ""
     tool_progress = []
     activity_line = ""
     header_printed = False
+    newline_needed = False
 
     def _stream_chunk(chunk: str):
-        nonlocal streaming_content, tool_progress, activity_line, header_printed
+        nonlocal streaming_content, tool_progress, activity_line, header_printed, newline_needed, status_obj
         # Check if this is a tool progress message (starts with ↳)
         if chunk.startswith("↳ "):
+            # If we were streaming content, we need a newline before showing tool progress
+            if newline_needed:
+                console.print()
+                newline_needed = False
+                
             tool_progress.append(chunk)
-            activity_line = f"Activity: {chunk.replace('↳ ', '')}"
+            current_activity = chunk.replace('↳ ', '')
+            activity_line = f"Activity: {current_activity}"
+            
+            # Update the spinner if active
+            if status_obj:
+                status_obj.update(status=f"[dim]{activity_line}[/dim]")
+            
             # Show tool progress with distinctive styling
             if "..." in chunk:
                 # Tool is running (single-line activity strip)
@@ -1659,10 +1697,22 @@ def chat(
             # Print header on first content chunk
             if not header_printed:
                 header_printed = True
-                bot_name = agent_loop.bot_name or "Assistant"
+                # Resolve display name for streaming
+                display_name = agent_loop.bot_name or "Assistant"
+                if display_name == "leader" or display_name == "Assistant":
+                    try:
+                        from nanofolks.bots.appearance_config import get_appearance_config
+                        appearance = get_appearance_config().get_bot_appearance("leader")
+                        if appearance.get("display_name"):
+                            display_name = appearance["display_name"]
+                    except Exception:
+                        pass
+                
                 emoji_prefix = _get_team_emoji(workspace_path=config.workspace_path) or "🏴"
-                console.print(f"\n{emoji_prefix} {bot_name}:", end=" ", highlight=False)
+                console.print(f"\n{emoji_prefix} {display_name}:", end=" ", highlight=False)
+            
             streaming_content += chunk
+            newline_needed = True
             # Show content directly (not just preview)
             console.print(f"[{ACCENT_COLOR}]{chunk}[/{ACCENT_COLOR}]", end="", highlight=False)
 
@@ -2354,8 +2404,8 @@ def explain_last_decision(
     session: Optional[str] = typer.Option(
         None, "--session", "-s", help="Specific session ID to explain"
     ),
-    workspace: Optional[str] = typer.Option(
-        None, "--workspace", "-w", help="Workspace to explain (#general, #project-alpha)"
+    room: Optional[str] = typer.Option(
+        None, "--room", "-r", "--workspace", "-w", help="Room to explain (#general, #project-alpha)"
     ),
     bot: Optional[str] = typer.Option(
         None, "--bot", "-b", help="Filter by bot (@researcher, @coder)"
@@ -2385,11 +2435,11 @@ def explain_last_decision(
     manager = get_work_log_manager()
 
     # Get the appropriate log
-    if workspace:
-        logs = manager.get_logs_by_workspace(workspace, limit=1)
+    if room:
+        logs = manager.get_logs_by_room(room, limit=1)
         log = logs[0] if logs else None
         if not log:
-            console.print(f"[yellow]No work log found for workspace: {workspace}[/yellow]")
+            console.print(f"[yellow]No work log found for room: {room}[/yellow]")
             console.print("[dim]Tip: Use 'nanofolks chat' first to generate a work log.[/dim]")
             raise typer.Exit(1)
     elif session:
@@ -2445,9 +2495,10 @@ def how_did_you_decide(
         ..., help="What to search for (e.g., 'routing', 'memory', 'web_search')"
     ),
     limit: int = typer.Option(5, "--limit", "-n", help="Maximum number of results to show"),
-    workspace: Optional[str] = typer.Option(
-        None, "--workspace", "-w", help="Search in specific workspace"
+    room: Optional[str] = typer.Option(
+        None, "--room", "-r", "--workspace", "-w", help="Search in specific room"
     ),
+    show_details: bool = typer.Option(False, "--details", "-d", help="Show extra details"),
 ):
     """
     Search work logs for specific decisions or events.
@@ -2472,10 +2523,10 @@ def how_did_you_decide(
     manager = get_work_log_manager()
 
     # Get logs to search
-    if workspace:
-        logs = manager.get_logs_by_workspace(workspace, limit=10)
+    if room:
+        logs = manager.get_logs_by_room(room, limit=10)
         if not logs:
-            console.print(f"[yellow]No work logs found for workspace: {workspace}[/yellow]")
+            console.print(f"[yellow]No work logs found for room: {room}[/yellow]")
             raise typer.Exit(1)
     else:
         log = manager.get_last_log()
@@ -2498,7 +2549,7 @@ def how_did_you_decide(
                 or (entry.tool_name and query_lower in entry.tool_name.lower())
                 or query_lower in str(entry.details).lower()
             ):
-                matches.append((log.workspace_id, entry))
+                matches.append((log.room_id, entry))
 
     if not matches:
         console.print(f"[yellow]No entries found matching '{query}'[/yellow]")
@@ -2508,12 +2559,13 @@ def how_did_you_decide(
     # Display results
     console.print(f"[cyan]Found {len(matches)} entries matching '{query}':[/cyan]\n")
 
-    for i, (workspace_id, entry) in enumerate(matches[:limit], 1):
+    for i, (room_id, entry) in enumerate(matches[:limit], 1):
+        if i > 1:
+            console.print("-" * 40, style="dim")
+        
         icon = _get_work_log_icon(entry.level)
-
-        # Show workspace for multi-workspace searches
-        if len(logs) > 1:
-            console.print(f"[dim]{workspace_id}[/dim] - Step {entry.step} - {entry.category}")
+        if show_details:
+            console.print(f"[dim]{room_id}[/dim] - Step {entry.step} - {entry.category}")
         else:
             console.print(f"{icon} [bold]Step {entry.step}[/bold] - {entry.category}")
 
@@ -2589,8 +2641,8 @@ def list_workspace_logs(
         status = "🟢 Complete" if log.end_time else "🟡 Active"
 
         table.add_row(
-            log.workspace_id,
-            log.workspace_type.value,
+            log.room_id,
+            log.room_type.value,
             ", ".join(log.participants[:3]),  # Show first 3 bots
             duration,
             status,
@@ -2625,13 +2677,13 @@ def _print_coordination_summary(log, entries):
     # Header with workspace context
     header = Text()
     header.append("🤖 Coordinator Mode Summary", style="bold cyan")
-    header.append(f" - {log.workspace_id}", style="bold")
+    header.append(f" - {log.room_id}", style="bold")
     console.print(header)
     console.print()
 
     # Workspace Info Panel
     info_lines = [
-        f"[cyan]Workspace:[/cyan] {log.workspace_id} ({log.workspace_type.value})",
+        f"[cyan]Room:[/cyan] {log.room_id} ({log.room_type.value})",
         f"[cyan]Coordinator:[/cyan] {log.coordinator}",
         f"[cyan]Participants:[/cyan] {', '.join(log.participants)}",
         f"[cyan]Total Coordinator Entries:[/cyan] {len(entries)}",
@@ -2722,7 +2774,7 @@ def _print_coordination_summary(log, entries):
 def _print_bot_conversations(log, entries):
     """Print bot-to-bot conversation threading visualization."""
 
-    console.print(f"[bold cyan]💬 Bot Conversation Threads - {log.workspace_id}[/bold cyan]\n")
+    console.print(f"[bold cyan]💬 Bot Conversation Threads - {log.room_id}[/bold cyan]\n")
 
     # Build conversation threads (response_to chains)
     threads = {}

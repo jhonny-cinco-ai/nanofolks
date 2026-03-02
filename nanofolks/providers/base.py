@@ -62,6 +62,7 @@ class LLMProvider(ABC):
         max_tokens: int = 4096,
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
+        response_format: dict[str, Any] | None = None,
     ) -> LLMResponse:
         """
         Send a chat completion request.
@@ -73,6 +74,7 @@ class LLMProvider(ABC):
             max_tokens: Maximum tokens in response.
             temperature: Sampling temperature.
             reasoning_effort: Optional thinking effort level (low/medium/high).
+            response_format: Optional JSON schema for structured outputs.
 
         Returns:
             LLMResponse with content and/or tool calls.
@@ -92,6 +94,7 @@ class LLMProvider(ABC):
         max_tokens: int = 4096,
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
+        response_format: dict[str, Any] | None = None,
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Stream a chat completion request.
@@ -106,6 +109,7 @@ class LLMProvider(ABC):
             max_tokens: Maximum tokens in response.
             reasoning_effort: Optional thinking effort level (low/medium/high).
             temperature: Sampling temperature.
+            response_format: Optional JSON schema for structured outputs.
 
         Yields:
             StreamChunk objects as they arrive.
@@ -117,6 +121,7 @@ class LLMProvider(ABC):
             model=model,
             max_tokens=max_tokens,
             temperature=temperature,
+            response_format=response_format,
         )
         yield StreamChunk(
             content=response.content or "",

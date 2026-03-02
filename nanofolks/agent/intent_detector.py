@@ -62,7 +62,7 @@ class IntentDetector:
             'suggestions for', 'how would you',
         ],
         IntentType.RESEARCH: [
-            'research', 'find out', 'learn about',
+            'research project', 'do research on', 'find out about', 'learn about',
             'information on', 'looking for info', 'need to know',
             'fun ways', 'best ways', 'top ways',
             'what are the best', 'what are some',
@@ -80,6 +80,8 @@ class IntentDetector:
             'that\'s', 'i see', 'hmm',
             'hello', 'hi', 'hey', 'how are you',
             'thanks', 'thank you', 'okay', 'sure',
+            'what could you find', 'what did you find', 'find about',
+            'in your last', 'last research', 'previously',
         ]
     }
 

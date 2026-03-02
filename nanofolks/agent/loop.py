@@ -256,7 +256,7 @@ class AgentLoop:
 
             self.learning_exchange = LearningExchange(
                 bot_name=self.bot_name,
-                workspace_id=self.workspace_id,
+                room_id=self.workspace_id,
             )
 
             # Load any pending packages from previous sessions
@@ -403,6 +403,25 @@ class AgentLoop:
 
         return re.sub(r"\[:\s*Yes,.*?\]", "", text, flags=re.DOTALL).strip() or None
 
+    async def _safe_stream(self, text: str) -> None:
+        """Call stream callback safely (handles both sync and async).
+
+        Args:
+            text: The text to stream
+        """
+        if not self._stream_callback:
+            return
+
+        try:
+            # Call the callback
+            result = self._stream_callback(text)
+
+            # If it returned a coroutine, await it
+            if asyncio.iscoroutine(result):
+                await result
+        except Exception as e:
+            logger.error(f"Error in stream callback: {e}")
+
     def _tool_hint(self, tool_calls: list) -> str:
         """Format tool calls as concise hint.
 
@@ -424,18 +443,25 @@ class AgentLoop:
                     return f"🤝 sidekicks x{count}"
                 return "🤝 sidekicks"
             val = None
-            if tc.arguments:
+            args = getattr(tc, "arguments", None)
+            if isinstance(args, dict) and args:
                 # Get first argument value
-                for v in tc.arguments.values():
+                for v in args.values():
                     val = v
                     break
+            elif isinstance(args, list) and args:
+                # Fallback for list arguments
+                val = args[0]
+            elif args and not isinstance(args, (dict, list)):
+                # Fallback for scalar arguments
+                val = args
             if not isinstance(val, str):
                 return tc.name
             if len(val) > 40:
                 return f'{tc.name}("{val[:40]}…")'
             return f'{tc.name}("{val}")'
 
-        return ", ".join(_fmt(tc) for tc in tool_calls)
+        return ", ".join(h for tc in tool_calls if (h := _fmt(tc)) and h.strip())
 
     def _process_document_media(self, msg: MessageEnvelope, session: Session) -> None:
         """Auto-parse PDF attachments and store digests in session metadata."""
@@ -513,7 +539,7 @@ class AgentLoop:
             from nanofolks.agent.chat_onboarding import OnboardingState
 
             state = onboarding_data.get("state")
-            if state in [OnboardingState.COMPLETED.value, OnboardingState.TEAM_INTRO.value]:
+            if state == OnboardingState.COMPLETED.value:
                 return False
 
         # Check USER.md for placeholders - onboarding complete if all filled
@@ -521,13 +547,11 @@ class AgentLoop:
         if user_file.exists():
             content = user_file.read_text()
             placeholders = [
-                "(your name)", 
-                "(your location)", 
+                "(your name)",
+                "(your location)",
                 "(preferred language)",
                 "(default from team)",
                 "(what you're working on)",
-                "(what you want help with)",
-                "(tools and software)"
             ]
             if not any(p in content for p in placeholders):
                 return False
@@ -553,7 +577,7 @@ class AgentLoop:
             )
 
         onboarding = self._chat_onboarding
-        
+
         # Load any existing data from USER.md first
         onboarding.load_from_user_md()
 
@@ -649,7 +673,11 @@ class AgentLoop:
                 )
 
         # Check onboarding state
-        if onboarding.state in [OnboardingState.NOT_STARTED, OnboardingState.IN_PROGRESS]:
+        if onboarding.state in [
+            OnboardingState.NOT_STARTED,
+            OnboardingState.IN_PROGRESS,
+            OnboardingState.TEAM_INTRO,
+        ]:
             # Transition from NOT_STARTED to IN_PROGRESS after first message
             if onboarding.state == OnboardingState.NOT_STARTED:
                 onboarding.state = OnboardingState.IN_PROGRESS
@@ -700,8 +728,13 @@ class AgentLoop:
 
             # Get missing fields for the prompt
             uncollected = onboarding.get_uncollected_fields()
-            missing_info_str = "\n".join([f"- {item['field']}: {getattr(onboarding.answers, item['field']) or 'not collected yet'}" for item in onboarding.QUESTIONS])
-            
+            missing_info_str = "\n".join(
+                [
+                    f"- {item['field']}: {getattr(onboarding.answers, item['field']) or 'not collected yet'}"
+                    for item in onboarding.QUESTIONS
+                ]
+            )
+
             # Get the next question to ask
             next_question = onboarding.get_next_question()
             next_question_text = (
@@ -751,30 +784,52 @@ Current conversation history:
             # Add current user message
             system_prompt += f"\nuser: {user_message}\n\nRespond naturally as yourself:"
 
-            # Call LLM for response
+            # Call LLM for response with structured extraction
             try:
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message},
                 ]
 
+                extraction_schema = onboarding.get_extraction_schema()
+                response_format = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "onboarding_extraction",
+                        "strict": True,
+                        "schema": extraction_schema,
+                    },
+                }
+
                 llm_response = await self.provider.chat(
                     messages=messages,
                     model=self.model,
                     temperature=0.7,
-                    max_tokens=512,
+                    max_tokens=1000,
+                    response_format=response_format,
                 )
 
-                response_text = (
-                    llm_response.content if llm_response else "Welcome! Tell me about yourself."
-                )
+                if not llm_response or not llm_response.content:
+                    raise RuntimeError("Empty response from LLM during onboarding")
 
-                # Extract information from user message
-                onboarding.extract_info_from_message(user_message)
+                # Parse structured output
+                structured_data = json.loads(llm_response.content)
+                response_text = structured_data.get("response", "Welcome! Tell me about yourself.")
+                extracted_profile = structured_data.get("extracted_data", {})
+
+                # Extract information from user message using structured data
+                onboarding.extract_info_from_message(user_message, extracted_data=extracted_profile)
 
                 # Check if we have finished all questions
-                if onboarding.get_next_question() is None:
+                if (
+                    onboarding.get_next_question() is None
+                    and onboarding.state != OnboardingState.TEAM_INTRO
+                ):
                     onboarding.state = OnboardingState.TEAM_INTRO
+                    # We don't call complete() yet, we want one more turn for "Meet the team"
+
+                # If we were in TEAM_INTRO, this response was likely the intro, so NOW we can complete
+                elif onboarding.state == OnboardingState.TEAM_INTRO:
                     onboarding.complete()
 
                 # Save state
@@ -1547,6 +1602,35 @@ Current conversation history:
         if msg.channel == "system":
             return await self._process_system_message(msg)
 
+        # Start work log session if not already active (e.g. from bus/broker)
+        we_started_session = False
+        if not self.work_log_manager.current_log:
+            room_id = msg.room_id or self._current_room_id or "general"
+            from nanofolks.agent.work_log import RoomType
+
+            self.work_log_manager.start_session(
+                session_id=msg.session_key,
+                query=msg.content or "Chat interaction",
+                room_id=room_id,
+                room_type=self._current_room_type
+                if isinstance(self._current_room_type, RoomType)
+                else RoomType.OPEN,
+                participants=self._current_room_participants or ["leader"],
+            )
+            we_started_session = True
+
+        response = None
+        try:
+            response = await self._do_process_message(msg)
+            return response
+        finally:
+            if we_started_session:
+                result_text = response.content if response else ""
+                self.work_log_manager.end_session(result_text)
+
+    async def _do_process_message(self, msg: MessageEnvelope) -> MessageEnvelope | None:
+        """Internal processing logic, wrapped by work log session management."""
+
         # Check if required configuration is present
         if not self._has_required_config():
             return await self._send_onboarding_message(msg)
@@ -1983,11 +2067,15 @@ Current conversation history:
             if response.has_tool_calls:
                 # Show progress for tool calls
                 if self._stream_callback:
-                    clean = self._strip_think(response.content)
+                    # If we streamed the first iteration, response.content was already sent
+                    # We only stream 'clean' if it's NOT the first iteration (or streaming was disabled)
+                    if iteration > 1 or not use_streaming:
+                        clean = self._strip_think(response.content)
+                        if clean:
+                            await self._safe_stream(clean)
+
                     hint = self._tool_hint(response.tool_calls)
-                    if clean:
-                        await self._stream_callback(clean)
-                    await self._stream_callback(f"↳ {hint}")
+                    await self._safe_stream(f"↳ {hint}")
 
                 # Add assistant message with tool calls
                 tool_call_dicts = [
@@ -2010,6 +2098,13 @@ Current conversation history:
 
                 # Execute tools
                 for tool_call in response.tool_calls:
+                    # Skip malformed tool calls (empty name)
+                    if not tool_call.name or not tool_call.name.strip():
+                        logger.warning(
+                            f"Skipping malformed tool call with empty name: id={tool_call.id}"
+                        )
+                        continue
+
                     args_str = json.dumps(tool_call.arguments, ensure_ascii=False)
                     # Sanitize tool arguments to prevent secrets in logs
                     sanitized_args = self.sanitizer.sanitize(args_str[:200])
@@ -2027,9 +2122,9 @@ Current conversation history:
                             tasks = args.get("tasks") if args else None
                             count = len(tasks) if isinstance(tasks, list) else 0
                             label = f"🤝 sidekicks x{count}" if count else "🤝 sidekicks"
-                            await self._stream_callback(f"↳ {label}...")
+                            await self._safe_stream(f"↳ {label}...")
                         else:
-                            await self._stream_callback(f"↳ 🔧 {label}...")
+                            await self._safe_stream(f"↳ 🔧 {label}...")
 
                     # Log tool execution start
                     import time
@@ -2051,9 +2146,9 @@ Current conversation history:
                                 tasks = args.get("tasks") if args else None
                                 count = len(tasks) if isinstance(tasks, list) else 0
                                 label = f"sidekicks x{count}" if count else "sidekicks"
-                                await self._stream_callback(f"✓ {label}")
+                                await self._safe_stream(f"✓ {label}")
                             else:
-                                await self._stream_callback(f"✓ {tool_call.name}")
+                                await self._safe_stream(f"✓ {tool_call.name}")
 
                         # Log successful tool execution
                         self.work_log_manager.log_tool(
@@ -2367,15 +2462,6 @@ Current conversation history:
         if session_key is None:
             session_key = room_to_session_id(room_id)
 
-        # Start work log session for transparency with room context
-        self.work_log_manager.start_session(
-            session_key,
-            content,
-            workspace_id=room_id,
-            workspace_type=RoomType(room_type) if room_type else RoomType.OPEN,
-            participants=participants or ["leader"],
-        )
-
         try:
             msg = MessageEnvelope(
                 channel=channel, sender_id="user", chat_id=chat_id, content=content, room_id=room_id
@@ -2391,18 +2477,12 @@ Current conversation history:
             # Clear callback after use
             self._stream_callback = None
 
-            # End work log session
-            self.work_log_manager.end_session(result)
             return result
 
         except Exception as e:
-            # Log error and end session
-            self.work_log_manager.log(
-                level=LogLevel.ERROR,
-                category="general",
-                message=f"Error processing message: {str(e)}",
-            )
-            self.work_log_manager.end_session(f"Error: {str(e)}")
+            # Clear callback on error
+            self._stream_callback = None
+            logger.error(f"Error in chat_conversation: {e}")
             raise
 
     def _has_required_config(self) -> bool:

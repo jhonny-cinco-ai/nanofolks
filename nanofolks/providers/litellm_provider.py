@@ -237,6 +237,7 @@ class LiteLLMProvider(LLMProvider):
         max_tokens: int = 4096,
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
+        response_format: dict[str, Any] | None = None,
     ) -> LLMResponse:
         """
         Send a chat completion request via LiteLLM.
@@ -262,6 +263,7 @@ class LiteLLMProvider(LLMProvider):
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
+            "response_format": response_format,
         }
 
         # Add reasoning_effort for models that support it (o3, Claude, etc.)
@@ -307,6 +309,7 @@ class LiteLLMProvider(LLMProvider):
         max_tokens: int = 4096,
         temperature: float = 0.7,
         reasoning_effort: str | None = None,
+        response_format: dict[str, Any] | None = None,
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Stream a chat completion request via LiteLLM.
@@ -330,6 +333,7 @@ class LiteLLMProvider(LLMProvider):
             "max_tokens": max_tokens,
             "temperature": temperature,
             "stream": True,
+            "response_format": response_format,
         }
 
         # Add reasoning_effort for models that support it
@@ -395,6 +399,14 @@ class LiteLLMProvider(LLMProvider):
                     current_tool_calls = []
                     if hasattr(delta, "tool_calls") and delta.tool_calls:
                         for tc in delta.tool_calls:
+                            # Skip incomplete tool calls (chunks without names)
+                            # Tool calls come in multiple chunks during streaming:
+                            # - First chunk: ID + name (no args yet)
+                            # - Subsequent chunks: args (no name)
+                            # We only yield complete tool calls with names
+                            if not hasattr(tc.function, "name") or not tc.function.name:
+                                continue
+
                             # Parse arguments
                             args = {}
                             if hasattr(tc.function, "arguments") and tc.function.arguments:
@@ -409,7 +421,7 @@ class LiteLLMProvider(LLMProvider):
                             current_tool_calls.append(
                                 ToolCallRequest(
                                     id=tc.id or f"call_{len(tool_calls_buffer)}",
-                                    name=tc.function.name or "",
+                                    name=tc.function.name,
                                     arguments=args,
                                 )
                             )

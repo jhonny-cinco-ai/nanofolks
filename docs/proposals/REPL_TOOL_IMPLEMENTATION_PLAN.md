@@ -2,9 +2,20 @@
 
 **Purpose**: Replace discrete tool calls with a programmable REPL environment for better composability, state persistence, and multi-bot coordination.
 
-**Status**: Proposed  
+**Status**: ✅ **Approved** (March 2, 2026)  
 **Created**: March 2, 2026  
 **Based on**: [Witan Labs Research - REPL Tool](https://github.com/witanlabs/research-log/blob/main/06-repl-tool.md)
+
+---
+
+## Key Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| **Language** | Python | Natural fit for codebase, RestrictedPython available |
+| **State Scope** | Per-Room | Aligns with room-centric architecture, cross-channel continuity |
+| **Approach** | Hybrid (short-term) | Lower risk, gradual migration, easy rollback |
+| **Channels** | All channels | REPL is room-scoped, works on CLI/WhatsApp/iMessage/etc. by default |
 
 ---
 
@@ -681,6 +692,416 @@ resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
 
 ---
 
+## REPL State Manager
+
+### Architecture
+
+The REPL State Manager provides room-scoped REPL environments:
+
+```
+┌────────────────────────────────────────────────────────┐
+│                    Room Manager                         │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │  Room: "project-alpha"                           │  │
+│  │  ┌────────────────────────────────────────────┐  │  │
+│  │  │ Session (messages, context)                │  │  │
+│  │  └────────────────────────────────────────────┘  │  │
+│  │  ┌────────────────────────────────────────────┐  │  │
+│  │  │ REPL State (Python environment)            │  │  │
+│  │  │ - Variables persist across calls           │  │  │
+│  │  │ - Shared by all channels                   │  │  │
+│  │  └────────────────────────────────────────────┘  │  │
+│  └──────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────┘
+                          ↑
+                          │
+        ┌─────────────────┼─────────────────┐
+        │                 │                 │
+   ┌────▼────┐      ┌────▼────┐      ┌────▼────┐
+   │   CLI   │      │WhatsApp │      │iMessage │
+   │ Channel │      │ Channel │      │ Channel │
+   └─────────┘      └─────────┘      └─────────┘
+```
+
+### Implementation
+
+#### REPL State Manager
+
+```python
+# nanofolks/agent/tools/repl_manager.py
+
+from typing import Dict
+from loguru import logger
+
+
+class REPLStateManager:
+    """
+    Manage REPL state per room.
+    
+    REPL state is room-scoped, not user-scoped or channel-scoped.
+    This means all channels in a room share the same REPL environment.
+    """
+    
+    def __init__(self):
+        # Map: room_id → REPLState
+        self._states: Dict[str, "REPLState"] = {}
+        self._sandbox_factory = RestrictedPythonSandbox
+    
+    def get_state(self, room_id: str) -> "REPLState":
+        """
+        Get or create REPL state for a room.
+        
+        Args:
+            room_id: Room identifier (e.g., "project-alpha")
+        
+        Returns:
+            REPLState instance for this room
+        """
+        if room_id not in self._states:
+            logger.info(f"Creating new REPL state for room: {room_id}")
+            self._states[room_id] = REPLState(
+                room_id=room_id,
+                sandbox=self._sandbox_factory()
+            )
+        return self._states[room_id]
+    
+    def clear_state(self, room_id: str) -> None:
+        """
+        Clear REPL state when room is archived.
+        
+        This is called when a room is deleted or archived to
+        free up memory and prevent stale state.
+        
+        Args:
+            room_id: Room identifier to clear
+        """
+        if room_id in self._states:
+            logger.info(f"Clearing REPL state for room: {room_id}")
+            del self._states[room_id]
+    
+    def has_state(self, room_id: str) -> bool:
+        """Check if a room has REPL state"""
+        return room_id in self._states
+    
+    def list_rooms(self) -> list[str]:
+        """List all rooms with active REPL state"""
+        return list(self._states.keys())
+    
+    def get_stats(self) -> dict:
+        """Get REPL state statistics"""
+        return {
+            "active_rooms": len(self._states),
+            "room_ids": self.list_rooms(),
+        }
+```
+
+#### REPL State
+
+```python
+# nanofolks/agent/tools/repl_state.py
+
+from typing import Any, Dict
+from loguru import logger
+
+
+class REPLState:
+    """
+    REPL state for a single room.
+    
+    This class manages:
+    - Persistent Python globals (survive across calls)
+    - Sandboxed code execution
+    - Room-scoped isolation
+    """
+    
+    def __init__(self, room_id: str, sandbox: "RestrictedPythonSandbox"):
+        self.room_id = room_id
+        self.sandbox = sandbox
+        self.call_count = 0
+        
+        # Persistent globals (survive across calls)
+        # These are shared by all channels in this room
+        self.globals: Dict[str, Any] = {
+            '__builtins__': {},  # Set by sandbox
+            'tools': ToolAPI(),
+            'bots': BotAPI(),
+            'memory': MemoryAPI(room_id=room_id),  # Room-scoped
+            'skills': SkillsAPI(),
+            'session': SessionAPI(room_id=room_id),
+        }
+        
+        logger.debug(f"REPL state initialized for room: {room_id}")
+    
+    async def execute(self, code: str) -> str:
+        """
+        Execute Python code in this room's REPL.
+        
+        Args:
+            code: Python code to execute
+        
+        Returns:
+            Execution result as string
+        """
+        self.call_count += 1
+        
+        logger.debug(
+            f"Executing REPL code in room {self.room_id} "
+            f"(call #{self.call_count}, {len(code)} chars)"
+        )
+        
+        try:
+            result = await self.sandbox.execute_async(
+                code=code,
+                globals=self.globals,
+                timeout=90
+            )
+            
+            logger.debug(
+                f"REPL execution complete in room {self.room_id}: "
+                f"{len(result)} chars output"
+            )
+            
+            return result
+            
+        except TimeoutError:
+            logger.warning(f"REPL timeout in room {self.room_id}")
+            return "Error: Execution timeout (90s limit)"
+        except Exception as e:
+            logger.error(f"REPL error in room {self.room_id}: {e}")
+            return f"Error: {type(e).__name__}: {str(e)}"
+    
+    def reset(self) -> None:
+        """
+        Reset REPL state (clear all variables).
+        
+        This is useful for debugging or when the agent gets into a bad state.
+        """
+        logger.info(f"Resetting REPL state for room: {self.room_id}")
+        self.globals = {
+            '__builtins__': {},
+            'tools': ToolAPI(),
+            'bots': BotAPI(),
+            'memory': MemoryAPI(room_id=self.room_id),
+            'skills': SkillsAPI(),
+            'session': SessionAPI(room_id=self.room_id),
+        }
+        self.call_count = 0
+    
+    def list_variables(self) -> Dict[str, str]:
+        """
+        List current REPL variables (for debugging).
+        
+        Returns:
+            Dict of variable name → type name
+        """
+        return {
+            name: type(value).__name__
+            for name, value in self.globals.items()
+            if not name.startswith('_')
+        }
+    
+    def get_variable(self, name: str) -> Any:
+        """Get a specific variable value"""
+        return self.globals.get(name)
+    
+    def set_variable(self, name: str, value: Any) -> None:
+        """Set a specific variable value (for testing)"""
+        self.globals[name] = value
+```
+
+#### Room-Scoped APIs
+
+```python
+# nanofolks/agent/tools/repl_api.py
+
+class MemoryAPI:
+    """
+    Memory API for REPL (room-scoped).
+    
+    All memory operations are automatically scoped to the current room.
+    """
+    
+    def __init__(self, room_id: str):
+        self.room_id = room_id
+        self._store = get_memory_store()  # Global memory store
+    
+    async def search(self, query: str, limit: int = 10):
+        """Search memory in current room"""
+        return await self._store.search(
+            query=query,
+            room_id=self.room_id,
+            limit=limit
+        )
+    
+    async def store(self, key: str, value: Any, tags: list[str] = None):
+        """Store in memory (room-scoped)"""
+        return await self._store.store(
+            key=key,
+            value=value,
+            tags=tags,
+            room_id=self.room_id  # Auto-scoped!
+        )
+    
+    async def recent(self, days: int = 7):
+        """Get recent memories from current room"""
+        return await self._store.get_recent(
+            days=days,
+            room_id=self.room_id
+        )
+    
+    async def load(self, key: str):
+        """Load a specific memory"""
+        return await self._store.load(
+            key=key,
+            room_id=self.room_id
+        )
+
+
+class SessionAPI:
+    """
+    Session API for REPL (room-scoped).
+    
+    Access current session context and history.
+    """
+    
+    def __init__(self, room_id: str):
+        self.room_id = room_id
+        self._session_manager = get_session_manager()
+    
+    async def get_history(self, limit: int = 10):
+        """Get recent session history"""
+        return await self._session_manager.get_history(
+            room_id=self.room_id,
+            limit=limit
+        )
+    
+    async def get_context(self):
+        """Get current session context"""
+        return await self._session_manager.get_context(
+            room_id=self.room_id
+        )
+```
+
+### Integration with Agent Loop
+
+```python
+# nanofolks/agent/loop.py
+
+class AgentLoop:
+    def __init__(
+        self,
+        tools: ToolRegistry,
+        bots: BotCoordinator,
+        memory: MemoryStore,
+        repl_manager: REPLStateManager,  # NEW!
+    ):
+        self.tools = tools
+        self.bots = bots
+        self.memory = memory
+        self.repl_manager = repl_manager  # NEW!
+    
+    async def process_message(self, msg: MessageEnvelope):
+        """Process message with REPL support"""
+        
+        # 1. Get room from message
+        room = self.room_manager.get_room(msg.room_id)
+        
+        # 2. Get REPL state for this room (creates if needed)
+        repl_state = self.repl_manager.get_state(room.id)
+        
+        # 3. Execute agent logic (agent can use REPL tool)
+        response = await self.agent_loop(
+            session=session,
+            msg=msg,
+            repl_state=repl_state  # Pass to tools
+        )
+        
+        # 4. Send response (channel-agnostic)
+        return response
+```
+
+### Cross-Channel Workflow Example
+
+**Scenario**: User researches on CLI, continues on WhatsApp
+
+```python
+# ========== MORNING (CLI in "Project Alpha" room) ==========
+
+# User sends: "Research OpenClaw and save for later"
+
+# Agent executes REPL code:
+from tools import web, file
+from memory import store
+
+url = web.search("OpenClaw GitHub")[0].url
+html = web.scrape(url)
+code = file.read("~/code/openclaw/main.py")
+
+# Store in REPL state AND memory
+research_data = {"url": url, "html": html, "code": code}
+store("openclaw_research", research_data)
+
+print(f"Research complete: {len(html)} chars from {url}")
+
+# REPL state saved to room: project-alpha
+# Variables persist: url, html, code, research_data
+
+
+# ========== AFTERNOON (WhatsApp in same room) ==========
+
+# User sends: "What did I find about OpenClaw?"
+
+# Agent executes REPL code (same state!):
+from memory import load
+
+# Load from memory (or use persisted variables)
+research = load("openclaw_research")
+
+# Or directly use persisted variables!
+# html, url, code still exist in REPL state
+
+summary = summarize(research["html"])
+return f"Found: {summary}\nURL: {research['url']}"
+
+# User receives response on WhatsApp with context from CLI session!
+```
+
+### Room Lifecycle Hooks
+
+```python
+# nanofolks/rooms/manager.py
+
+class RoomManager:
+    def __init__(self, repl_manager: REPLStateManager):
+        self.repl_manager = repl_manager
+    
+    def create_room(self, room_id: str, config: dict):
+        """Create a new room"""
+        # Create room...
+        
+        # REPL state will be created on first access
+        # (lazy initialization)
+    
+    def archive_room(self, room_id: str):
+        """Archive a room and clear REPL state"""
+        # Archive room...
+        
+        # Clear REPL state to free memory
+        self.repl_manager.clear_state(room_id)
+        
+        logger.info(f"Room {room_id} archived, REPL state cleared")
+```
+
+### Benefits of Room-Scoped REPL
+
+1. **Cross-Channel Continuity**: Start task on CLI, continue on WhatsApp
+2. **Natural Lifecycle**: REPL state dies when room is archived
+3. **Security Isolation**: Each room is isolated, no cross-room access
+4. **Memory Efficiency**: Stale REPL state is automatically cleaned up
+5. **Multi-User Support**: If teams are added later, REPL state is shared in room
+
+---
+
 ## Comparison: REPL vs. Other Approaches
 
 | Approach | Composability | State | Tool Calls | Complexity | Security |
@@ -692,23 +1113,87 @@ resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
 
 ---
 
-## Open Questions
+## Design Decisions
 
-1. **Language choice**: Python vs. JavaScript?
-   - Python: Natural fit, RestrictedPython available
-   - JavaScript: Better for QuickJS sandboxing (Witan's approach)
-   
-2. **State persistence scope**: Per-session vs. per-user?
-   - Per-session: Simpler, isolated
-   - Per-user: More powerful, but privacy concerns
+### 1. Language Choice: Python ✅
 
-3. **Hybrid vs. full REPL**: Keep discrete tools or deprecate?
-   - Hybrid: Lower risk, gradual adoption
-   - Full REPL: Simpler, but higher risk
+**Decision**: Use Python for REPL implementation.
 
-4. **External channels**: Enable REPL for WhatsApp/iMessage?
-   - CLI/Desktop: Yes (trusted)
-   - External channels: Maybe (security review needed)
+**Rationale**:
+- Entire nanofolks codebase is Python
+- RestrictedPython is mature and well-tested
+- Natural integration with existing tools (no language bridging)
+- Easier for team to maintain and extend
+
+**Implementation**: Use RestrictedPython for sandboxing with custom security policies.
+
+---
+
+### 2. State Persistence: Per-Room ✅
+
+**Decision**: REPL state is scoped to rooms, not users or sessions.
+
+**Rationale**:
+- Aligns with room-centric architecture
+- All channels in a room share the same REPL state
+- Natural lifecycle (room archived → REPL state cleared)
+- Enables cross-channel workflows (start on CLI, continue on WhatsApp)
+- No cross-room pollution (security benefit)
+
+**Implementation**:
+```python
+# REPL state is tied to room_id, not user_id or channel
+repl_state = repl_manager.get_state(room_id="project-alpha")
+```
+
+**Example Workflow**:
+```
+Morning (CLI in "Project Alpha" room):
+  wb = open_workbook("data.xlsx")
+  results = search("OpenClaw")
+  # State saved to room: project-alpha
+
+Afternoon (WhatsApp in same room):
+  # wb and results still accessible!
+  analysis = analyze(results)
+  return analysis
+```
+
+---
+
+### 3. Hybrid Approach (Short-term) ✅
+
+**Decision**: Keep existing discrete tools, add REPL for complex workflows.
+
+**Rationale**:
+- Lower risk (existing tools still work)
+- Gradual migration based on data
+- Agent can choose best approach per task
+- Easy to measure improvement
+- Rollback is trivial
+
+**Long-term Vision**: Evaluate moving to full REPL after 3-6 months of usage data.
+
+---
+
+### 4. External Channels: Supported by Default ✅
+
+**Decision**: REPL works on all channels (CLI, WhatsApp, iMessage, Discord, Slack).
+
+**Rationale**:
+- REPL state is room-scoped, not channel-scoped
+- All channels in a room access the same REPL state
+- Security is identical across channels (same sandboxing)
+- This is a **strength** of room-centric architecture
+
+**Security**: Same sandboxing applies to all channels:
+- RestrictedPython sandbox
+- No filesystem/network access
+- 90s timeout
+- Output truncation
+- Room-scoped isolation
+
+**Implementation**: No per-channel handling needed. REPL state manager automatically provides the right state based on room_id.
 
 ---
 
@@ -722,14 +1207,34 @@ resource.setrlimit(resource.RLIMIT_AS, (256 * 1024 * 1024, 256 * 1024 * 1024))
 
 ## Next Steps
 
-1. **Approve this plan** - Review with team
-2. **Phase 1 kickoff** - Start REPL tool implementation
-3. **Set up telemetry** - Baseline metrics
+1. ~~**Approve this plan**~~ - ✅ **APPROVED** (March 2, 2026)
+   - Language: Python
+   - State persistence: Per-Room
+   - Approach: Hybrid (short-term)
+   - Channels: All channels supported
+
+2. **Phase 1 kickoff** - Start REPL tool implementation (Week 1)
+   - Create `REPLStateManager` and `REPLState` classes
+   - Implement `RestrictedPythonSandbox`
+   - Build room-scoped APIs (ToolAPI, BotAPI, MemoryAPI)
+
+3. **Set up telemetry** - Baseline metrics before implementation
+   - Tool calls per task
+   - Multi-bot latency
+   - Context token usage
+
 4. **Create examples** - Document common patterns
+   - Research workflows
+   - Multi-bot coordination
+   - Cross-channel usage
+
 5. **Begin migration** - High-value workflows first
+   - Multi-bot coordination
+   - Complex memory operations
+   - Research pipelines
 
 ---
 
-**Status**: Ready for review  
+**Status**: ✅ **Approved** - Ready for implementation  
 **Owner**: TBD  
-**Target Start**: Week 1 (pending approval)
+**Target Start**: Week 1 (March 2026)

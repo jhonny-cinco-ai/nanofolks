@@ -334,6 +334,39 @@ class UpdateConfigTool(Tool):
                 "exec.timeout": {"type": "integer", "default": 60, "min": 1, "max": 3600},
                 "web.search.apiKey": {"type": "string", "help": "Brave Search API key (optional)"},
                 "web.search.maxResults": {"type": "integer", "default": 5, "min": 1, "max": 20},
+                "web.scraplingEnabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "help": "Use Scrapling as fallback when simple fetch fails",
+                },
+                "web.scraplingMinChars": {
+                    "type": "integer",
+                    "default": 800,
+                    "min": 100,
+                    "max": 10000,
+                    "help": "Minimum characters before using Scrapling fallback",
+                },
+                "web.scraplingMode": {
+                    "type": "enum",
+                    "options": ["auto", "stealth", "dynamic"],
+                    "default": "auto",
+                    "help": "Scrapling rendering mode",
+                },
+                "browser.enabled": {
+                    "type": "boolean",
+                    "default": True,
+                    "help": "Enable agent-browser for interactive web tasks",
+                },
+                "browser.binary": {
+                    "type": "string",
+                    "default": "agent-browser",
+                    "help": "Path to agent-browser binary",
+                },
+                "browser.allowlist": {
+                    "type": "array",
+                    "item_type": "string",
+                    "help": "Allowed domains for browser automation",
+                },
             },
         },
         "gateway": {

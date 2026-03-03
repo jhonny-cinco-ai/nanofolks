@@ -1,0 +1,653 @@
+"""
+REPL API Surfaces - API wrappers for REPL environment.
+
+This module provides API classes that wrap nanofolks functionality
+for use in the REPL environment. All APIs are room-scoped.
+"""
+
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
+
+from loguru import logger
+
+if TYPE_CHECKING:
+    from nanofolks.agent.tools.registry import ToolRegistry
+    from nanofolks.bots.coordinator import BotCoordinator
+    from nanofolks.memory.store import TurboMemoryStore
+    from nanofolks.session.manager import RoomSessionManager
+
+
+class ToolAPI:
+    """
+    Tools API for REPL.
+
+    Provides access to all registered tools (web, file, shell, etc.)
+    through a simple interface.
+
+    Example:
+        from tools import web, file, shell
+
+        results = web.search("OpenClaw")
+        content = file.read("~/project/README.md")
+        output = shell.exec("ls -la")
+    """
+
+    def __init__(self, registry: "ToolRegistry", room_id: Optional[str] = None):
+        """
+        Initialize Tools API.
+
+        Args:
+            registry: Tool registry with all registered tools
+            room_id: Room ID for room-scoped operations
+        """
+        self._registry = registry
+        self._room_id = room_id
+
+        # Create sub-modules for organization
+        self.web = WebToolsAPI(registry)
+        self.file = FileToolsAPI(registry)
+        self.shell = ShellToolsAPI(registry)
+        self.browser = BrowserToolsAPI(registry)
+
+    async def execute(self, tool_name: str, params: Dict[str, Any]) -> str:
+        """
+        Execute a tool by name.
+
+        Args:
+            tool_name: Name of the tool
+            params: Tool parameters
+
+        Returns:
+            Tool execution result
+        """
+        return await self._registry.execute(tool_name, params)
+
+    def list_tools(self) -> List[str]:
+        """List all available tools."""
+        return self._registry.tool_names
+
+    def has_tool(self, name: str) -> bool:
+        """Check if a tool exists."""
+        return self._registry.has(name)
+
+
+class WebToolsAPI:
+    """Web-related tools (search, scrape, etc.)"""
+
+    def __init__(self, registry: "ToolRegistry"):
+        self._registry = registry
+
+    async def search(self, query: str, limit: int = 5) -> str:
+        """Search the web."""
+        return await self._registry.execute(
+            "web_search",
+            {
+                "query": query,
+                "limit": limit,
+            },
+        )
+
+    async def scrape(self, url: str) -> str:
+        """Scrape a webpage."""
+        return await self._registry.execute(
+            "scrape_url",
+            {
+                "url": url,
+            },
+        )
+
+    async def fetch(self, url: str) -> str:
+        """Fetch URL content (alias for scrape)."""
+        return await self.scrape(url)
+
+
+class FileToolsAPI:
+    """File-related tools (read, write, list, etc.)"""
+
+    def __init__(self, registry: "ToolRegistry"):
+        self._registry = registry
+
+    async def read(self, path: str) -> str:
+        """Read a file."""
+        return await self._registry.execute(
+            "read_file",
+            {
+                "path": path,
+            },
+        )
+
+    async def write(self, path: str, content: str) -> str:
+        """Write to a file."""
+        return await self._registry.execute(
+            "write_file",
+            {
+                "path": path,
+                "content": content,
+            },
+        )
+
+    async def list(self, path: str) -> str:
+        """List directory contents."""
+        return await self._registry.execute(
+            "list_dir",
+            {
+                "path": path,
+            },
+        )
+
+    async def edit(self, path: str, edits: List[Dict[str, str]]) -> str:
+        """Edit a file with multiple edits."""
+        return await self._registry.execute(
+            "edit_file",
+            {
+                "path": path,
+                "edits": edits,
+            },
+        )
+
+
+class ShellToolsAPI:
+    """Shell execution tools"""
+
+    def __init__(self, registry: "ToolRegistry"):
+        self._registry = registry
+
+    async def exec(self, command: str, timeout: int = 30) -> str:
+        """Execute a shell command."""
+        return await self._registry.execute(
+            "shell",
+            {
+                "command": command,
+                "timeout": timeout,
+            },
+        )
+
+    async def run(self, command: str) -> str:
+        """Run a shell command (alias for exec)."""
+        return await self.exec(command)
+
+
+class BrowserToolsAPI:
+    """Browser automation tools"""
+
+    def __init__(self, registry: "ToolRegistry"):
+        self._registry = registry
+
+    async def open(self, url: str) -> str:
+        """Open URL in browser."""
+        return await self._registry.execute(
+            "browser_navigate",
+            {
+                "url": url,
+            },
+        )
+
+    async def click(self, selector: str) -> str:
+        """Click element."""
+        return await self._registry.execute(
+            "browser_click",
+            {
+                "selector": selector,
+            },
+        )
+
+    async def type_text(self, selector: str, text: str) -> str:
+        """Type text into element."""
+        return await self._registry.execute(
+            "browser_type",
+            {
+                "selector": selector,
+                "text": text,
+            },
+        )
+
+    async def screenshot(self) -> str:
+        """Take screenshot."""
+        return await self._registry.execute("browser_screenshot", {})
+
+
+class BotAPI:
+    """
+    Bot coordination API for REPL.
+
+    Provides access to multi-bot coordination (ask, broadcast, delegate).
+
+    Example:
+        from bots import coordinator
+
+        result = coordinator.ask("researcher", "Find info on OpenClaw")
+        coordinator.broadcast("Important update!")
+        results = coordinator.delegate("Research X", ["researcher", "analyst"])
+    """
+
+    def __init__(self, coordinator: "BotCoordinator", room_id: Optional[str] = None):
+        """
+        Initialize Bot API.
+
+        Args:
+            coordinator: Bot coordinator instance
+            room_id: Room ID for room-scoped operations
+        """
+        self._coordinator = coordinator
+        self._room_id = room_id
+
+    async def ask(self, bot_name: str, message: str, timeout: int = 60) -> str:
+        """
+        Ask a specific bot.
+
+        Args:
+            bot_name: Name of the bot (e.g., "researcher", "analyst")
+            message: Message to send
+            timeout: Timeout in seconds
+
+        Returns:
+            Bot response
+        """
+        logger.debug(f"REPL BotAPI: Asking {bot_name}")
+        return await self._coordinator.ask_bot(bot_name, message, timeout)
+
+    async def broadcast(self, message: str) -> Dict[str, str]:
+        """
+        Broadcast message to all bots.
+
+        Args:
+            message: Message to broadcast
+
+        Returns:
+            Dict of bot_name → response
+        """
+        logger.debug("REPL BotAPI: Broadcasting to all bots")
+        return await self._coordinator.broadcast(message)
+
+    async def delegate(
+        self,
+        task: str,
+        bots: List[str],
+        parallel: bool = True,
+    ) -> Dict[str, str]:
+        """
+        Delegate task to multiple bots.
+
+        Args:
+            task: Task description
+            bots: List of bot names
+            parallel: Run in parallel (default: True)
+
+        Returns:
+            Dict of bot_name → response
+        """
+        logger.debug(f"REPL BotAPI: Delegating to {len(bots)} bots")
+        return await self._coordinator.delegate_task(task, bots, parallel)
+
+    def list_bots(self) -> List[str]:
+        """List available bots."""
+        return self._coordinator.list_bots()
+
+    def has_bot(self, name: str) -> bool:
+        """Check if a bot exists."""
+        return self._coordinator.has_bot(name)
+
+
+class MemoryAPI:
+    """
+    Memory API for REPL (room-scoped).
+
+    All memory operations are automatically scoped to the current room.
+
+    Example:
+        from memory import search, store, recent
+
+        results = search("project X", limit=5)
+        store("important_key", {"data": "value"}, tags=["important"])
+        recent_items = recent(days=7)
+    """
+
+    def __init__(
+        self,
+        memory_store: Optional["TurboMemoryStore"] = None,
+        room_id: Optional[str] = None,
+    ):
+        """
+        Initialize Memory API.
+
+        Args:
+            memory_store: Memory store instance
+            room_id: Room ID for room-scoped operations
+        """
+        self._store = memory_store
+        self._room_id = room_id
+
+    async def search(
+        self,
+        query: str,
+        limit: int = 10,
+        room_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Search memory.
+
+        Args:
+            query: Search query
+            limit: Maximum results
+            room_id: Override room ID (optional)
+
+        Returns:
+            List of matching memories
+        """
+        if not self._store:
+            return [{"error": "Memory store not available"}]
+
+        effective_room = room_id or self._room_id
+        logger.debug(f"REPL MemoryAPI: Searching for '{query}' in room {effective_room}")
+
+        return await self._store.search(
+            query=query,
+            room_id=effective_room,
+            limit=limit,
+        )
+
+    async def store(
+        self,
+        key: str,
+        value: Any,
+        tags: Optional[List[str]] = None,
+        room_id: Optional[str] = None,
+    ) -> str:
+        """
+        Store in memory.
+
+        Args:
+            key: Storage key
+            value: Value to store
+            tags: Optional tags
+            room_id: Override room ID (optional)
+
+        Returns:
+            Success message
+        """
+        if not self._store:
+            return "Error: Memory store not available"
+
+        effective_room = room_id or self._room_id
+        logger.debug(f"REPL MemoryAPI: Storing '{key}' in room {effective_room}")
+
+        await self._store.store(
+            key=key,
+            value=value,
+            tags=tags or [],
+            room_id=effective_room,
+        )
+        return f"Stored: {key}"
+
+    async def load(
+        self,
+        key: str,
+        room_id: Optional[str] = None,
+    ) -> Optional[Any]:
+        """
+        Load from memory.
+
+        Args:
+            key: Storage key
+            room_id: Override room ID (optional)
+
+        Returns:
+            Stored value or None
+        """
+        if not self._store:
+            return None
+
+        effective_room = room_id or self._room_id
+        logger.debug(f"REPL MemoryAPI: Loading '{key}' from room {effective_room}")
+
+        return await self._store.load(
+            key=key,
+            room_id=effective_room,
+        )
+
+    async def recent(
+        self,
+        days: int = 7,
+        room_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recent memories.
+
+        Args:
+            days: Number of days to look back
+            room_id: Override room ID (optional)
+
+        Returns:
+            List of recent memories
+        """
+        if not self._store:
+            return []
+
+        effective_room = room_id or self._room_id
+        logger.debug(f"REPL MemoryAPI: Getting recent memories from room {effective_room}")
+
+        return await self._store.get_recent(
+            days=days,
+            room_id=effective_room,
+        )
+
+    async def associate(
+        self,
+        key: str,
+        tags: List[str],
+        room_id: Optional[str] = None,
+    ) -> str:
+        """
+        Associate memory with tags.
+
+        Args:
+            key: Storage key
+            tags: Tags to associate
+            room_id: Override room ID (optional)
+
+        Returns:
+            Success message
+        """
+        if not self._store:
+            return "Error: Memory store not available"
+
+        effective_room = room_id or self._room_id
+        await self._store.associate_tags(
+            key=key,
+            tags=tags,
+            room_id=effective_room,
+        )
+        return f"Associated: {key} with {tags}"
+
+
+class SessionAPI:
+    """
+    Session API for REPL (room-scoped).
+
+    Access current session context and history.
+
+    Example:
+        from session import history, context
+
+        recent = history(limit=10)
+        ctx = context()
+    """
+
+    def __init__(
+        self,
+        session_manager: Optional["RoomSessionManager"] = None,
+        room_id: Optional[str] = None,
+    ):
+        """
+        Initialize Session API.
+
+        Args:
+            session_manager: Session manager instance
+            room_id: Room ID for room-scoped operations
+        """
+        self._session_manager = session_manager
+        self._room_id = room_id
+
+    async def history(
+        self,
+        limit: int = 10,
+        room_id: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recent session history.
+
+        Args:
+            limit: Maximum messages
+            room_id: Override room ID (optional)
+
+        Returns:
+            List of recent messages
+        """
+        if not self._session_manager:
+            return []
+
+        effective_room = room_id or self._room_id
+        logger.debug(f"REPL SessionAPI: Getting history for room {effective_room}")
+
+        session = self._session_manager.get_session(effective_room)
+        if session:
+            return session.get_history(max_messages=limit)
+        return []
+
+    async def context(
+        self,
+        room_id: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Get current session context.
+
+        Args:
+            room_id: Override room ID (optional)
+
+        Returns:
+            Session context or None
+        """
+        if not self._session_manager:
+            return None
+
+        effective_room = room_id or self._room_id
+        logger.debug(f"REPL SessionAPI: Getting context for room {effective_room}")
+
+        session = self._session_manager.get_session(effective_room)
+        if session:
+            return session.get_context()
+        return None
+
+
+class SkillsAPI:
+    """
+    Skills API for REPL.
+
+    Access and compose skills.
+
+    Example:
+        from skills import load, compose, run
+
+        load("web-research")
+        workflow = compose(["web-research", "summarize"])
+        result = run(workflow, "Research OpenClaw")
+    """
+
+    def __init__(self, room_id: Optional[str] = None):
+        """
+        Initialize Skills API.
+
+        Args:
+            room_id: Room ID for room-scoped operations
+        """
+        self._room_id = room_id
+        self._loaded_skills: Dict[str, Any] = {}
+
+    def load(self, skill_name: str) -> str:
+        """
+        Load a skill.
+
+        Args:
+            skill_name: Name of the skill
+
+        Returns:
+            Success message
+        """
+        # TODO: Implement skill loading
+        logger.debug(f"REPL SkillsAPI: Loading skill '{skill_name}'")
+        self._loaded_skills[skill_name] = True
+        return f"Loaded: {skill_name}"
+
+    def compose(self, skills: List[str]) -> str:
+        """
+        Compose multiple skills.
+
+        Args:
+            skills: List of skill names
+
+        Returns:
+            Workflow ID
+        """
+        # TODO: Implement skill composition
+        logger.debug(f"REPL SkillsAPI: Composing {len(skills)} skills")
+        return f"workflow-{len(skills)}"
+
+    async def run(self, workflow: str, input_data: Any) -> str:
+        """
+        Run a workflow.
+
+        Args:
+            workflow: Workflow ID
+            input_data: Input data
+
+        Returns:
+            Workflow result
+        """
+        # TODO: Implement workflow execution
+        logger.debug(f"REPL SkillsAPI: Running workflow '{workflow}'")
+        return f"Result for: {input_data}"
+
+    def list_skills(self) -> List[str]:
+        """List loaded skills."""
+        return list(self._loaded_skills.keys())
+
+
+def create_api_instances(
+    room_id: str,
+    tools_registry: Optional["ToolRegistry"] = None,
+    bot_coordinator: Optional["BotCoordinator"] = None,
+    memory_store: Optional["TurboMemoryStore"] = None,
+    session_manager: Optional["RoomSessionManager"] = None,
+) -> Dict[str, Any]:
+    """
+    Create API instances for a room.
+
+    This is a factory function used by REPLStateManager.
+
+    Args:
+        room_id: Room identifier
+        tools_registry: Tool registry
+        bot_coordinator: Bot coordinator
+        memory_store: Memory store
+        session_manager: Session manager
+
+    Returns:
+        Dict of API instances
+    """
+    instances = {}
+
+    if tools_registry:
+        instances["tools"] = ToolAPI(tools_registry, room_id)
+
+    if bot_coordinator:
+        instances["bots"] = BotAPI(bot_coordinator, room_id)
+
+    if memory_store:
+        instances["memory"] = MemoryAPI(memory_store, room_id)
+
+    if session_manager:
+        instances["session"] = SessionAPI(session_manager, room_id)
+
+    # Always create skills API
+    instances["skills"] = SkillsAPI(room_id)
+
+    return instances

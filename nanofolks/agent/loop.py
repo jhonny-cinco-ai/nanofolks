@@ -1557,7 +1557,6 @@ Current conversation history:
                 if isinstance(self._current_room_type, RoomType)
                 else RoomType.OPEN,
                 participants=self._current_room_participants or ["leader"],
-                clear_existing=True,  # Clear previous turn's thinking log
             )
             we_started_session = True
 

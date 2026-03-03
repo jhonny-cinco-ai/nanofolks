@@ -1153,6 +1153,14 @@ Current conversation history:
         from nanofolks.agent.tools.repl_manager import REPLStateManager
 
         # Create REPL state manager with API factory for room-scoped REPL environments
+        # Note: repl_manager is set after creation to avoid circular reference
+        self.repl_manager = REPLStateManager(
+            api_factory=None,  # Set below after manager is created
+            sandbox_timeout=90.0,
+            sandbox_max_output_chars=20000,
+        )
+
+        # Create API factory with reference to repl_manager
         def repl_api_factory(room_id: str) -> dict:
             return create_api_instances(
                 room_id=room_id,
@@ -1160,13 +1168,10 @@ Current conversation history:
                 bot_invoker=self.bot_invoker,
                 memory_store=self.memory_store,
                 session_manager=self.sessions,
+                repl_manager=self.repl_manager,
             )
 
-        self.repl_manager = REPLStateManager(
-            api_factory=repl_api_factory,
-            sandbox_timeout=90.0,
-            sandbox_max_output_chars=20000,
-        )
+        self.repl_manager._api_factory = repl_api_factory
 
         # Use factory to create registry with all standard tools
         # This harmonizes toolsets for both @leader and specialist bots

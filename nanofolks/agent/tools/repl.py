@@ -67,14 +67,27 @@ This is a programmable environment where you can:
 
 Available APIs:
 - tools: Tool API (tools.web.search(), tools.file.read(), etc.)
-- bots: Bot API (bots.ask(), bots.broadcast(), bots.delegate())
+- bots: Bot API (bots.invoke(), bots.invoke_many(), bots.list_bots(), bots.has_bot())
 - memory: Memory API (memory.search(), memory.store(), memory.recent())
 - skills: Skills API (skills.load(), skills.compose(), skills.run())
 - session: Session API (session.history(), session.context())
 
 State persists across calls in the same room.
 
+Management Actions (use action parameter):
+- list_variables: Show current variables in REPL state
+- reset: Clear all variables, start fresh
+- get_history: Show recent execution history
+- get_stats: Show REPL statistics
+- save_snapshot: Save current state for later
+- restore_snapshot: Restore from saved snapshot
+
 Example:
+    # Invoke specialist bot
+    from bots import coordinator
+    result = coordinator.invoke("researcher", "Find info on OpenClaw")
+    print(result)
+
     # Multi-step research
     from tools import web
     from memory import store
@@ -96,8 +109,31 @@ Security: 90s timeout, 20K char output limit, no filesystem/network access."""
                     "type": "string",
                     "description": "Python code to execute. Can use tools, bots, memory, skills, and session APIs.",
                 },
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "list_variables",
+                        "reset",
+                        "get_history",
+                        "get_stats",
+                        "save_snapshot",
+                        "restore_snapshot",
+                    ],
+                    "description": "REPL management action (alternative to code)",
+                },
+                "room_id": {
+                    "type": "string",
+                    "description": "Room ID (uses default if not provided)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Limit for history/stats actions (default: 10)",
+                },
+                "snapshot": {
+                    "type": "object",
+                    "description": "Snapshot data for restore_snapshot action",
+                },
             },
-            "required": ["code"],
         }
 
     def __init__(
@@ -119,32 +155,87 @@ Security: 90s timeout, 20K char output limit, no filesystem/network access."""
 
     async def execute(self, **kwargs: Any) -> str:
         """
-        Execute Python code in the REPL environment.
+        Execute Python code or REPL management actions in the environment.
 
         Args:
             code: Python code to execute
+            action: Optional action (list_variables, reset, get_history, get_stats, save_snapshot, restore_snapshot)
             room_id: Optional room ID (uses default if not provided)
+            limit: Limit for history/stats actions
+            snapshot: Snapshot data for restore_snapshot action
 
         Returns:
             Execution result as string
         """
+        action = kwargs.get("action")
         code = kwargs.get("code", "")
         room_id = kwargs.get("room_id") or self._default_room_id
-
-        if not code:
-            return "Error: No code provided"
+        limit = kwargs.get("limit", 10)
+        snapshot = kwargs.get("snapshot")
 
         if not room_id:
             return "Error: No room ID available"
 
-        # Get REPL state for this room
         state = self._repl_manager.get_state(room_id)
 
-        # Execute code
+        if action:
+            return await self._handle_action(action, state, limit, snapshot)
+
+        if not code:
+            return "Error: No code provided"
+
         logger.info(f"REPLTool: Executing {len(code)} chars in room {room_id}")
         result = await state.execute(code)
 
         return result
+
+    async def _handle_action(
+        self,
+        action: str,
+        state: Any,
+        limit: int = 10,
+        snapshot: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Handle REPL management actions."""
+        import json
+
+        if action == "list_variables":
+            variables = state.list_variables()
+            if not variables:
+                return "No variables in REPL state"
+            lines = [f"{name}: {vtype}" for name, vtype in sorted(variables.items())]
+            return "Variables:\n" + "\n".join(lines)
+
+        elif action == "reset":
+            state.reset()
+            return "REPL state reset successfully"
+
+        elif action == "get_history":
+            history = state.get_history(limit)
+            if not history:
+                return "No execution history"
+            lines = []
+            for i, h in enumerate(history):
+                status = "✓" if h.success else "✗"
+                lines.append(f"{i + 1}. {status} ({h.execution_time_ms}ms): {h.output[:50]}...")
+            return "History:\n" + "\n".join(lines)
+
+        elif action == "get_stats":
+            stats = state.get_stats()
+            lines = [f"{k}: {v}" for k, v in stats.items()]
+            return "Stats:\n" + "\n".join(lines)
+
+        elif action == "save_snapshot":
+            snap = state.save_snapshot()
+            return f"Snapshot saved: {len(snap.get('variables', {}))} variables"
+
+        elif action == "restore_snapshot":
+            if not snapshot:
+                return "Error: No snapshot provided"
+            success = state.restore_snapshot(snapshot)
+            return "Snapshot restored" if success else "Failed to restore snapshot"
+
+        return f"Unknown action: {action}"
 
     def validate_params(self, params: Dict[str, Any]) -> list[str]:
         """
@@ -190,7 +281,7 @@ Security: 90s timeout, 20K char output limit, no filesystem/network access."""
 def create_repl_tool(
     room_id: str,
     tools_registry: Optional[Any] = None,
-    bot_coordinator: Optional[Any] = None,
+    bot_invoker: Optional[Any] = None,
     memory_store: Optional[Any] = None,
     session_manager: Optional[Any] = None,
     sandbox_timeout: float = 90.0,
@@ -204,7 +295,7 @@ def create_repl_tool(
     Args:
         room_id: Default room ID
         tools_registry: Tool registry
-        bot_coordinator: Bot coordinator
+        bot_invoker: BotInvoker for invoking specialist bots
         memory_store: Memory store
         session_manager: Session manager
         sandbox_timeout: Sandbox timeout in seconds
@@ -221,7 +312,7 @@ def create_repl_tool(
         return create_api_instances(
             room_id=rid,
             tools_registry=tools_registry,
-            bot_coordinator=bot_coordinator,
+            bot_invoker=bot_invoker,
             memory_store=memory_store,
             session_manager=session_manager,
         )

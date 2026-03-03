@@ -11,7 +11,8 @@ from loguru import logger
 
 if TYPE_CHECKING:
     from nanofolks.agent.tools.registry import ToolRegistry
-    from nanofolks.bots.coordinator import BotCoordinator
+    from nanofolks.agent.bot_invoker import BotInvoker
+    from nanofolks.agent.tools.repl_manager import REPLStateManager
     from nanofolks.memory.store import TurboMemoryStore
     from nanofolks.session.manager import RoomSessionManager
 
@@ -209,82 +210,164 @@ class BotAPI:
     """
     Bot coordination API for REPL.
 
-    Provides access to multi-bot coordination (ask, broadcast, delegate).
+    Provides access to multi-bot coordination (invoke, list, has).
+    Uses BotInvoker to delegate tasks to specialist bots.
 
     Example:
         from bots import coordinator
 
-        result = coordinator.ask("researcher", "Find info on OpenClaw")
-        coordinator.broadcast("Important update!")
-        results = coordinator.delegate("Research X", ["researcher", "analyst"])
+        result = coordinator.invoke("researcher", "Find info on OpenClaw")
+        bots = coordinator.list_bots()
     """
 
-    def __init__(self, coordinator: "BotCoordinator", room_id: Optional[str] = None):
+    def __init__(self, invoker: "BotInvoker", room_id: Optional[str] = None):
         """
         Initialize Bot API.
 
         Args:
-            coordinator: Bot coordinator instance
+            invoker: BotInvoker instance for invoking specialist bots
             room_id: Room ID for room-scoped operations
         """
-        self._coordinator = coordinator
+        self._invoker = invoker
         self._room_id = room_id
 
-    async def ask(self, bot_name: str, message: str, timeout: int = 60) -> str:
-        """
-        Ask a specific bot.
-
-        Args:
-            bot_name: Name of the bot (e.g., "researcher", "analyst")
-            message: Message to send
-            timeout: Timeout in seconds
-
-        Returns:
-            Bot response
-        """
-        logger.debug(f"REPL BotAPI: Asking {bot_name}")
-        return await self._coordinator.ask_bot(bot_name, message, timeout)
-
-    async def broadcast(self, message: str) -> Dict[str, str]:
-        """
-        Broadcast message to all bots.
-
-        Args:
-            message: Message to broadcast
-
-        Returns:
-            Dict of bot_name → response
-        """
-        logger.debug("REPL BotAPI: Broadcasting to all bots")
-        return await self._coordinator.broadcast(message)
-
-    async def delegate(
+    async def invoke(
         self,
+        bot_name: str,
         task: str,
+        context: Optional[str] = None,
+    ) -> str:
+        """
+        Invoke a specialist bot to handle a task.
+
+        The bot works in the background and reports results back when complete.
+        This is always async - the main agent continues immediately.
+
+        Args:
+            bot_name: Name of the bot (e.g., "researcher", "coder", "social", "creative", "auditor")
+            task: Task description for the bot
+            context: Additional context from the main conversation
+
+        Returns:
+            Confirmation message that the bot was invoked
+        """
+        logger.debug(f"REPL BotAPI: Invoking {bot_name}")
+        return await self._invoker.invoke(
+            bot_role=bot_name,
+            task=task,
+            context=context,
+            origin_channel="repl",
+            origin_chat_id="repl",
+            origin_room_id=self._room_id,
+        )
+
+    async def invoke_many(
+        self,
         bots: List[str],
-        parallel: bool = True,
+        task: str,
+        context: Optional[str] = None,
     ) -> Dict[str, str]:
         """
-        Delegate task to multiple bots.
+        Invoke multiple specialist bots in parallel.
 
         Args:
-            task: Task description
-            bots: List of bot names
-            parallel: Run in parallel (default: True)
+            bots: List of bot names to invoke
+            task: Task description for the bots
+            context: Additional context
 
         Returns:
-            Dict of bot_name → response
+            Dict of bot_name → invocation confirmation
         """
-        logger.debug(f"REPL BotAPI: Delegating to {len(bots)} bots")
-        return await self._coordinator.delegate_task(task, bots, parallel)
+        import asyncio
+
+        logger.debug(f"REPL BotAPI: Invoking {len(bots)} bots")
+
+        async def invoke_one(bot: str) -> tuple[str, str]:
+            result = await self.invoke(bot, task, context)
+            return bot, result
+
+        results = await asyncio.gather(*[invoke_one(b) for b in bots])
+        return dict(results)
 
     def list_bots(self) -> List[str]:
         """List available bots."""
-        return self._coordinator.list_bots()
+        from nanofolks.agent.bot_invoker import AVAILABLE_BOTS
+
+        return list(AVAILABLE_BOTS.keys())
 
     def has_bot(self, name: str) -> bool:
         """Check if a bot exists."""
-        return self._coordinator.has_bot(name)
+        from nanofolks.agent.bot_invoker import AVAILABLE_BOTS
+
+        return name in AVAILABLE_BOTS
+
+
+class REPLToolsAPI:
+    """
+    REPL management API for introspection and control.
+
+    Example:
+        from repl import list_variables, reset, get_history, get_stats
+
+        vars = list_variables()
+        reset()
+        history = get_history()
+        stats = get_stats()
+    """
+
+    def __init__(
+        self,
+        repl_manager: "REPLStateManager",
+        room_id: Optional[str] = None,
+    ):
+        """
+        Initialize REPL Tools API.
+
+        Args:
+            repl_manager: REPL state manager
+            room_id: Room ID for room-scoped operations
+        """
+        self._repl_manager = repl_manager
+        self._room_id = room_id
+
+    def _get_state(self):
+        """Get REPL state for current room."""
+        room_id = self._room_id or "general"
+        return self._repl_manager.get_state(room_id)
+
+    def list_variables(self) -> Dict[str, str]:
+        """List current variables in REPL state."""
+        return self._get_state().list_variables()
+
+    def reset(self) -> str:
+        """Reset REPL state (clear all variables)."""
+        self._get_state().reset()
+        return "REPL state reset"
+
+    def get_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get execution history."""
+        return [
+            {
+                "success": h.success,
+                "output": h.output,
+                "error": h.error,
+                "execution_time_ms": h.execution_time_ms,
+            }
+            for h in self._get_state().get_history(limit)
+        ]
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Get REPL statistics."""
+        return self._get_state().get_stats()
+
+    def save_snapshot(self) -> Dict[str, Any]:
+        """Save current REPL state as snapshot."""
+        return self._get_state().save_snapshot()
+
+    def restore_snapshot(self, snapshot: Dict[str, Any]) -> str:
+        """Restore REPL state from snapshot."""
+        success = self._get_state().restore_snapshot(snapshot)
+        return "Restored" if success else "Failed"
 
 
 class MemoryAPI:
@@ -614,9 +697,10 @@ class SkillsAPI:
 def create_api_instances(
     room_id: str,
     tools_registry: Optional["ToolRegistry"] = None,
-    bot_coordinator: Optional["BotCoordinator"] = None,
+    bot_invoker: Optional["BotInvoker"] = None,
     memory_store: Optional["TurboMemoryStore"] = None,
     session_manager: Optional["RoomSessionManager"] = None,
+    repl_manager: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Create API instances for a room.
@@ -626,9 +710,10 @@ def create_api_instances(
     Args:
         room_id: Room identifier
         tools_registry: Tool registry
-        bot_coordinator: Bot coordinator
+        bot_invoker: BotInvoker for invoking specialist bots
         memory_store: Memory store
         session_manager: Session manager
+        repl_manager: REPL state manager
 
     Returns:
         Dict of API instances
@@ -638,14 +723,17 @@ def create_api_instances(
     if tools_registry:
         instances["tools"] = ToolAPI(tools_registry, room_id)
 
-    if bot_coordinator:
-        instances["bots"] = BotAPI(bot_coordinator, room_id)
+    if bot_invoker:
+        instances["bots"] = BotAPI(bot_invoker, room_id)
 
     if memory_store:
         instances["memory"] = MemoryAPI(memory_store, room_id)
 
     if session_manager:
         instances["session"] = SessionAPI(session_manager, room_id)
+
+    if repl_manager:
+        instances["repl"] = REPLToolsAPI(repl_manager, room_id)
 
     # Always create skills API
     instances["skills"] = SkillsAPI(room_id)

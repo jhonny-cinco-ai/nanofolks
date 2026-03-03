@@ -583,7 +583,21 @@ Examples:
 
         schema = self.SCHEMA[category]
 
-        # Navigate nested schema
+        # Check if "fields" exists
+        if "fields" not in schema:
+            return {}
+
+        fields = schema["fields"]
+
+        # Try to find the field by joining remaining parts with dots
+        # This handles both "web.scraplingEnabled" and nested structures
+        remaining_path = ".".join(parts[1:])
+
+        # Direct lookup for flat keys like "web.scraplingEnabled"
+        if remaining_path in fields:
+            return fields[remaining_path]
+
+        # Navigate nested schema for providers/channels
         current = schema
         for part in parts[1:]:
             if "fields" in current and part in current["fields"]:

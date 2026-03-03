@@ -48,6 +48,7 @@ class ToolAPI:
         self.file = FileToolsAPI(registry)
         self.shell = ShellToolsAPI(registry)
         self.browser = BrowserToolsAPI(registry)
+        self.mcp = MCPToolsAPI(registry)
 
     async def execute(self, tool_name: str, params: Dict[str, Any]) -> str:
         """
@@ -204,6 +205,73 @@ class BrowserToolsAPI:
     async def screenshot(self) -> str:
         """Take screenshot."""
         return await self._registry.execute("browser_screenshot", {})
+
+
+class MCPToolsAPI:
+    """
+    MCP (Model Context Protocol) tools API for REPL.
+
+    Provides access to MCP server tools. MCP tools are registered with
+    names starting with "mcp_" (e.g., mcp_github_search).
+
+    Example:
+        from tools import mcp
+
+        # List available MCP tools
+        mcp_tools = mcp.list()
+
+        # Check if an MCP tool is available
+        if mcp.has("github_search"):
+            result = mcp.call("github_search", query="openclaw")
+    """
+
+    def __init__(self, registry: "ToolRegistry"):
+        self._registry = registry
+
+    def list(self) -> List[str]:
+        """List all available MCP tools (tools starting with mcp_)."""
+        return [name for name in self._registry.tool_names if name.startswith("mcp_")]
+
+    def has(self, tool_name: str) -> bool:
+        """Check if an MCP tool is available.
+
+        Args:
+            tool_name: Tool name without mcp_ prefix (e.g., "github_search")
+                       or with prefix (e.g., "mcp_github_search")
+        """
+        # Normalize name
+        if not tool_name.startswith("mcp_"):
+            tool_name = f"mcp_{tool_name}"
+        return self._registry.has(tool_name)
+
+    async def call(self, tool_name: str, **kwargs: Any) -> str:
+        """Call an MCP tool by name.
+
+        Args:
+            tool_name: Tool name (with or without mcp_ prefix)
+            **kwargs: Tool parameters
+
+        Returns:
+            Tool execution result
+        """
+        # Normalize name
+        if not tool_name.startswith("mcp_"):
+            tool_name = f"mcp_{tool_name}"
+        return await self._registry.execute(tool_name, kwargs)
+
+    async def connect(self, server_name: str) -> str:
+        """Connect to an MCP server.
+
+        Note: This triggers the connection process but the tool may not
+        be immediately available. Check with mcp.list() after calling.
+
+        Args:
+            server_name: Name of the MCP server to connect to
+
+        Returns:
+            Connection status message
+        """
+        return await self._registry.execute("connect_mcp_server", {"server_name": server_name})
 
 
 class BotAPI:

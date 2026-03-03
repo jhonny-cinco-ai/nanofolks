@@ -1596,9 +1596,9 @@ def chat(
 
     async def _warmup_local_model():
         if agent_loop.routing_stage and hasattr(agent_loop.routing_stage, "warmup"):
-            console.print("[dim]Warming up local model...[/dim]")
-            await agent_loop.routing_stage.warmup()
-            console.print("[green]Local model ready![/green]")
+            with console.status("[dim]Warming up local model...[/dim]", spinner="dots"):
+                await agent_loop.routing_stage.warmup()
+            console.print("[green]✓ Local model ready![/green]")
 
     async def _send_cli(_msg: MessageEnvelope) -> None:
         # Rendering is handled after receiving the final response.

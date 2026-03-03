@@ -71,139 +71,184 @@ class ToolAPI:
         """Check if a tool exists."""
         return self._registry.has(name)
 
+    def _run_async(self, coro):
+        """Run async coroutine in executor (for sync access in REPL)."""
+        import asyncio
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If we're in an async context, create a new loop in a thread
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, coro)
+                    return future.result()
+            else:
+                return loop.run_until_complete(coro)
+        except RuntimeError:
+            return asyncio.run(coro)
+
 
 class WebToolsAPI:
-    """Web-related tools (search, scrape, etc.)"""
+    """Web-related tools (search, scrape, etc.) - sync version for REPL."""
 
     def __init__(self, registry: "ToolRegistry"):
         self._registry = registry
 
-    async def search(self, query: str, limit: int = 5) -> str:
-        """Search the web."""
+    def _run_sync(self, coro):
+        """Run async coroutine synchronously."""
+        import asyncio
+
+        return asyncio.run(coro)
+
+    def search(self, query: str, limit: int = 5) -> str:
+        """Search the web (sync version for REPL)."""
+        return self._run_sync(
+            self._registry.execute(
+                "web_search",
+                {"query": query, "limit": limit},
+            )
+        )
+
+    async def search_async(self, query: str, limit: int = 5) -> str:
+        """Search the web (async version)."""
         return await self._registry.execute(
             "web_search",
-            {
-                "query": query,
-                "limit": limit,
-            },
+            {"query": query, "limit": limit},
         )
 
-    async def scrape(self, url: str) -> str:
-        """Scrape a webpage."""
-        return await self._registry.execute(
-            "scrape_url",
-            {
-                "url": url,
-            },
-        )
+    def scrape(self, url: str) -> str:
+        """Scrape a webpage (sync version for REPL)."""
+        return self._run_sync(self._registry.execute("scrape_url", {"url": url}))
 
-    async def fetch(self, url: str) -> str:
+    async def scrape_async(self, url: str) -> str:
+        """Scrape a webpage (async version)."""
+        return await self._registry.execute("scrape_url", {"url": url})
+
+    def fetch(self, url: str) -> str:
         """Fetch URL content (alias for scrape)."""
-        return await self.scrape(url)
+        return self.scrape(url)
 
 
 class FileToolsAPI:
-    """File-related tools (read, write, list, etc.)"""
+    """File-related tools (read, write, list, etc.) - sync version for REPL."""
 
     def __init__(self, registry: "ToolRegistry"):
         self._registry = registry
 
-    async def read(self, path: str) -> str:
-        """Read a file."""
-        return await self._registry.execute(
-            "read_file",
-            {
-                "path": path,
-            },
+    def _run_sync(self, coro):
+        """Run async coroutine synchronously."""
+        import asyncio
+
+        return asyncio.run(coro)
+
+    def read(self, path: str) -> str:
+        """Read a file (sync version for REPL)."""
+        return self._run_sync(self._registry.execute("read_file", {"path": path}))
+
+    async def read_async(self, path: str) -> str:
+        """Read a file (async version)."""
+        return await self._registry.execute("read_file", {"path": path})
+
+    def write(self, path: str, content: str) -> str:
+        """Write to a file (sync version for REPL)."""
+        return self._run_sync(
+            self._registry.execute("write_file", {"path": path, "content": content})
         )
 
-    async def write(self, path: str, content: str) -> str:
-        """Write to a file."""
-        return await self._registry.execute(
-            "write_file",
-            {
-                "path": path,
-                "content": content,
-            },
-        )
+    async def write_async(self, path: str, content: str) -> str:
+        """Write to a file (async version)."""
+        return await self._registry.execute("write_file", {"path": path, "content": content})
 
-    async def list(self, path: str) -> str:
-        """List directory contents."""
-        return await self._registry.execute(
-            "list_dir",
-            {
-                "path": path,
-            },
-        )
+    def list(self, path: str) -> str:
+        """List directory contents (sync version for REPL)."""
+        return self._run_sync(self._registry.execute("list_dir", {"path": path}))
 
-    async def edit(self, path: str, edits: List[Dict[str, str]]) -> str:
-        """Edit a file with multiple edits."""
-        return await self._registry.execute(
-            "edit_file",
-            {
-                "path": path,
-                "edits": edits,
-            },
-        )
+    async def list_async(self, path: str) -> str:
+        """List directory contents (async version)."""
+        return await self._registry.execute("list_dir", {"path": path})
+
+    def edit(self, path: str, edits: List[Dict[str, str]]) -> str:
+        """Edit a file with multiple edits (sync version for REPL)."""
+        return self._run_sync(self._registry.execute("edit_file", {"path": path, "edits": edits}))
+
+    async def edit_async(self, path: str, edits: List[Dict[str, str]]) -> str:
+        """Edit a file with multiple edits (async version)."""
+        return await self._registry.execute("edit_file", {"path": path, "edits": edits})
 
 
 class ShellToolsAPI:
-    """Shell execution tools"""
+    """Shell execution tools - sync version for REPL."""
 
     def __init__(self, registry: "ToolRegistry"):
         self._registry = registry
 
-    async def exec(self, command: str, timeout: int = 30) -> str:
-        """Execute a shell command."""
-        return await self._registry.execute(
-            "shell",
-            {
-                "command": command,
-                "timeout": timeout,
-            },
+    def _run_sync(self, coro):
+        """Run async coroutine synchronously."""
+        import asyncio
+
+        return asyncio.run(coro)
+
+    def exec(self, command: str, timeout: int = 30) -> str:
+        """Execute a shell command (sync version for REPL)."""
+        return self._run_sync(
+            self._registry.execute("shell", {"command": command, "timeout": timeout})
         )
 
-    async def run(self, command: str) -> str:
+    async def exec_async(self, command: str, timeout: int = 30) -> str:
+        """Execute a shell command (async version)."""
+        return await self._registry.execute("shell", {"command": command, "timeout": timeout})
+
+    def run(self, command: str) -> str:
         """Run a shell command (alias for exec)."""
-        return await self.exec(command)
+        return self.exec(command)
 
 
 class BrowserToolsAPI:
-    """Browser automation tools"""
+    """Browser automation tools - sync version for REPL."""
 
     def __init__(self, registry: "ToolRegistry"):
         self._registry = registry
 
-    async def open(self, url: str) -> str:
-        """Open URL in browser."""
-        return await self._registry.execute(
-            "browser_navigate",
-            {
-                "url": url,
-            },
+    def _run_sync(self, coro):
+        """Run async coroutine synchronously."""
+        import asyncio
+
+        return asyncio.run(coro)
+
+    def open(self, url: str) -> str:
+        """Open URL in browser (sync version for REPL)."""
+        return self._run_sync(self._registry.execute("browser_navigate", {"url": url}))
+
+    async def open_async(self, url: str) -> str:
+        """Open URL in browser (async version)."""
+        return await self._registry.execute("browser_navigate", {"url": url})
+
+    def click(self, selector: str) -> str:
+        """Click element (sync version for REPL)."""
+        return self._run_sync(self._registry.execute("browser_click", {"selector": selector}))
+
+    async def click_async(self, selector: str) -> str:
+        """Click element (async version)."""
+        return await self._registry.execute("browser_click", {"selector": selector})
+
+    def type_text(self, selector: str, text: str) -> str:
+        """Type text into element (sync version for REPL)."""
+        return self._run_sync(
+            self._registry.execute("browser_type", {"selector": selector, "text": text})
         )
 
-    async def click(self, selector: str) -> str:
-        """Click element."""
-        return await self._registry.execute(
-            "browser_click",
-            {
-                "selector": selector,
-            },
-        )
+    async def type_text_async(self, selector: str, text: str) -> str:
+        """Type text into element (async version)."""
+        return await self._registry.execute("browser_type", {"selector": selector, "text": text})
 
-    async def type_text(self, selector: str, text: str) -> str:
-        """Type text into element."""
-        return await self._registry.execute(
-            "browser_type",
-            {
-                "selector": selector,
-                "text": text,
-            },
-        )
+    def screenshot(self) -> str:
+        """Take screenshot (sync version for REPL)."""
+        return self._run_sync(self._registry.execute("browser_screenshot", {}))
 
-    async def screenshot(self) -> str:
-        """Take screenshot."""
+    async def screenshot_async(self) -> str:
+        """Take screenshot (async version)."""
         return await self._registry.execute("browser_screenshot", {})
 
 

@@ -49,6 +49,7 @@ dependencies = [
     "prompt-toolkit>=3.0.0",
     "json-repair>=0.30.0",
     "mcp>=1.0.0",
+    "RestrictedPython>=7.0",
     'apple-fm-sdk @ git+https://github.com/apple/python-apple-fm-sdk.git',
 ]
 

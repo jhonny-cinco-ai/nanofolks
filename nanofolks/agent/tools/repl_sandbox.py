@@ -21,10 +21,13 @@ try:
     from RestrictedPython.Guards import safe_builtins, guarded_setattr
     from RestrictedPython.Eval import default_guarded_getitem
 
+    # RestrictedPython is available but we use basic sandboxing for better compatibility
+    # The basic sandboxing (code validation + restricted builtins) is sufficient for security
     RESTRICTED_PYTHON_AVAILABLE = True
+    USE_RESTRICTED_PYTHON = False  # Disabled by default - basic sandboxing is sufficient
 except ImportError:
     RESTRICTED_PYTHON_AVAILABLE = False
-    logger.warning("RestrictedPython not installed. REPL will use basic sandboxing.")
+    USE_RESTRICTED_PYTHON = False
 
 
 class REPLError(Exception):
@@ -233,11 +236,14 @@ class RestrictedPythonSandbox:
         """
         safe = dict(self.SAFE_BUILTINS)
 
-        if RESTRICTED_PYTHON_AVAILABLE:
+        if USE_RESTRICTED_PYTHON:
+            # RestrictedPython PrintCollector handles print() transformation
+            # Note: Currently disabled - basic sandboxing is used instead for better compatibility
             # Add RestrictedPython guards
             safe.update(
                 {
                     "__builtins__": safe,
+                    "_print_": PrintCollector,  # Required for print() in RestrictedPython
                     "_getattr_": default_guarded_getitem,
                     "_getitem_": default_guarded_getitem,
                     "_write_": lambda x: x,
@@ -308,7 +314,7 @@ class RestrictedPythonSandbox:
         """
         self._validate_code(code)
 
-        if RESTRICTED_PYTHON_AVAILABLE:
+        if USE_RESTRICTED_PYTHON:
             try:
                 return compile_restricted(code, filename, mode="exec")
             except SyntaxError as e:

@@ -1149,6 +1149,24 @@ Current conversation history:
     def _register_default_tools(self) -> None:
         """Register the default set of tools."""
         from nanofolks.agent.tools.factory import create_default_registry
+        from nanofolks.agent.tools.repl_api import create_api_instances
+        from nanofolks.agent.tools.repl_manager import REPLStateManager
+
+        # Create REPL state manager with API factory for room-scoped REPL environments
+        def repl_api_factory(room_id: str) -> dict:
+            return create_api_instances(
+                room_id=room_id,
+                tools_registry=self.tools,
+                bot_invoker=self.bot_invoker,
+                memory_store=self.memory_store,
+                session_manager=self.sessions,
+            )
+
+        self.repl_manager = REPLStateManager(
+            api_factory=repl_api_factory,
+            sandbox_timeout=90.0,
+            sandbox_max_output_chars=20000,
+        )
 
         # Use factory to create registry with all standard tools
         # This harmonizes toolsets for both @leader and specialist bots
@@ -1171,6 +1189,8 @@ Current conversation history:
             memory_store=self.memory_store,
             memory_retrieval=self.memory_retrieval,
             canceller=self.cancel_room_tasks,
+            repl_manager=self.repl_manager,
+            room_id=self._current_room_id,
         )
 
         # Register tools that need AgentLoop instance (circular dependency prevention in factory)
@@ -1318,6 +1338,11 @@ Current conversation history:
         """Set a stream callback for incremental output rendering."""
         self._stream_callback = callback
 
+    def emit_status(self, message: str) -> None:
+        """Emit a status/progress message (prefixed with ↳ for CLI UI)."""
+        if self._stream_callback:
+            self._stream_callback(f"↳ {message}...")
+
     async def _connect_mcp(self, bot_name: str = None, server_name: str = None) -> None:
         """Connect to configured MCP servers (lazy, incremental, discovery-aware).
 
@@ -1425,6 +1450,9 @@ Current conversation history:
             return self.model
 
         try:
+            # Emit status for CLI UI
+            self.emit_status("selecting best model for query")
+
             # Create routing context
             routing_ctx = RoutingContext(
                 message=msg,
@@ -1524,6 +1552,7 @@ Current conversation history:
                 if isinstance(self._current_room_type, RoomType)
                 else RoomType.OPEN,
                 participants=self._current_room_participants or ["leader"],
+                clear_existing=True,  # Clear previous turn's thinking log
             )
             we_started_session = True
 
@@ -1623,6 +1652,10 @@ Current conversation history:
 
         if not hasattr(self, "_orchestrator") or self._orchestrator is None:
             self._orchestrator = OrchestratorPipeline(self)
+
+        # Emit status for long-running classification/routing
+        self.emit_status("identifying request goal")
+
         orchestrated = await self._orchestrator.handle(msg, session)
         if orchestrated is not None:
             return orchestrated
@@ -2044,6 +2077,10 @@ Current conversation history:
                         result = await self.tools.execute(tool_call.name, tool_call.arguments)
                         tool_duration_ms = int((time.time() - tool_start_time) * 1000)
 
+                        # Check for fallback signals to update UI spinner
+                        if "Fallback" in result or "DuckDuckGo" in result:
+                            self.emit_status("retrying with search fallback")
+
                         # Show tool completion progress
                         if self._stream_callback:
                             if tool_call.name == "sidekick":
@@ -2096,13 +2133,25 @@ Current conversation history:
                     # Capture the reflection and continue the loop to get final answer
                     messages.append({"role": "assistant", "content": response.content})
                     # Add a nudge to encourage final answer based on reflection
-                    messages.append({"role": "user", "content": "Now, based on your reflection above, provide the final response to the user."})
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": "Now, based on your reflection above, provide the final response to the user.",
+                        }
+                    )
                     pending_reflection = False
                     logger.debug("CoT: reflection received, forcing one more turn for final answer")
                     continue
                 else:
                     # No tool calls and not in reflection, we're done
                     final_content = response.content
+
+                    # If we didn't stream this iteration (e.g. because it's > 1), stream the final answer now
+                    if self._stream_callback and (iteration > 1 or not use_streaming):
+                        clean_final = self._strip_think(final_content)
+                        if clean_final:
+                            await self._safe_stream(clean_final)
+
                     break
 
         if final_content is None:
@@ -2110,6 +2159,10 @@ Current conversation history:
                 final_content = f"Reached {self.max_iterations} iterations without completion."
             else:
                 final_content = "I've completed processing but have no response to give."
+
+            # Ensure edge-case messages are also streamed
+            if self._stream_callback:
+                await self._safe_stream(final_content)
 
         # Log response completion
         preview = final_content[:120] + "..." if len(final_content) > 120 else final_content

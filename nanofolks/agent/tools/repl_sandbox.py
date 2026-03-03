@@ -402,8 +402,12 @@ class RestrictedPythonSandbox:
         """
         timeout = timeout or self.timeout
 
+        # Check if code contains async/await - if so, run in async mode
+        if "await " in code or "async def" in code:
+            return await self._execute_async_code(code, globals_dict, timeout)
+
+        # Otherwise, run synchronously in executor
         try:
-            # Run in executor to avoid blocking event loop
             loop = asyncio.get_event_loop()
             result = await asyncio.wait_for(
                 loop.run_in_executor(
@@ -422,6 +426,64 @@ class RestrictedPythonSandbox:
         except Exception as e:
             logger.error(f"REPL execution error: {e}")
             raise
+
+    async def _execute_async_code(
+        self,
+        code: str,
+        globals_dict: Optional[Dict[str, Any]] = None,
+        timeout: float = 90.0,
+    ) -> str:
+        """Execute async Python code in a new event loop."""
+        if globals_dict is None:
+            globals_dict = {}
+
+        if "__builtins__" not in globals_dict:
+            globals_dict["__builtins__"] = self._create_safe_builtins()
+
+        stdout_capture = io.StringIO()
+        stderr_capture = io.StringIO()
+
+        try:
+            # Create a new event loop for async execution
+            import asyncio
+            from contextlib import redirect_stdout, redirect_stderr
+
+            async def run_async_code():
+                # Compile and execute the async code
+                compiled = compile(code, "<repl>", "exec")
+                async_globals = {
+                    **globals_dict,
+                    "__name__": "__repl__",
+                }
+                exec(compiled, async_globals)
+                return async_globals
+
+            with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                result = await asyncio.wait_for(
+                    run_async_code(),
+                    timeout=timeout,
+                )
+                # Update globals with any new variables
+                globals_dict.update(result)
+
+            output = stdout_capture.getvalue()
+            stderr_output = stderr_capture.getvalue()
+
+            if stderr_output:
+                output += f"\n[stderr]: {stderr_output}"
+
+            if len(output) > self.max_output_chars:
+                output = output[: self.max_output_chars]
+                output += f"\n... (truncated, {self.max_output_chars} chars limit)"
+
+            return output if output.strip() else "OK"
+
+        except asyncio.TimeoutError:
+            raise REPLTimeoutError(f"Execution timed out after {timeout} seconds")
+        except REPLError:
+            raise
+        except Exception as e:
+            return f"Error: {type(e).__name__}: {str(e)}"
 
 
 # Convenience function for quick testing

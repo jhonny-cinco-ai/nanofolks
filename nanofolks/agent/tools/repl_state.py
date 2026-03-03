@@ -292,3 +292,86 @@ class REPLState:
             f"calls={self.call_count}, "
             f"variables={len(self.list_variables())})"
         )
+
+    def save_snapshot(self) -> Dict[str, Any]:
+        """
+        Save a snapshot of the current REPL state.
+
+        This can be used to restore state later or share state between contexts.
+
+        Returns:
+            Dict containing the snapshot data
+        """
+        snapshot = {
+            "room_id": self.room_id,
+            "variables": {
+                k: v
+                for k, v in self.globals.items()
+                if k not in self._api_keys and not k.startswith("_")
+            },
+            "call_count": self.call_count,
+            "created_at": self.created_at.isoformat(),
+            "snapshot_created_at": datetime.now().isoformat(),
+        }
+        logger.info(
+            f"Saved REPL snapshot for room {self.room_id}: {len(snapshot['variables'])} variables"
+        )
+        return snapshot
+
+    def restore_snapshot(self, snapshot: Dict[str, Any]) -> bool:
+        """
+        Restore REPL state from a snapshot.
+
+        Args:
+            snapshot: Snapshot data from save_snapshot()
+
+        Returns:
+            True if restore successful, False otherwise
+        """
+        try:
+            if snapshot.get("room_id") != self.room_id:
+                logger.warning(
+                    f"Snapshot room_id mismatch: {snapshot.get('room_id')} != {self.room_id}"
+                )
+                return False
+
+            variables = snapshot.get("variables", {})
+            for key, value in variables.items():
+                self.globals[key] = value
+
+            logger.info(
+                f"Restored REPL snapshot for room {self.room_id}: {len(variables)} variables"
+            )
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to restore REPL snapshot: {e}")
+            return False
+
+    def get_namespaced_variables(self, prefix: str) -> Dict[str, Any]:
+        """
+        Get variables with a specific prefix (for sub-agent isolation).
+
+        Args:
+            prefix: Variable prefix to filter by
+
+        Returns:
+            Dict of namespaced variables
+        """
+        return {
+            k: v
+            for k, v in self.globals.items()
+            if k.startswith(prefix) and k not in self._api_keys
+        }
+
+    def set_namespaced_variables(self, prefix: str, variables: Dict[str, Any]) -> None:
+        """
+        Set multiple variables with a specific prefix (for sub-agent isolation).
+
+        Args:
+            prefix: Variable prefix
+            variables: Dict of variables to set
+        """
+        for key, value in variables.items():
+            self.globals[f"{prefix}{key}"] = value
+        logger.debug(f"Set {len(variables)} namespaced variables with prefix '{prefix}'")

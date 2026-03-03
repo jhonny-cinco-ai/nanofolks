@@ -79,6 +79,9 @@ class REPLState:
         self._history: List[REPLExecutionResult] = []
         self._max_history = 50
 
+        # Track API instance keys (for reset)
+        self._api_keys: set = set()
+
         # Persistent globals (survive across calls)
         # These are shared by all channels in this room
         self.globals: Dict[str, Any] = {}
@@ -89,6 +92,7 @@ class REPLState:
         # Add API instances if provided
         if api_instances:
             self.globals.update(api_instances)
+            self._api_keys = set(api_instances.keys())
 
         logger.debug(f"REPL state initialized for room: {room_id}")
 
@@ -186,10 +190,8 @@ class REPLState:
         """
         logger.info(f"Resetting REPL state for room: {self.room_id}")
 
-        # Preserve API instances
-        api_instances = {
-            k: v for k, v in self.globals.items() if not k.startswith("_") and k != "__builtins__"
-        }
+        # Preserve only API instances
+        api_instances = {k: v for k, v in self.globals.items() if k in self._api_keys}
 
         # Reset globals
         self.globals = {}

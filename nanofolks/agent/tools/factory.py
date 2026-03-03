@@ -38,6 +38,8 @@ def create_bot_registry(
     memory_store: Optional[Any] = None,
     memory_retrieval: Optional[Any] = None,
     canceller: Optional[callable] = None,
+    repl_manager: Optional[Any] = None,
+    room_id: Optional[str] = None,
 ) -> ToolRegistry:
     """Create a tool registry for a specialist bot.
 
@@ -67,6 +69,8 @@ def create_bot_registry(
         memory_store: Memory store for context retrieval
         memory_retrieval: Memory retrieval system
         canceller: Callback to cancel room tasks
+        repl_manager: REPL state manager for REPL tool
+        room_id: Room ID for REPL tool
 
     Returns:
         Filtered ToolRegistry for the bot
@@ -99,6 +103,8 @@ def create_bot_registry(
             memory_store=memory_store,
             memory_retrieval=memory_retrieval,
             canceller=canceller,
+            repl_manager=repl_manager,
+            room_id=room_id,
         )
 
     # Create base registry and filter
@@ -121,6 +127,8 @@ def create_bot_registry(
         memory_store=memory_store,
         memory_retrieval=memory_retrieval,
         canceller=canceller,
+        repl_manager=repl_manager,
+        room_id=room_id,
     )
 
     return filter_registry(base, permissions)
@@ -145,6 +153,8 @@ def create_default_registry(
     memory_store: Optional[Any] = None,
     memory_retrieval: Optional[Any] = None,
     canceller: Optional[callable] = None,
+    repl_manager: Optional[Any] = None,
+    room_id: Optional[str] = None,
 ) -> ToolRegistry:
     """Create a default tool registry with all standard tools.
 
@@ -167,6 +177,8 @@ def create_default_registry(
         memory_store: Memory store for context retrieval
         memory_retrieval: Memory retrieval system
         canceller: Callback to cancel room tasks
+        repl_manager: REPL state manager for REPL tool
+        room_id: Room ID for REPL tool
 
     Returns:
         ToolRegistry with default tools
@@ -200,11 +212,13 @@ def create_default_registry(
         registry.register(EditFileTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
         registry.register(ListDirTool(allowed_paths=allowed_dirs, protected_paths=protected_dirs))
 
-        registry.register(ExecTool(
-            working_dir=str(workspace),
-            timeout=exec_config.timeout if exec_config else 60,
-            allowed_paths=allowed_paths,
-        ))
+        registry.register(
+            ExecTool(
+                working_dir=str(workspace),
+                timeout=exec_config.timeout if exec_config else 60,
+                allowed_paths=allowed_paths,
+            )
+        )
     else:
         allowed_dir = workspace if restrict_to_workspace else None
         registry.register(ReadFileTool(allowed_dir=allowed_dir, protected_paths=protected_dirs))
@@ -212,35 +226,43 @@ def create_default_registry(
         registry.register(EditFileTool(allowed_dir=allowed_dir, protected_paths=protected_dirs))
         registry.register(ListDirTool(allowed_dir=allowed_dir, protected_paths=protected_dirs))
 
-        registry.register(ExecTool(
-            working_dir=str(workspace),
-            timeout=exec_config.timeout if exec_config else 60,
-            restrict_to_workspace=restrict_to_workspace,
-        ))
+        registry.register(
+            ExecTool(
+                working_dir=str(workspace),
+                timeout=exec_config.timeout if exec_config else 60,
+                restrict_to_workspace=restrict_to_workspace,
+            )
+        )
 
     # Web tools
     registry.register(WebSearchTool(api_key=brave_api_key))
-    registry.register(WebFetchTool(
-        scrapling_enabled=bool(getattr(web_config, "scrapling_enabled", False)),
-        scrapling_min_chars=int(getattr(web_config, "scrapling_min_chars", 800)),
-        scrapling_mode=str(getattr(web_config, "scrapling_mode", "auto")),
-        content_store=content_store,
-    ))
+    registry.register(
+        WebFetchTool(
+            scrapling_enabled=bool(getattr(web_config, "scrapling_enabled", False)),
+            scrapling_min_chars=int(getattr(web_config, "scrapling_min_chars", 800)),
+            scrapling_mode=str(getattr(web_config, "scrapling_mode", "auto")),
+            content_store=content_store,
+        )
+    )
 
     # Markdown conversion
     from nanofolks.agent.tools.markdown_convert import MarkdownNewTool
+
     registry.register(MarkdownNewTool())
 
     # Content access tool
     from nanofolks.agent.tools.content import ReadFetchedContentTool
+
     registry.register(ReadFetchedContentTool(content_store=content_store))
 
     # Browser tool
     if getattr(browser_config, "enabled", False):
-        registry.register(AgentBrowserTool(
-            binary=getattr(browser_config, "binary", "agent-browser"),
-            allowlist=getattr(browser_config, "allowlist", []),
-        ))
+        registry.register(
+            AgentBrowserTool(
+                binary=getattr(browser_config, "binary", "agent-browser"),
+                allowlist=getattr(browser_config, "allowlist", []),
+            )
+        )
 
     # Message tool
     if bus:
@@ -249,6 +271,7 @@ def create_default_registry(
     # Invoke tool
     if invoker:
         from nanofolks.agent.tools.invoke import InvokeTool
+
         registry.register(InvokeTool(invoker=invoker))
 
     # Room task tool
@@ -267,15 +290,23 @@ def create_default_registry(
     # Memory tools
     if memory_store and memory_retrieval:
         from nanofolks.agent.tools.memory import create_memory_tools
+
         memory_tools = create_memory_tools(memory_store, memory_retrieval)
         for tool in memory_tools:
             registry.register(tool)
 
     # Security tools
     from nanofolks.agent.tools.security import create_security_tools
+
     security_tools = create_security_tools()
     for tool in security_tools:
         registry.register(tool)
+
+    # REPL tool (programmable Python environment)
+    if repl_manager and room_id:
+        from nanofolks.agent.tools.repl import REPLTool
+
+        registry.register(REPLTool(repl_manager=repl_manager, room_id=room_id))
 
     return registry
 
@@ -316,7 +347,7 @@ def get_tool_definitions_for_bot(
                     "function": {
                         **tool_def.get("function", {}),
                         "description": custom_desc,
-                    }
+                    },
                 }
             filtered.append(tool_def)
 

@@ -1596,8 +1596,39 @@ def chat(
 
     async def _warmup_local_model():
         if agent_loop.routing_stage and hasattr(agent_loop.routing_stage, "warmup"):
-            with console.status("[dim]Warming up local model...[/dim]", spinner="dots"):
-                await agent_loop.routing_stage.warmup()
+            import asyncio
+
+            messages = [
+                "[dim]Warming up local model... So your first message gets a fast reply[/dim]",
+                "[dim]Loading on-device AI... Private conversations from the start[/dim]",
+                "[dim]Preparing smart routing... Your requests reach the right expert instantly[/dim]",
+                "[dim]Initializing local processing... No cloud delays, no data leaving your device[/dim]",
+                "[dim]Activating intelligent assistant... Fast, private, and ready to help[/dim]",
+            ]
+
+            message_index = 0
+            stop_updating = False
+
+            async def update_status(status_obj):
+                nonlocal message_index
+                while not stop_updating:
+                    await asyncio.sleep(2.5)
+                    if not stop_updating:
+                        message_index = (message_index + 1) % len(messages)
+                        status_obj.update(messages[message_index])
+
+            with console.status(messages[0], spinner="dots") as status:
+                update_task = asyncio.create_task(update_status(status))
+                try:
+                    await agent_loop.routing_stage.warmup()
+                finally:
+                    stop_updating = True
+                    update_task.cancel()
+                    try:
+                        await update_task
+                    except asyncio.CancelledError:
+                        pass
+
             console.print("[green]✓ Local model ready![/green]")
 
     async def _send_cli(_msg: MessageEnvelope) -> None:

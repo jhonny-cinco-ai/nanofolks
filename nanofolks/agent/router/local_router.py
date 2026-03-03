@@ -72,6 +72,21 @@ class LocalRouter:
             self._available = False
             logger.warning(f"Failed to initialize Apple Foundation Model: {e}")
 
+    async def warmup(self) -> None:
+        """Pre-warm the local model to eliminate cold start delay on first use."""
+        if not self.is_available():
+            return
+
+        try:
+            import apple_fm_sdk as fm
+
+            prompt = LOCAL_UNIFIED_PROMPT.format(content="hello")
+            session = fm.LanguageModelSession()
+            response = await session.respond(prompt)
+            logger.info("Local model warmed up and ready")
+        except Exception as e:
+            logger.warning(f"Failed to warm up local model: {e}")
+
     async def classify_unified(
         self,
         content: str,
@@ -97,7 +112,7 @@ class LocalRouter:
             logger.debug(f"Local unified classification raw response: {response}")
 
             result = self._parse_json_robust(response)
-            
+
             # 1. Parse Intent
             raw_intent = result.get("intent")
             valid_intents = ["build", "explore", "advice", "research", "task", "chat"]
@@ -140,7 +155,7 @@ class LocalRouter:
                 "confidence": result.get("confidence", 0.7),
                 "reasoning": result.get("reasoning", "Unified local classification"),
                 "needs_tools": cleaned_tier not in ["SIMPLE"],
-                "model": "apple-on-device"
+                "model": "apple-on-device",
             }
 
             self._last_content = content
@@ -174,7 +189,7 @@ class LocalRouter:
             result = json.loads(content)
             if not isinstance(result, dict):
                 return {}
-            
+
             # Clean keys
             return {k.strip().strip('"').strip("'"): v for k, v in result.items()}
         except Exception:
@@ -199,10 +214,7 @@ class LocalRouter:
             reasoning=unified["reasoning"],
             estimated_tokens=self._estimate_tokens(content),
             needs_tools=unified["needs_tools"],
-            metadata={
-                "local_model": "apple-foundation",
-                "unified": True
-            },
+            metadata={"local_model": "apple-foundation", "unified": True},
         )
 
     def _fallback_parse(self, response: str) -> dict[str, Any]:

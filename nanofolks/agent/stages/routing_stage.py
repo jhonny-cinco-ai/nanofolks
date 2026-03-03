@@ -118,6 +118,9 @@ class RoutingStage:
                     "Local model routing enabled but Apple Foundation Model not available"
                 )
 
+        # Warmup flag to ensure model is loaded only once
+        self._warmed_up = False
+
         # Sticky router (combines both layers)
         self.sticky_router = StickyRouter(
             client_classifier=self.client_classifier,
@@ -178,6 +181,16 @@ class RoutingStage:
             self._run_calibration()
 
         return ctx
+
+    async def warmup(self) -> None:
+        """Pre-warm the local model to eliminate cold start delay on first intent detection."""
+        if self._warmed_up:
+            return
+
+        if self.local_router and self.local_router.is_available():
+            logger.info("Warming up local model for intent detection...")
+            await self.local_router.warmup()
+            self._warmed_up = True
 
     def _record_for_calibration(
         self,

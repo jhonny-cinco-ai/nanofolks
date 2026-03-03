@@ -247,6 +247,7 @@ def _print_agent_response(
     if bot_name == "leader" or bot_name == "Assistant":
         try:
             from nanofolks.bots.appearance_config import get_appearance_config
+
             appearance = get_appearance_config().get_bot_appearance("leader")
             if appearance.get("display_name"):
                 display_name = appearance["display_name"]
@@ -402,10 +403,10 @@ async def _show_thinking_logs(
     if not log:
         # Fallback to last log if session just ended
         log = manager.get_last_log()
-    
+
     if not log:
         return None
-        
+
     # Create the thinking display
     display = ThinkingDisplay(log, bot_name=bot_name)
 
@@ -711,6 +712,8 @@ def configure():
         from nanofolks.cli.configure import configure_cli
     configure_cli()
 
+    config = load_config()
+    workspace = Path(config.agents.defaults.workspace).expanduser().resolve()
     memory_dir = workspace / "memory"
     memory_dir.mkdir(exist_ok=True)
     memory_file = memory_dir / "MEMORY.md"
@@ -1591,6 +1594,12 @@ def chat(
         document_config=config.tools.documents,
     )
 
+    async def _warmup_local_model():
+        if agent_loop.routing_stage and hasattr(agent_loop.routing_stage, "warmup"):
+            console.print("[dim]Warming up local model...[/dim]")
+            await agent_loop.routing_stage.warmup()
+            console.print("[green]Local model ready![/green]")
+
     async def _send_cli(_msg: MessageEnvelope) -> None:
         # Rendering is handled after receiving the final response.
         return None
@@ -1655,6 +1664,7 @@ def chat(
         nonlocal status_obj
         if logs:
             from contextlib import nullcontext
+
             return nullcontext()
         # Animated spinner is safe to use with prompt_toolkit input handling
         loader_text = _get_loader_text()
@@ -1669,29 +1679,38 @@ def chat(
     newline_needed = False
 
     def _stream_chunk(chunk: str):
-        nonlocal streaming_content, tool_progress, activity_line, header_printed, newline_needed, status_obj
+        nonlocal \
+            streaming_content, \
+            tool_progress, \
+            activity_line, \
+            header_printed, \
+            newline_needed, \
+            status_obj
         # Check if this is a tool progress message (starts with ↳)
         if chunk.startswith("↳ "):
             # If we were streaming content, we need a newline before showing tool progress
             if newline_needed:
                 console.print()
                 newline_needed = False
-                
+
             tool_progress.append(chunk)
-            current_activity = chunk.replace('↳ ', '')
-            activity_line = f"Activity: {current_activity}"
-            
+            current_activity = chunk.replace("↳ ", "").replace("...", "")
+            display_name = agent_loop.bot_name or "Assistant"
+            activity_line = f"{display_name} is {current_activity.lower()}..."
+
             # Update the spinner if active
             if status_obj:
                 status_obj.update(status=f"[dim]{activity_line}[/dim]")
-            
-            # Show tool progress with distinctive styling
-            if "..." in chunk:
-                # Tool is running (single-line activity strip)
-                _render_activity_line(activity_line, final=False)
+
+                # If tool completed, print it but skip rendering ongoing activity line to avoid clashing with spinner
+                if "..." not in chunk:
+                    _render_activity_line(activity_line.replace("...", "done"), final=True)
             else:
-                # Tool completed
-                _render_activity_line(activity_line.replace("...", "done"), final=True)
+                # No spinner, use manual activity line rendering
+                if "..." in chunk:
+                    _render_activity_line(activity_line, final=False)
+                else:
+                    _render_activity_line(activity_line.replace("...", "done"), final=True)
         else:
             # Regular content chunk - show in real-time
             # Print header on first content chunk
@@ -1702,15 +1721,16 @@ def chat(
                 if display_name == "leader" or display_name == "Assistant":
                     try:
                         from nanofolks.bots.appearance_config import get_appearance_config
+
                         appearance = get_appearance_config().get_bot_appearance("leader")
                         if appearance.get("display_name"):
                             display_name = appearance["display_name"]
                     except Exception:
                         pass
-                
+
                 emoji_prefix = _get_team_emoji(workspace_path=config.workspace_path) or "🏴"
                 console.print(f"\n{emoji_prefix} {display_name}:", end=" ", highlight=False)
-            
+
             streaming_content += chunk
             newline_needed = True
             # Show content directly (not just preview)
@@ -1749,6 +1769,7 @@ def chat(
     if message:
         # Single message mode
         async def run_once():
+            await _warmup_local_model()
             try:
                 agent_task = asyncio.create_task(agent_loop.run())
                 with _thinking_ctx():
@@ -1834,18 +1855,25 @@ def chat(
                 console.print(f"  {emoji} {name} - {title} - {role}")
 
         console.print("\n[dim]Type /help for commands.[/dim]")
-        
+
         # Check onboarding status for conditional greeting
         try:
             from nanofolks.agent.chat_onboarding import ChatOnboarding
-            onboarding = ChatOnboarding(workspace_path=config.workspace_path, team_manager=team_manager)
+
+            onboarding = ChatOnboarding(
+                workspace_path=config.workspace_path, team_manager=team_manager
+            )
             onboarding.load_from_user_md()
-            
+
             if onboarding.check_if_needed():
                 if onboarding.has_any_answers():
-                    console.print(f"\n[bold yellow]👉 Welcome back! Just say hi to {leader_name} to continue.[/bold yellow]\n")
+                    console.print(
+                        f"\n[bold yellow]👉 Welcome back! Just say hi to {leader_name} to continue.[/bold yellow]\n"
+                    )
                 else:
-                    console.print(f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n")
+                    console.print(
+                        f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n"
+                    )
         except Exception as e:
             # Fallback to default if check fails
             console.print(f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n")
@@ -1943,6 +1971,7 @@ def chat(
                     layout_manager = None
                     sidebar_manager = None
 
+            await _warmup_local_model()
             agent_task = asyncio.create_task(agent_loop.run())
 
             # Wait a moment for agent loop to initialize, then send greeting
@@ -2562,7 +2591,7 @@ def how_did_you_decide(
     for i, (room_id, entry) in enumerate(matches[:limit], 1):
         if i > 1:
             console.print("-" * 40, style="dim")
-        
+
         icon = _get_work_log_icon(entry.level)
         if show_details:
             console.print(f"[dim]{room_id}[/dim] - Step {entry.step} - {entry.category}")

@@ -1838,77 +1838,6 @@ def chat(
         # Interactive mode
         _init_prompt_session()
 
-        # Get team manager for team-styled names (with workspace path for correct team detection)
-        from nanofolks.bots.room_manager import get_room_manager
-        from nanofolks.teams import TeamManager
-
-        team_manager = TeamManager(workspace_path=config.workspace_path)
-        room_manager_local = get_room_manager()
-
-        # Ensure current_room and room_manager are available
-        assert current_room is not None, "current_room should not be None"
-        assert room_manager_local is not None, "room_manager should not be None"
-
-        # Display friendly welcome UI
-        console.print("\n[bold green]Welcome to Nanofolks![/bold green] 🎉\n")
-
-        # Get leader info (use actual bot name from team profile)
-        leader_profile = team_manager.get_bot_team_profile("leader")
-        if leader_profile and leader_profile.bot_name:
-            leader_name = leader_profile.bot_name
-            leader_emoji = leader_profile.emoji or "🏴‍☠️"
-        else:
-            leader_name = "Captain"
-            leader_emoji = "🏴‍☠️"
-
-        console.print(
-            f"You're in Room [bold cyan]#{current_room.id}[/bold cyan] with {leader_emoji} {leader_name}, your Captain."
-        )
-        console.print("He's ready to help and can bring in specialists when needed.\n")
-
-        console.print("[dim]Available team:[/dim]")
-
-        # Show available bots with their names
-        available_bots = [
-            ("researcher", "🧭"),
-            ("coder", "🔫"),
-            ("creative", "🎨"),
-            ("social", "👀"),
-            ("auditor", "⚖"),
-        ]
-
-        for bot_role, emoji in available_bots:
-            profile = team_manager.get_bot_team_profile(bot_role)
-            if profile:
-                name = profile.bot_name or profile.bot_title or bot_role
-                title = profile.bot_title or bot_role.capitalize()
-                role = bot_role.capitalize()
-                console.print(f"  {emoji} {name} - {title} - {role}")
-
-        console.print("\n[dim]Type /help for commands.[/dim]")
-
-        # Check onboarding status for conditional greeting
-        try:
-            from nanofolks.agent.chat_onboarding import ChatOnboarding
-
-            onboarding = ChatOnboarding(
-                workspace_path=config.workspace_path, team_manager=team_manager
-            )
-            onboarding.load_from_user_md()
-
-            if onboarding.check_if_needed():
-                if onboarding.has_any_answers():
-                    console.print(
-                        f"\n[bold yellow]👉 Welcome back! Just say hi to {leader_name} to continue.[/bold yellow]\n"
-                    )
-                else:
-                    console.print(
-                        f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n"
-                    )
-        except Exception as e:
-            # Fallback to default if check fails
-            console.print(f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n")
-
         def _exit_on_sigint(signum, frame):
             _restore_terminal()
             console.print("\nGoodbye!")
@@ -1970,7 +1899,12 @@ def chat(
                 logger.debug(f"Could not initialize onboarding: {e}")
 
         async def run_interactive():
-            nonlocal current_room, room_manager_local, room  # Allow updating current_room, accessing room, and updating room
+            nonlocal current_room, room  # Allow updating current_room and accessing room
+
+            # Get room manager early (needed for layout and welcome)
+            from nanofolks.bots.room_manager import get_room_manager
+
+            room_manager_local = get_room_manager()
 
             # Phase 3: Initialize advanced layout
             layout_manager = None
@@ -2003,6 +1937,73 @@ def chat(
                     sidebar_manager = None
 
             await _warmup_local_model()
+
+            # Display friendly welcome UI (after warmup)
+            from nanofolks.teams import TeamManager
+
+            team_manager = TeamManager(workspace_path=config.workspace_path)
+
+            console.print("\n[bold green]Welcome to Nanofolks![/bold green] 🎉\n")
+
+            # Get leader info (use actual bot name from team profile)
+            leader_profile = team_manager.get_bot_team_profile("leader")
+            if leader_profile and leader_profile.bot_name:
+                leader_name = leader_profile.bot_name
+                leader_emoji = leader_profile.emoji or "🏴‍☠️"
+            else:
+                leader_name = "Captain"
+                leader_emoji = "🏴‍☠️"
+
+            console.print(
+                f"You're in Room [bold cyan]#{current_room.id}[/bold cyan] with {leader_emoji} {leader_name}, your Captain."
+            )
+            console.print("He's ready to help and can bring in specialists when needed.\n")
+
+            console.print("[dim]Available team:[/dim]")
+
+            # Show available bots with their names
+            available_bots = [
+                ("researcher", "🧭"),
+                ("coder", "🔫"),
+                ("creative", "🎨"),
+                ("social", "👀"),
+                ("auditor", "⚖"),
+            ]
+
+            for bot_role, emoji in available_bots:
+                profile = team_manager.get_bot_team_profile(bot_role)
+                if profile:
+                    name = profile.bot_name or profile.bot_title or bot_role
+                    title = profile.bot_title or bot_role.capitalize()
+                    role = bot_role.capitalize()
+                    console.print(f"  {emoji} {name} - {title} - {role}")
+
+            console.print("\n[dim]Type /help for commands.[/dim]")
+
+            # Check onboarding status for conditional greeting
+            try:
+                from nanofolks.agent.chat_onboarding import ChatOnboarding
+
+                onboarding = ChatOnboarding(
+                    workspace_path=config.workspace_path, team_manager=team_manager
+                )
+                onboarding.load_from_user_md()
+
+                if onboarding.check_if_needed():
+                    if onboarding.has_any_answers():
+                        console.print(
+                            f"\n[bold yellow]👉 Welcome back! Just say hi to {leader_name} to continue.[/bold yellow]\n"
+                        )
+                    else:
+                        console.print(
+                            f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n"
+                        )
+            except Exception as e:
+                # Fallback to default if check fails
+                console.print(
+                    f"\n[bold yellow]👉 Start by saying hi to {leader_name}![/bold yellow]\n"
+                )
+
             agent_task = asyncio.create_task(agent_loop.run())
 
             # Wait a moment for agent loop to initialize, then send greeting

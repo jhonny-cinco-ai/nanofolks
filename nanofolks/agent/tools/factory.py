@@ -303,7 +303,7 @@ def create_default_registry(
         registry.register(tool)
 
     # REPL tool (programmable Python environment)
-    if repl_manager and room_id:
+    if repl_manager is not None and room_id:
         from nanofolks.agent.tools.repl import REPLTool
 
         registry.register(REPLTool(repl_manager=repl_manager, room_id=room_id))

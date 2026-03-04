@@ -94,6 +94,7 @@ class BotInvoker:
         system_timezone: str = "UTC",
         memory_retrieval: Any = None,
         canceller: Optional[callable] = None,
+        repl_manager: Any = None,
     ):
         self.provider = provider
         self.workspace = workspace
@@ -117,6 +118,7 @@ class BotInvoker:
         self._system_timezone = system_timezone
         self._memory_retrieval = memory_retrieval
         self._canceller = canceller
+        self._repl_manager = repl_manager
         self.routing_stage: RoutingStage | None = None
         if routing_config and routing_config.enabled:
             self.routing_stage = RoutingStage(
@@ -389,7 +391,9 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
         )
 
         await self.bus.publish_inbound(msg)
-        logger.debug(f"Invocation {invocation_id} announced result to {origin_channel}:{origin_chat_id}")
+        logger.debug(
+            f"Invocation {invocation_id} announced result to {origin_channel}:{origin_chat_id}"
+        )
 
         self._update_room_task(invocation_id, status, result)
 
@@ -415,8 +419,14 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
         except Exception as e:
             logger.warning(f"Failed to update room task for invocation {invocation_id}: {e}")
 
-    def _log_task_event(self, room_id: str, action: str, task: Any, reason: str | None = None,
-                        extra: dict[str, Any] | None = None) -> None:
+    def _log_task_event(
+        self,
+        room_id: str,
+        action: str,
+        task: Any,
+        reason: str | None = None,
+        extra: dict[str, Any] | None = None,
+    ) -> None:
         if not self._memory_store:
             return
         try:
@@ -439,10 +449,7 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
             if extra:
                 metadata.update(extra)
 
-            content = (
-                f"Task {action}: {task.title} "
-                f"(owner: {task.owner}, status: {task.status})"
-            )
+            content = f"Task {action}: {task.title} (owner: {task.owner}, status: {task.status})"
 
             event = Event(
                 id=str(uuid.uuid4()),
@@ -502,12 +509,12 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
             system_prompt = soul_content
         else:
             # Fallback to basic role
-            system_prompt = f"""You are @{bot_role} ({bot_info['bot_name']}), a specialist bot.
+            system_prompt = f"""You are @{bot_role} ({bot_info["bot_name"]}), a specialist bot.
 
-Domain: {bot_info['domain']}
-Role: {bot_info['description']}
+Domain: {bot_info["domain"]}
+Role: {bot_info["description"]}
 
-You are a specialist focused on {bot_info['domain']} tasks.
+You are a specialist focused on {bot_info["domain"]} tasks.
 Provide helpful, expert responses in your domain."""
 
         # Add task context
@@ -519,11 +526,15 @@ Focus only on your domain expertise and provide a helpful response.
 
         return system_prompt
 
-    def _create_bot_tool_registry(self, bot_role: str, allow_sidekicks: bool = True) -> "ToolRegistry":
+    def _create_bot_tool_registry(
+        self, bot_role: str, allow_sidekicks: bool = True, room_id: str | None = None
+    ) -> "ToolRegistry":
         """Create a tool registry for a bot based on permissions.
 
         Args:
             bot_role: Name of the bot
+            allow_sidekicks: Whether to allow sidekick tool
+            room_id: Room ID for REPL tool
 
         Returns:
             ToolRegistry configured for this bot
@@ -556,6 +567,8 @@ Focus only on your domain expertise and provide a helpful response.
             memory_store=self._memory_store,
             memory_retrieval=self._memory_retrieval,
             canceller=self._canceller,
+            repl_manager=self._repl_manager,
+            room_id=room_id,
         )
         if allow_sidekicks and self.sidekick_config.enabled:
             try:
@@ -592,7 +605,9 @@ Focus only on your domain expertise and provide a helpful response.
         """
 
         # Create tool registry for this bot
-        tool_registry = self._create_bot_tool_registry(bot_role, allow_sidekicks=allow_sidekicks)
+        tool_registry = self._create_bot_tool_registry(
+            bot_role, allow_sidekicks=allow_sidekicks, room_id=room_id
+        )
         tool_definitions = tool_registry.get_definitions()
         if room_id:
             room_task_tool = tool_registry.get("room_task")
@@ -623,7 +638,7 @@ Focus only on your domain expertise and provide a helpful response.
 
             # Get content and tool calls
             content = response.content or ""
-            tool_calls = getattr(response, 'tool_calls', None) or []
+            tool_calls = getattr(response, "tool_calls", None) or []
 
             # If no tool calls, return the response
             if not tool_calls:
@@ -637,6 +652,7 @@ Focus only on your domain expertise and provide a helpful response.
                 # Parse arguments (could be string or dict)
                 if isinstance(tool_args, str):
                     import json
+
                     try:
                         tool_args = json.loads(tool_args)
                     except json.JSONDecodeError:
@@ -647,29 +663,33 @@ Focus only on your domain expertise and provide a helpful response.
                 result = await tool_registry.execute(tool_name, tool_args)
 
                 # Add tool result to messages
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call.id,
-                    "name": tool_name,
-                    "content": result,
-                })
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "name": tool_name,
+                        "content": result,
+                    }
+                )
 
             # Add assistant message with tool calls
-            messages.append({
-                "role": "assistant",
-                "content": content,
-                "tool_calls": [
-                    {
-                        "id": tc.id,
-                        "type": "function",
-                        "function": {
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments,
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": content,
+                    "tool_calls": [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
                         }
-                    }
-                    for tc in tool_calls
-                ],
-            })
+                        for tc in tool_calls
+                    ],
+                }
+            )
 
         # Max iterations reached, return last content
         logger.warning(f"[{bot_role}] Max tool iterations ({max_iterations}) reached")
@@ -707,12 +727,12 @@ Focus only on your domain expertise and provide a helpful response.
         if soul_content:
             system_prompt = soul_content
         else:
-            system_prompt = f"""You are @{bot_role} ({bot_info['bot_name']}), a specialist bot.
+            system_prompt = f"""You are @{bot_role} ({bot_info["bot_name"]}), a specialist bot.
 
-Domain: {bot_info['domain']}
-Role: {bot_info['description']}
+Domain: {bot_info["domain"]}
+Role: {bot_info["description"]}
 
-You are a specialist focused on {bot_info['domain']} tasks.
+You are a specialist focused on {bot_info["domain"]} tasks.
 Provide helpful, expert responses in your domain."""
 
         system_prompt += """
@@ -930,12 +950,14 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
         profile = self._get_team_profile(bot_role)
         if profile:
             display_name = profile.bot_name or profile.bot_title or bot_role
-            base_info.update({
-                "bot_name": profile.bot_name or display_name,
-                "bot_title": profile.bot_title,
-                "emoji": profile.emoji,
-                "team_name": profile.team_name,
-            })
+            base_info.update(
+                {
+                    "bot_name": profile.bot_name or display_name,
+                    "bot_title": profile.bot_title,
+                    "emoji": profile.emoji,
+                    "team_name": profile.team_name,
+                }
+            )
 
         return base_info or None
 
@@ -955,7 +977,7 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
             self.work_log_manager.log_bot_message(
                 bot_role="leader",
                 message=f"Invoking @{bot_role} with task: {task[:200]}...",
-                mentions=[f"@{bot_role}"]
+                mentions=[f"@{bot_role}"],
             )
 
             # Log as a handoff (bot-to-bot transfer)
@@ -972,7 +994,7 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
                     "context_transferred": bool(context),
                     "requires_approval": False,
                 },
-                triggered_by="leader"
+                triggered_by="leader",
             )
         except Exception as e:
             logger.warning(f"Failed to log invocation request: {e}")
@@ -993,7 +1015,7 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
             self.work_log_manager.log_bot_message(
                 bot_role=bot_role,
                 message=f"Response to task: {task[:100]}...\n\n{response[:1000]}...",
-                mentions=[f"@{bot_role}"]
+                mentions=[f"@{bot_role}"],
             )
 
             # Log completion
@@ -1006,7 +1028,7 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
                     "task": task[:500],
                     "response_length": len(response),
                 },
-                triggered_by=f"@{bot_role}"
+                triggered_by=f"@{bot_role}",
             )
 
             self.work_log_manager.log(
@@ -1022,7 +1044,7 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
                     "status": "ok",
                     "response_length": len(response),
                 },
-                triggered_by=f"@{bot_role}"
+                triggered_by=f"@{bot_role}",
             )
         except Exception as e:
             logger.warning(f"Failed to log invocation response: {e}")
@@ -1048,7 +1070,7 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
                     "task": task[:500],
                     "error": error,
                 },
-                triggered_by="leader"
+                triggered_by="leader",
             )
 
             self.work_log_manager.log(
@@ -1064,7 +1086,7 @@ Be concise and practical. Do not mention sidekicks or internal IDs.
                     "status": "error",
                     "error": error,
                 },
-                triggered_by=f"@{bot_role}"
+                triggered_by=f"@{bot_role}",
             )
         except Exception as e:
             logger.warning(f"Failed to log invocation error: {e}")

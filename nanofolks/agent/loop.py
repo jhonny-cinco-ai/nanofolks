@@ -353,6 +353,15 @@ class AgentLoop:
         # Initialize work log manager for transparency
         self.work_log_manager = get_work_log_manager()
 
+        # Initialize REPL manager early (needed by BotInvoker for specialist bots)
+        from nanofolks.agent.tools.repl_manager import REPLStateManager
+
+        self.repl_manager = REPLStateManager(
+            api_factory=None,  # Will be set later in _register_default_tools
+            sandbox_timeout=90.0,
+            sandbox_max_output_chars=20000,
+        )
+
         # Initialize bot invoker for delegating to specialist bots
         from nanofolks.agent.bot_invoker import BotInvoker
 
@@ -380,6 +389,7 @@ class AgentLoop:
             system_timezone=self.system_timezone,
             memory_retrieval=self.memory_retrieval,
             canceller=self.cancel_room_tasks,
+            repl_manager=self.repl_manager,
         )
 
         # Initialize hybrid flow router for Phase 2 intent detection
@@ -1150,17 +1160,8 @@ Current conversation history:
         """Register the default set of tools."""
         from nanofolks.agent.tools.factory import create_default_registry
         from nanofolks.agent.tools.repl_api import create_api_instances
-        from nanofolks.agent.tools.repl_manager import REPLStateManager
 
-        # Create REPL state manager with API factory for room-scoped REPL environments
-        # Note: repl_manager is set after creation to avoid circular reference
-        self.repl_manager = REPLStateManager(
-            api_factory=None,  # Set below after manager is created
-            sandbox_timeout=90.0,
-            sandbox_max_output_chars=20000,
-        )
-
-        # Create API factory with reference to repl_manager
+        # Set API factory for REPL manager (created in __init__)
         def repl_api_factory(room_id: str) -> dict:
             return create_api_instances(
                 room_id=room_id,

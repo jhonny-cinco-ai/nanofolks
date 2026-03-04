@@ -445,6 +445,71 @@ This keeps multi-bot teamwork predictable and easy to debug, while still letting
 
 Bots can spawn short-lived sidekicks for focused sub-tasks. Sidekicks work with minimal context, return summaries to their parent bot, and never speak in the room directly. The parent bot merges results and responds in its own voice.
 
+### REPL Tool (Programmable Environment)
+
+The REPL (Read-Eval-Print Loop) tool gives bots a programmable Python environment for efficient multi-step operations.
+
+**How It Works:**
+
+Instead of making 10-15 separate tool calls, bots can execute complex workflows in a single LLM round-trip:
+
+```python
+# Multi-step research in ONE call
+from tools import web
+from memory import store
+
+# Search and scrape
+results = web.search("market trends 2026")
+data = web.scrape(results[0].url)
+
+# Store and analyze
+store("market_data", data)
+analysis = analyze_trends(data)
+
+print(f"Analysis: {analysis}")
+```
+
+**Benefits:**
+
+| Benefit | Description |
+|---------|-------------|
+| **70-80% fewer tool calls** | Multi-step operations in one call |
+| **State persistence** | Variables survive across operations |
+| **Programmatic composition** | Use loops, conditionals, functions |
+| **Room-scoped isolation** | Each room has its own environment |
+
+**Architecture:**
+
+- ✅ **Main Agent (@leader)** — Has REPL for orchestration
+- ✅ **Specialist Bots** — Have REPL for multi-step work (can talk directly to users)
+- ❌ **Sidekicks** — No REPL (stay lightweight for parallel execution)
+
+**Example:**
+
+```python
+# Specialist bot using REPL for research
+from tools import web, bots
+from memory import store
+
+# Quick research
+overview = web.search("project alpha")[0]
+html = web.scrape(overview.url)
+
+# Store findings
+store("project_research", html)
+
+# Coordinate with team
+results = bots.invoke_many([
+    ("analyst", "Analyze financials"),
+    ("researcher", "Check competitors"),
+])
+
+# Merge and report
+print(f"Research complete: {results}")
+```
+
+This makes specialists as efficient as the main agent when working directly with users.
+
 
 ## 🧠 Memory System
 

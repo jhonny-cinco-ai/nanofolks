@@ -2424,10 +2424,11 @@ def chat(
                             else None,
                         )
 
-                    # NEW: Show thinking logs after response
-                    thinking_display = await _show_thinking_logs(agent_loop)
-                    if thinking_display:
-                        await _handle_thinking_toggle(thinking_display)
+                    # NEW: Show thinking logs after response (skip interactive toggle when logs enabled)
+                    if not logs:
+                        thinking_display = await _show_thinking_logs(agent_loop)
+                        if thinking_display:
+                            await _handle_thinking_toggle(thinking_display)
                 except KeyboardInterrupt:
                     _restore_terminal()
                     console.print("\nGoodbye!")

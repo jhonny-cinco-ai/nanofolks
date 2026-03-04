@@ -86,7 +86,7 @@ class ThinkingDisplay:
         """Render single-line collapsed view.
 
         Output format:
-            💭 Thinking: <summary> [SPACE to expand]
+            💭 Thinking: <summary> [SPACE to expand, any key to continue]
 
         Returns:
             Collapsed view string
@@ -96,11 +96,11 @@ class ThinkingDisplay:
             text.append("💭 ", style="cyan")
             text.append("Thinking: ", style=self.COLORS["summary"])
             text.append(self.summary, style="white")
-            text.append(" [SPACE to expand]", style="dim")
+            text.append(" [SPACE to expand, any key to continue]", style="dim")
             # Return the rendered text as string for compatibility
             return str(text)
         else:
-            return f"💭 Thinking: {self.summary} [SPACE to expand]"
+            return f"💭 Thinking: {self.summary} [SPACE to expand, any key to continue]"
 
     def render_expanded(self) -> str:
         """Render multi-line expanded view.
@@ -186,8 +186,7 @@ class ThinkingDisplay:
         return 3 + len(self.details)
 
 
-def create_thinking_display(work_log: WorkLog,
-                           bot_name: Optional[str] = None) -> ThinkingDisplay:
+def create_thinking_display(work_log: WorkLog, bot_name: Optional[str] = None) -> ThinkingDisplay:
     """Factory function to create a thinking display.
 
     Args:

@@ -162,6 +162,7 @@ class AgentLoop:
         self.context = ContextBuilder(workspace)
 
         # Initialize session manager (dual-mode with room-centric support)
+        self.config = None
         if session_manager:
             self.sessions = session_manager
         else:
@@ -169,10 +170,10 @@ class AgentLoop:
             try:
                 from nanofolks.config.loader import load_config
 
-                config = load_config()
+                self.config = load_config()
             except Exception:
-                config = None
-            self.sessions = create_session_manager(workspace, config)
+                self.config = None
+            self.sessions = create_session_manager(workspace, self.config)
 
         self.tools = ToolRegistry()
 
@@ -390,6 +391,7 @@ class AgentLoop:
             memory_retrieval=self.memory_retrieval,
             canceller=self.cancel_room_tasks,
             repl_manager=self.repl_manager,
+            nto_config=getattr(self.config.tools, "nto", None) if self.config else None,
         )
 
         # Initialize hybrid flow router for Phase 2 intent detection

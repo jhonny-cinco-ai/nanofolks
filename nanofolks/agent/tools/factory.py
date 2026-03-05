@@ -40,6 +40,7 @@ def create_bot_registry(
     canceller: Optional[callable] = None,
     repl_manager: Optional[Any] = None,
     room_id: Optional[str] = None,
+    nto_config: Optional[Any] = None,
 ) -> ToolRegistry:
     """Create a tool registry for a specialist bot.
 
@@ -71,6 +72,7 @@ def create_bot_registry(
         canceller: Callback to cancel room tasks
         repl_manager: REPL state manager for REPL tool
         room_id: Room ID for REPL tool
+        nto_config: NTO configuration for token optimization
 
     Returns:
         Filtered ToolRegistry for the bot
@@ -105,6 +107,7 @@ def create_bot_registry(
             canceller=canceller,
             repl_manager=repl_manager,
             room_id=room_id,
+            nto_config=nto_config,
         )
 
     # Create base registry and filter
@@ -129,6 +132,7 @@ def create_bot_registry(
         canceller=canceller,
         repl_manager=repl_manager,
         room_id=room_id,
+        nto_config=nto_config,
     )
 
     return filter_registry(base, permissions)
@@ -155,6 +159,7 @@ def create_default_registry(
     canceller: Optional[callable] = None,
     repl_manager: Optional[Any] = None,
     room_id: Optional[str] = None,
+    nto_config: Optional[Any] = None,
 ) -> ToolRegistry:
     """Create a default tool registry with all standard tools.
 
@@ -179,6 +184,7 @@ def create_default_registry(
         canceller: Callback to cancel room tasks
         repl_manager: REPL state manager for REPL tool
         room_id: Room ID for REPL tool
+        nto_config: NTO configuration for token optimization
 
     Returns:
         ToolRegistry with default tools
@@ -235,13 +241,14 @@ def create_default_registry(
         )
 
     # Web tools
-    registry.register(WebSearchTool(api_key=brave_api_key))
+    registry.register(WebSearchTool(api_key=brave_api_key, nto_config=nto_config))
     registry.register(
         WebFetchTool(
             scrapling_enabled=bool(getattr(web_config, "scrapling_enabled", False)),
             scrapling_min_chars=int(getattr(web_config, "scrapling_min_chars", 800)),
             scrapling_mode=str(getattr(web_config, "scrapling_mode", "auto")),
             content_store=content_store,
+            nto_config=nto_config,
         )
     )
 
@@ -291,7 +298,7 @@ def create_default_registry(
     if memory_store and memory_retrieval:
         from nanofolks.agent.tools.memory import create_memory_tools
 
-        memory_tools = create_memory_tools(memory_store, memory_retrieval)
+        memory_tools = create_memory_tools(memory_store, memory_retrieval, nto_config=nto_config)
         for tool in memory_tools:
             registry.register(tool)
 

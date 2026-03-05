@@ -11,7 +11,7 @@ Tools provided:
 - recall: Retrieve context about a topic
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
 
@@ -23,8 +23,13 @@ from nanofolks.memory.store import TurboMemoryStore
 class MemorySearchTool(Tool):
     """Tool to search the memory system."""
 
-    def __init__(self, retrieval: MemoryRetrieval):
+    def __init__(self, retrieval: MemoryRetrieval, nto_config: Optional[Any] = None):
         self.retrieval = retrieval
+
+        # NTO integration
+        from nanofolks.agent.tools.nto import create_nto_wrapper
+
+        self.nto = create_nto_wrapper(nto_config)
 
     @property
     def name(self) -> str:
@@ -45,24 +50,24 @@ class MemorySearchTool(Tool):
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Search query (e.g., 'pricing information', 'John project')"
+                    "description": "Search query (e.g., 'pricing information', 'John project')",
                 },
                 "search_type": {
                     "type": "string",
                     "enum": ["semantic", "text", "hybrid"],
-                    "description": "Search type: semantic (embedding-based), text (keyword), or hybrid (both)"
+                    "description": "Search type: semantic (embedding-based), text (keyword), or hybrid (both)",
                 },
                 "limit": {
                     "type": "integer",
                     "description": "Maximum number of results to return",
-                    "default": 10
+                    "default": 10,
                 },
                 "channel": {
                     "type": "string",
-                    "description": "Optional: filter by specific channel (e.g., 'telegram', 'cli')"
-                }
+                    "description": "Optional: filter by specific channel (e.g., 'telegram', 'cli')",
+                },
             },
-            "required": ["query"]
+            "required": ["query"],
         }
 
     async def execute(
@@ -71,7 +76,8 @@ class MemorySearchTool(Tool):
         search_type: str = "hybrid",
         limit: int = 10,
         channel: str = None,
-        **kwargs
+        skip_compression: bool = False,
+        **kwargs,
     ) -> str:
         """Execute memory search."""
         try:
@@ -95,7 +101,29 @@ class MemorySearchTool(Tool):
                 for event in results["events"][:3]:
                     parts.append(f"  - {event.content[:80]}...")
 
-            return "\n".join(parts) if len(parts) > 1 else f"No results found for '{query}'."
+            output = "\n".join(parts) if len(parts) > 1 else f"No results found for '{query}'."
+
+            # Apply NTO compression if enabled
+            if not skip_compression and self.nto and self.nto.config.enabled:
+                # Convert to format expected by NTO
+                nto_results = []
+                if results["events"]:
+                    for event in results["events"][:limit]:
+                        nto_results.append(
+                            {
+                                "content": event.content,
+                                "score": getattr(event, "relevance_score", 0.5),
+                                "timestamp": getattr(event, "timestamp", None),
+                            }
+                        )
+
+                if nto_results:
+                    compressed = self.nto.compress_memory_results(
+                        nto_results, top_k=min(limit, self.nto.config.memory_top_k)
+                    )
+                    return compressed
+
+            return output
 
         except Exception as e:
             logger.error(f"Memory search failed: {e}")
@@ -127,28 +155,24 @@ class GetEntityTool(Tool):
             "properties": {
                 "name": {
                     "type": "string",
-                    "description": "Name of the entity (e.g., 'John Smith', 'Google', 'Python')"
+                    "description": "Name of the entity (e.g., 'John Smith', 'Google', 'Python')",
                 },
                 "include_facts": {
                     "type": "boolean",
                     "description": "Whether to include known facts about the entity",
-                    "default": True
+                    "default": True,
                 },
                 "include_relationships": {
                     "type": "boolean",
                     "description": "Whether to include relationships with other entities",
-                    "default": True
-                }
+                    "default": True,
+                },
             },
-            "required": ["name"]
+            "required": ["name"],
         }
 
     async def execute(
-        self,
-        name: str,
-        include_facts: bool = True,
-        include_relationships: bool = True,
-        **kwargs
+        self, name: str, include_facts: bool = True, include_relationships: bool = True, **kwargs
     ) -> str:
         """Execute entity lookup."""
         try:
@@ -213,27 +237,23 @@ class GetRelationshipsTool(Tool):
             "properties": {
                 "entity_name": {
                     "type": "string",
-                    "description": "Name of the entity to find relationships for"
+                    "description": "Name of the entity to find relationships for",
                 },
                 "relation_type": {
                     "type": "string",
-                    "description": "Optional: filter by relationship type (e.g., 'works_at', 'friend')"
+                    "description": "Optional: filter by relationship type (e.g., 'works_at', 'friend')",
                 },
                 "min_strength": {
                     "type": "number",
                     "description": "Minimum relationship strength (0.0-1.0)",
-                    "default": 0.5
-                }
+                    "default": 0.5,
+                },
             },
-            "required": ["entity_name"]
+            "required": ["entity_name"],
         }
 
     async def execute(
-        self,
-        entity_name: str,
-        relation_type: str = None,
-        min_strength: float = 0.5,
-        **kwargs
+        self, entity_name: str, relation_type: str = None, min_strength: float = 0.5, **kwargs
     ) -> str:
         """Execute relationship lookup."""
         try:
@@ -294,23 +314,18 @@ class RecallTool(Tool):
             "properties": {
                 "topic": {
                     "type": "string",
-                    "description": "Topic to recall information about (e.g., 'project deadline', 'vacation plans')"
+                    "description": "Topic to recall information about (e.g., 'project deadline', 'vacation plans')",
                 },
                 "limit": {
                     "type": "integer",
                     "description": "Maximum number of facts/events to include",
-                    "default": 5
-                }
+                    "default": 5,
+                },
             },
-            "required": ["topic"]
+            "required": ["topic"],
         }
 
-    async def execute(
-        self,
-        topic: str,
-        limit: int = 5,
-        **kwargs
-    ) -> str:
+    async def execute(self, topic: str, limit: int = 5, **kwargs) -> str:
         """Execute recall."""
         try:
             result = self.retrieval.recall(topic, limit=limit)
@@ -321,19 +336,22 @@ class RecallTool(Tool):
             return f"Error recalling information: {e}"
 
 
-def create_memory_tools(store: TurboMemoryStore, retrieval: MemoryRetrieval) -> list[Tool]:
+def create_memory_tools(
+    store: TurboMemoryStore, retrieval: MemoryRetrieval, nto_config: Optional[Any] = None
+) -> list[Tool]:
     """
     Create all memory tools for the agent.
 
     Args:
         store: TurboMemoryStore instance
         retrieval: MemoryRetrieval instance
+        nto_config: Optional NTO configuration for token optimization
 
     Returns:
         List of memory tools
     """
     return [
-        MemorySearchTool(retrieval),
+        MemorySearchTool(retrieval, nto_config=nto_config),
         GetEntityTool(retrieval),
         GetRelationshipsTool(retrieval),
         RecallTool(retrieval),

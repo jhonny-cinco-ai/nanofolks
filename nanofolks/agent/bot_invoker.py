@@ -95,6 +95,7 @@ class BotInvoker:
         memory_retrieval: Any = None,
         canceller: Optional[callable] = None,
         repl_manager: Any = None,
+        nto_config: Any = None,
     ):
         self.provider = provider
         self.workspace = workspace
@@ -126,6 +127,11 @@ class BotInvoker:
                 provider=provider,
                 workspace=workspace,
             )
+
+        # Initialize NTO (Nanofolks Token Optimizer)
+        from nanofolks.agent.tools.nto import create_nto_wrapper
+
+        self.nto = create_nto_wrapper(nto_config)
 
         # Initialize secret sanitizer
         self.sanitizer = SecretSanitizer()
@@ -317,6 +323,12 @@ class BotInvoker:
                 room_id=origin_room_id,
             )
             result = response or "Task completed but no response generated."
+
+            # Apply NTO compression if enabled
+            if self.nto and self.nto.config.enabled:
+                result = self.nto.compress_bot_response(
+                    result, max_tokens=self.nto.config.bot_max_response_tokens
+                )
 
             logger.info(f"Async invocation {invocation_id} completed")
 

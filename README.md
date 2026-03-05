@@ -510,6 +510,41 @@ print(f"Research complete: {results}")
 
 This makes specialists as efficient as the main agent when working directly with users.
 
+### Token Optimization (NTO)
+
+**NTO (Nanofolks Token Optimizer)** automatically reduces token consumption by 50-90% on common operations.
+
+**How It Works:**
+
+```
+Agent calls tool → Tool executes → NTO compresses → Agent receives compressed output
+```
+
+**Automatic compression** - no configuration needed!
+
+**Token Savings:**
+
+| Operation | Savings | Example |
+|-----------|---------|---------|
+| **Web Search** | 60-80% | 10 results → 5 results, truncated |
+| **Web Fetch** | 70-90% | Full HTML → Clean text |
+| **Bot Responses** | 50-70% | Long reports → Summaries |
+| **Memory Search** | 70-85% | 20 results → Top 5 |
+
+**Check your savings:**
+
+```bash
+nanofolks nto-stats
+```
+
+**Benefits:**
+- 💰 **Lower API costs** - 50-90% fewer tokens
+- ⚡ **Faster responses** - Smaller context
+- 🔧 **Zero config** - Works automatically
+- 🎛️ **Flexible** - Configurable compression levels
+
+See [NTO User Guide](docs/NTO_USER_GUIDE.md) for details.
+
 
 ## 🧠 Memory System
 

@@ -4,7 +4,7 @@ import html
 import json
 import os
 import re
-from typing import Any
+from typing import Any, Optional
 from urllib.parse import urlparse
 
 import httpx
@@ -19,23 +19,23 @@ MAX_REDIRECTS = 5  # Limit redirects to prevent DoS attacks
 
 def _strip_tags(text: str) -> str:
     """Remove HTML tags and decode entities."""
-    text = re.sub(r'<script[\s\S]*?</script>', '', text, flags=re.I)
-    text = re.sub(r'<style[\s\S]*?</style>', '', text, flags=re.I)
-    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r"<script[\s\S]*?</script>", "", text, flags=re.I)
+    text = re.sub(r"<style[\s\S]*?</style>", "", text, flags=re.I)
+    text = re.sub(r"<[^>]+>", "", text)
     return html.unescape(text).strip()
 
 
 def _normalize(text: str) -> str:
     """Normalize whitespace."""
-    text = re.sub(r'[ \t]+', ' ', text)
-    return re.sub(r'\n{3,}', '\n\n', text).strip()
+    text = re.sub(r"[ \t]+", " ", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _validate_url(url: str) -> tuple[bool, str]:
     """Validate URL: must be http(s) with valid domain."""
     try:
         p = urlparse(url)
-        if p.scheme not in ('http', 'https'):
+        if p.scheme not in ("http", "https"):
             return False, f"Only http/https allowed, got '{p.scheme or 'none'}'"
         if not p.netloc:
             return False, "Missing domain"
@@ -53,16 +53,28 @@ class WebSearchTool(Tool):
         "type": "object",
         "properties": {
             "query": {"type": "string", "description": "Search query"},
-            "count": {"type": "integer", "description": "Results (1-10)", "minimum": 1, "maximum": 10}
+            "count": {
+                "type": "integer",
+                "description": "Results (1-10)",
+                "minimum": 1,
+                "maximum": 10,
+            },
         },
-        "required": ["query"]
+        "required": ["query"],
     }
 
-    def __init__(self, api_key: str | None = None, max_results: int = 5):
+    def __init__(
+        self, api_key: str | None = None, max_results: int = 5, nto_config: Optional[Any] = None
+    ):
         # Accept symbolic reference like "{{brave_key}}" or actual key
         self._raw_api_key = api_key or os.environ.get("BRAVE_API_KEY", "")
         self.max_results = max_results
         self._secret_manager = get_secret_manager()
+
+        # NTO integration
+        from nanofolks.agent.tools.nto import create_nto_wrapper
+
+        self.nto = create_nto_wrapper(nto_config)
 
     @property
     def api_key(self) -> str:
@@ -72,7 +84,9 @@ class WebSearchTool(Tool):
 
         return self._secret_manager.resolve_for_execution(self._raw_api_key)
 
-    async def execute(self, query: str, count: int | None = None, **kwargs: Any) -> str:
+    async def execute(
+        self, query: str, count: int | None = None, skip_compression: bool = False, **kwargs: Any
+    ) -> str:
         if not self.api_key:
             return "Error: BRAVE_API_KEY not configured"
 
@@ -83,7 +97,7 @@ class WebSearchTool(Tool):
                     "https://api.search.brave.com/res/v1/web/search",
                     params={"q": query, "count": n},
                     headers={"Accept": "application/json", "X-Subscription-Token": self.api_key},
-                    timeout=10.0
+                    timeout=10.0,
                 )
                 r.raise_for_status()
 
@@ -91,6 +105,20 @@ class WebSearchTool(Tool):
             if not results:
                 return f"No results for: {query}"
 
+            # Apply NTO compression if enabled
+            if not skip_compression and self.nto and self.nto.config.enabled:
+                # Convert to format expected by NTO
+                nto_results = [
+                    {
+                        "title": item.get("title", ""),
+                        "url": item.get("url", ""),
+                        "snippet": item.get("description", ""),
+                    }
+                    for item in results[:n]
+                ]
+                return self.nto.compress_web_results(nto_results)
+
+            # Original format (no compression)
             lines = [f"Results for: {query}\n"]
             for i, item in enumerate(results[:n], 1):
                 lines.append(f"{i}. {item.get('title', '')}\n   {item.get('url', '')}")
@@ -111,9 +139,9 @@ class WebFetchTool(Tool):
         "properties": {
             "url": {"type": "string", "description": "URL to fetch"},
             "extractMode": {"type": "string", "enum": ["markdown", "text"], "default": "markdown"},
-            "maxChars": {"type": "integer", "minimum": 100}
+            "maxChars": {"type": "integer", "minimum": 100},
         },
-        "required": ["url"]
+        "required": ["url"],
     }
 
     def __init__(
@@ -123,6 +151,7 @@ class WebFetchTool(Tool):
         scrapling_min_chars: int = 800,
         scrapling_mode: str = "auto",
         content_store=None,
+        nto_config: Optional[Any] = None,
     ):
         self.max_chars = max_chars
         self.scrapling_enabled = scrapling_enabled
@@ -130,7 +159,19 @@ class WebFetchTool(Tool):
         self.scrapling_mode = scrapling_mode
         self.content_store = content_store
 
-    async def execute(self, url: str, extractMode: str = "markdown", maxChars: int | None = None, **kwargs: Any) -> str:
+        # NTO integration
+        from nanofolks.agent.tools.nto import create_nto_wrapper
+
+        self.nto = create_nto_wrapper(nto_config)
+
+    async def execute(
+        self,
+        url: str,
+        extractMode: str = "markdown",
+        maxChars: int | None = None,
+        skip_compression: bool = False,
+        **kwargs: Any,
+    ) -> str:
         from readability import Document
 
         max_chars = maxChars or self.max_chars
@@ -159,18 +200,28 @@ class WebFetchTool(Tool):
             http_result["length"] = len(text)
             http_result["text"] = text
 
+            # Apply NTO compression if enabled (before content store)
+            if not skip_compression and self.nto and self.nto.config.enabled:
+                compressed_text = self.nto.compress_web_page(text)
+                http_result["compressed"] = True
+                http_result["original_length"] = len(text)
+                http_result["text"] = compressed_text
+                http_result["length"] = len(compressed_text)
+                text = compressed_text
+
             # Process through content store if available
             if self.content_store:
                 from nanofolks.agent.content_store import get_content_store
+
                 store = self.content_store or get_content_store()
-                
+
                 # Extract title from text
                 title = None
                 if text.startswith("# "):
                     lines = text.split("\n")
                     if lines:
                         title = lines[0].lstrip("# ").strip()
-                
+
                 # Store content and get reference
                 content_id, scan_result = await store.store(
                     url=url,
@@ -178,11 +229,11 @@ class WebFetchTool(Tool):
                     title=title,
                     scan=True,
                 )
-                
+
                 # If blocked, return blocked message
                 if scan_result.is_blocked:
                     return store.get_blocked_message(url, scan_result)
-                
+
                 # Return reference instead of full content
                 return store.get_reference(content_id, url, scan_result)
 
@@ -200,9 +251,7 @@ class WebFetchTool(Tool):
 
     async def _fetch_with_httpx(self, url: str, extractMode: str) -> dict[str, Any]:
         async with httpx.AsyncClient(
-            follow_redirects=True,
-            max_redirects=MAX_REDIRECTS,
-            timeout=30.0
+            follow_redirects=True, max_redirects=MAX_REDIRECTS, timeout=30.0
         ) as client:
             r = await client.get(url, headers={"User-Agent": USER_AGENT})
             r.raise_for_status()
@@ -215,8 +264,13 @@ class WebFetchTool(Tool):
         # HTML
         elif "text/html" in ctype or r.text[:256].lower().startswith(("<!doctype", "<html")):
             from readability import Document
+
             doc = Document(r.text)
-            content = self._to_markdown(doc.summary()) if extractMode == "markdown" else _strip_tags(doc.summary())
+            content = (
+                self._to_markdown(doc.summary())
+                if extractMode == "markdown"
+                else _strip_tags(doc.summary())
+            )
             text = f"# {doc.title()}\n\n{content}" if doc.title() else content
             extractor = "readability"
         else:
@@ -267,8 +321,13 @@ class WebFetchTool(Tool):
             return {"error": "Scrapling returned empty content", "url": url}
 
         from readability import Document
+
         doc = Document(html_text)
-        content = self._to_markdown(doc.summary()) if extractMode == "markdown" else _strip_tags(doc.summary())
+        content = (
+            self._to_markdown(doc.summary())
+            if extractMode == "markdown"
+            else _strip_tags(doc.summary())
+        )
         text = f"# {doc.title()}\n\n{content}" if doc.title() else content
 
         final_url = getattr(result, "url", url)
@@ -308,11 +367,21 @@ class WebFetchTool(Tool):
     def _to_markdown(self, html: str) -> str:
         """Convert HTML to markdown."""
         # Convert links, headings, lists before stripping tags
-        text = re.sub(r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>([\s\S]*?)</a>',
-                      lambda m: f'[{_strip_tags(m[2])}]({m[1]})', html, flags=re.I)
-        text = re.sub(r'<h([1-6])[^>]*>([\s\S]*?)</h\1>',
-                      lambda m: f'\n{"#" * int(m[1])} {_strip_tags(m[2])}\n', text, flags=re.I)
-        text = re.sub(r'<li[^>]*>([\s\S]*?)</li>', lambda m: f'\n- {_strip_tags(m[1])}', text, flags=re.I)
-        text = re.sub(r'</(p|div|section|article)>', '\n\n', text, flags=re.I)
-        text = re.sub(r'<(br|hr)\s*/?>', '\n', text, flags=re.I)
+        text = re.sub(
+            r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>([\s\S]*?)</a>',
+            lambda m: f"[{_strip_tags(m[2])}]({m[1]})",
+            html,
+            flags=re.I,
+        )
+        text = re.sub(
+            r"<h([1-6])[^>]*>([\s\S]*?)</h\1>",
+            lambda m: f"\n{'#' * int(m[1])} {_strip_tags(m[2])}\n",
+            text,
+            flags=re.I,
+        )
+        text = re.sub(
+            r"<li[^>]*>([\s\S]*?)</li>", lambda m: f"\n- {_strip_tags(m[1])}", text, flags=re.I
+        )
+        text = re.sub(r"</(p|div|section|article)>", "\n\n", text, flags=re.I)
+        text = re.sub(r"<(br|hr)\s*/?>", "\n", text, flags=re.I)
         return _normalize(_strip_tags(text))

@@ -297,6 +297,11 @@ class ToolsConfig(Base):
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
     browser: BrowserToolsConfig = Field(default_factory=BrowserToolsConfig)
     documents: DocumentToolsConfig = Field(default_factory=DocumentToolsConfig)
+    nto: "NTOConfig" = Field(
+        default_factory=lambda: __import__(
+            "nanofolks.agent.tools.nto", fromlist=["NTOConfig"]
+        ).NTOConfig()
+    )
     restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
     evolutionary: bool = (
         True  # If true, use allowed_paths whitelist instead of restrict_to_workspace

@@ -4984,6 +4984,59 @@ def list_dm_rooms():
     console.print("\n[dim]Use 'nanofolks peek <room-id>' to view a conversation[/dim]")
 
 
+@app.command("nto-stats")
+def nto_stats():
+    """Show Nanofolks Token Optimizer (NTO) statistics."""
+    from nanofolks.agent.tools.nto import create_nto_wrapper
+
+    # Create NTO instance to get stats
+    nto = create_nto_wrapper()
+    stats = nto.get_stats()
+
+    if stats["operations"] == 0:
+        console.print("[yellow]No NTO operations recorded yet.[/yellow]")
+        console.print("[dim]Token optimization will begin when tools are used.[/dim]")
+        return
+
+    # Display stats
+    console.print(
+        "\n[bold bright_magenta]📊 NTO (Nanofolks Token Optimizer) Statistics[/bold bright_magenta]\n"
+    )
+
+    table = Table(title="Token Savings Summary")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="green")
+
+    table.add_row("Total Operations", str(stats["operations"]))
+    table.add_row("Original Tokens", f"{stats['total_original_tokens']:,}")
+    table.add_row("Compressed Tokens", f"{stats['total_compressed_tokens']:,}")
+    table.add_row("Tokens Saved", f"[bold green]{stats['total_saved']:,}[/bold green]")
+    table.add_row("Average Savings", f"[bold]{stats['average_savings_percent']:.1f}%[/bold]")
+
+    console.print(table)
+
+    # Show breakdown by operation
+    if stats.get("by_operation"):
+        console.print("\n[bold]By Operation:[/bold]")
+        op_table = Table()
+        op_table.add_column("Operation", style="cyan")
+        op_table.add_column("Count", style="yellow")
+        op_table.add_column("Saved", style="green")
+        op_table.add_column("Avg Savings", style="blue")
+
+        for op_name, op_stats in stats["by_operation"].items():
+            op_table.add_row(
+                op_name,
+                str(op_stats["count"]),
+                f"{op_stats['total_saved']:,}",
+                f"{op_stats['average_savings_percent']:.1f}%",
+            )
+
+        console.print(op_table)
+
+    console.print("\n[dim]NTO automatically compresses tool outputs to reduce token usage.[/dim]")
+
+
 app.add_typer(room_app, name="room")
 app.add_typer(project_app, name="project")
 

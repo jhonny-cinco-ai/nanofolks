@@ -290,6 +290,54 @@ class MCPServerConfig(Base):
     auto_connect: bool = True  # If true, connect automatically on startup/message
 
 
+class NTOConfig(Base):
+    """NTO (Nanofolks Token Optimizer) configuration."""
+
+    enabled: bool = True
+    """Enable NTO token optimization."""
+
+    default_level: str = "minimal"
+    """Default compression level: none, minimal, or aggressive."""
+
+    track_savings: bool = True
+    """Track token savings statistics."""
+
+    # Web tool settings
+    web_max_results: int = 10
+    """Maximum web search results to return."""
+
+    web_max_snippet_length: int = 200
+    """Maximum snippet length in characters."""
+
+    web_max_page_length: int = 1000
+    """Maximum web page content length."""
+
+    # Bot tool settings
+    bot_max_response_tokens: int = 500
+    """Maximum bot response tokens."""
+
+    # Memory tool settings
+    memory_top_k: int = 5
+    """Top K memory results to return."""
+
+    memory_max_content_length: int = 300
+    """Maximum memory content length."""
+
+    # Session tool settings
+    session_max_messages: int = 10
+    """Maximum session messages to return."""
+
+    session_max_message_length: int = 200
+    """Maximum message content length."""
+
+    # Log settings
+    log_max_unique_errors: int = 10
+    """Maximum unique errors to show."""
+
+    log_max_unique_warnings: int = 5
+    """Maximum unique warnings to show."""
+
+
 class ToolsConfig(Base):
     """Tools configuration."""
 
@@ -297,11 +345,7 @@ class ToolsConfig(Base):
     exec: ExecToolConfig = Field(default_factory=ExecToolConfig)
     browser: BrowserToolsConfig = Field(default_factory=BrowserToolsConfig)
     documents: DocumentToolsConfig = Field(default_factory=DocumentToolsConfig)
-    nto: "NTOConfig" = Field(
-        default_factory=lambda: __import__(
-            "nanofolks.agent.tools.nto", fromlist=["NTOConfig"]
-        ).NTOConfig()
-    )
+    nto: NTOConfig = Field(default_factory=NTOConfig)
     restrict_to_workspace: bool = False  # If true, restrict all tool access to workspace directory
     evolutionary: bool = (
         True  # If true, use allowed_paths whitelist instead of restrict_to_workspace

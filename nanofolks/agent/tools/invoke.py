@@ -36,12 +36,17 @@ class InvokeTool(Tool):
         self._origin_chat_id: str = "direct"
         self._origin_room_id: str | None = None
         self._memory_store = None
+        self._conversation_history: list | None = None
 
     def set_context(self, channel: str, chat_id: str, room_id: str | None = None) -> None:
         """Set conversation context for invocations."""
         self._origin_channel = channel
         self._origin_chat_id = chat_id
         self._origin_room_id = room_id
+
+    def set_conversation_history(self, history: list | None) -> None:
+        """Set conversation history for invocations."""
+        self._conversation_history = history
 
     def set_memory_store(self, memory_store) -> None:
         """Attach a memory store for logging task events."""
@@ -110,23 +115,36 @@ class InvokeTool(Tool):
                     room_task.add_handoff("leader", bot, reason="Leader assigned task")
                     manager._save_room(room)
                     room_task_id = room_task.id
-                    self._log_task_event(self._origin_room_id, "add", room_task, reason="Leader assigned task")
+                    self._log_task_event(
+                        self._origin_room_id, "add", room_task, reason="Leader assigned task"
+                    )
             except Exception:
                 room_task_id = None
+
+        # Use the room's session if we're in a room, so the bot has full room context
+        session_id = None
+        if self._origin_room_id:
+            from nanofolks.utils.ids import room_to_session_id
+
+            session_id = room_to_session_id(self._origin_room_id)
 
         result = await self._invoker.invoke(
             bot_role=bot,
             task=task,
             context=self._context,
+            session_id=session_id,  # Pass room session, not "invoke_general"
             origin_channel=self._origin_channel,
             origin_chat_id=self._origin_chat_id,
             origin_room_id=self._origin_room_id,
             room_task_id=room_task_id,
+            conversation_history=self._conversation_history,
         )
 
         return result
 
-    def _log_task_event(self, room_id: str | None, action: str, task: Any, reason: str | None = None) -> None:
+    def _log_task_event(
+        self, room_id: str | None, action: str, task: Any, reason: str | None = None
+    ) -> None:
         if not self._memory_store or not room_id:
             return
         try:
@@ -147,10 +165,7 @@ class InvokeTool(Tool):
             if reason:
                 metadata["reason"] = reason
 
-            content = (
-                f"Task {action}: {task.title} "
-                f"(owner: {task.owner}, status: {task.status})"
-            )
+            content = f"Task {action}: {task.title} (owner: {task.owner}, status: {task.status})"
 
             event = Event(
                 id=str(uuid.uuid4()),

@@ -213,9 +213,9 @@ class IntentFlowRouter:
         if flow_state == self.FlowState.FULL_START:
             return await self._handle_full(msg, intent, session, state_manager)
         if flow_state == self.FlowState.FULL_DISCOVERY:
-            return await self._continue_discovery(msg, state_manager)
+            return await self._continue_discovery(msg, state_manager, session)
         if flow_state == self.FlowState.FULL_APPROVAL:
-            return await self._handle_approval(msg, state_manager)
+            return await self._handle_approval(msg, state_manager, session)
         if flow_state == self.FlowState.FULL_EXECUTION:
             return await self._handle_execution(msg, state_manager)
         if flow_state == self.FlowState.FULL_REVIEW:
@@ -453,7 +453,7 @@ class IntentFlowRouter:
                 quick_state.questions_asked, quick_state.user_answers
             )
 
-            question = await self._generate_quick_question_llm(intent, quick_state)
+            question = await self._generate_quick_question_llm(intent, quick_state, session)
             quick_state.questions_asked += 1
             state_manager.update_quick_flow_state(
                 quick_state.questions_asked, quick_state.user_answers
@@ -475,7 +475,9 @@ class IntentFlowRouter:
             )
         else:
             quick_state.user_answers.append(msg.content)
-            answer = await self._generate_quick_answer_llm(intent, quick_state, msg.content)
+            answer = await self._generate_quick_answer_llm(
+                intent, quick_state, msg.content, session
+            )
             state_manager.clear_quick_flow_state()
 
             from nanofolks.bus.events import MessageEnvelope
@@ -534,7 +536,9 @@ class IntentFlowRouter:
             state_manager.start_discovery(msg.content, intent.intent_type.value, bots_in_room)
 
             first_bot = bots_in_room[0] if bots_in_room else "leader"
-            question = await self._generate_discovery_question_llm(first_bot, state_manager, intent)
+            question = await self._generate_discovery_question_llm(
+                first_bot, state_manager, intent, session
+            )
 
             state_manager.log_discovery_entry(first_bot, question, is_question=True)
 
@@ -716,9 +720,9 @@ class IntentFlowRouter:
         state = state_manager.state
 
         if state.phase == ProjectPhase.DISCOVERY:
-            return await self._continue_discovery(msg, state_manager)
+            return await self._continue_discovery(msg, state_manager, session)
         elif state.phase == ProjectPhase.APPROVAL:
-            return await self._handle_approval(msg, state_manager)
+            return await self._handle_approval(msg, state_manager, session)
         elif state.phase == ProjectPhase.EXECUTION:
             return await self._handle_execution(msg, state_manager)
         elif state.phase == ProjectPhase.REVIEW:
@@ -736,7 +740,7 @@ class IntentFlowRouter:
         )
 
     async def _continue_discovery(
-        self, msg: "MessageEnvelope", state_manager: "ProjectStateManager"
+        self, msg: "MessageEnvelope", state_manager: "ProjectStateManager", session: "Session"
     ) -> "MessageEnvelope":
         """Continue discovery phase."""
 
@@ -745,7 +749,7 @@ class IntentFlowRouter:
         if state_manager._is_discovery_complete():
             state_manager.complete_discovery()
 
-            synthesis = await self._generate_synthesis_llm(state_manager)
+            synthesis = await self._generate_synthesis_llm(state_manager, session)
             state_manager.set_synthesis(synthesis)
 
             formatted = self._format_synthesis(synthesis)
@@ -762,7 +766,9 @@ class IntentFlowRouter:
             )
 
         next_bot = state_manager._get_next_bot()
-        question = await self._generate_discovery_question_llm(next_bot, state_manager, None)
+        question = await self._generate_discovery_question_llm(
+            next_bot, state_manager, None, session
+        )
         state_manager.log_discovery_entry(next_bot, question, is_question=True)
 
         from nanofolks.bus.events import MessageEnvelope
@@ -777,7 +783,7 @@ class IntentFlowRouter:
         )
 
     async def _handle_approval(
-        self, msg: "MessageEnvelope", state_manager: "ProjectStateManager"
+        self, msg: "MessageEnvelope", state_manager: "ProjectStateManager", session: "Session"
     ) -> "MessageEnvelope":
         """Handle approval response."""
         approved = self._check_approval(msg.content)
@@ -803,7 +809,7 @@ class IntentFlowRouter:
             state_manager.handle_approval(approved=False, feedback=msg.content)
 
             next_bot = state_manager._get_next_bot()
-            question = f"Noted! {await self._generate_discovery_question_llm(next_bot, state_manager, None)}"
+            question = f"Noted! {await self._generate_discovery_question_llm(next_bot, state_manager, None, session)}"
             state_manager.log_discovery_entry(next_bot, question, is_question=True)
 
             from nanofolks.bus.events import MessageEnvelope
@@ -854,7 +860,9 @@ class IntentFlowRouter:
             metadata={"phase": "idle"},
         )
 
-    async def _generate_quick_question_llm(self, intent: Intent, state: Any) -> str:
+    async def _generate_quick_question_llm(
+        self, intent: Intent, state: Any, session: Optional["Session"] = None
+    ) -> str:
         """Generate a quick clarifying question using LLM."""
         user_goal = state.user_goal if not isinstance(state, dict) else state.get("user_goal", "")
         user_answers = (
@@ -879,9 +887,16 @@ User's original request: {user_goal}
 
 Question:"""
 
+        messages = [{"role": "user", "content": prompt}]
+
+        if session:
+            session_history = session.get_history(max_messages=10)
+            if session_history:
+                messages = session_history + messages
+
         try:
             response = await self.agent.provider.chat(
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 model=self.agent.model,
                 temperature=0.7,
                 max_tokens=150,
@@ -902,7 +917,7 @@ Question:"""
         return "Can you tell me a bit more about what you're looking for?"
 
     async def _generate_quick_answer_llm(
-        self, intent: Intent, state: Any, user_context: str
+        self, intent: Intent, state: Any, user_context: str, session: Optional["Session"] = None
     ) -> str:
         """Generate a quick answer after clarification using LLM."""
         user_goal = state.user_goal if not isinstance(state, dict) else state.get("user_goal", "")
@@ -921,9 +936,16 @@ Their answers to your questions:
 
 Provide a helpful, concise answer to their request. Be specific and actionable."""
 
+        messages = [{"role": "user", "content": prompt}]
+
+        if session:
+            session_history = session.get_history(max_messages=10)
+            if session_history:
+                messages = session_history + messages
+
         try:
             response = await self.agent.provider.chat(
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 model=self.agent.model,
                 temperature=0.7,
                 max_tokens=500,
@@ -934,7 +956,11 @@ Provide a helpful, concise answer to their request. Be specific and actionable."
             return f"Based on what you've shared, here's my advice regarding: {user_goal}"
 
     async def _generate_discovery_question_llm(
-        self, bot_name: str, state_manager: "ProjectStateManager", intent: Optional[Intent]
+        self,
+        bot_name: str,
+        state_manager: "ProjectStateManager",
+        intent: Optional[Intent],
+        session: Optional["Session"] = None,
     ) -> str:
         """Generate a discovery phase question using LLM."""
         state = state_manager.state
@@ -956,9 +982,16 @@ Ask ONE clarifying question that @ {bot_name} needs answered to do their job eff
 Be specific to your domain expertise.
 Keep it brief (1-2 sentences)."""
 
+        messages = [{"role": "user", "content": prompt}]
+
+        if session:
+            session_history = session.get_history(max_messages=10)
+            if session_history:
+                messages = session_history + messages
+
         try:
             response = await self.agent.provider.chat(
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 model=self.agent.model,
                 temperature=0.7,
                 max_tokens=150,
@@ -980,7 +1013,9 @@ Keep it brief (1-2 sentences)."""
         }
         return questions_by_bot.get(bot_name, "Can you tell me more about what you need?")
 
-    async def _generate_synthesis_llm(self, state_manager: "ProjectStateManager") -> dict:
+    async def _generate_synthesis_llm(
+        self, state_manager: "ProjectStateManager", session: Optional["Session"] = None
+    ) -> dict:
         """Generate synthesis from discovery log using LLM."""
         state = state_manager.state
 
@@ -1038,9 +1073,16 @@ Discovery Conversation:
             "json_schema": {"name": "project_brief", "strict": True, "schema": schema},
         }
 
+        messages = [{"role": "user", "content": prompt}]
+
+        if session:
+            session_history = session.get_history(max_messages=10)
+            if session_history:
+                messages = session_history + messages
+
         try:
             response = await self.agent.provider.chat(
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 model=self.agent.model,
                 temperature=0.5,
                 max_tokens=1000,

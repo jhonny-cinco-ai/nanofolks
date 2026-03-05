@@ -201,6 +201,7 @@ class BotInvoker:
         origin_chat_id: str = "direct",
         origin_room_id: str | None = None,
         room_task_id: str | None = None,
+        conversation_history: Optional[list] = None,
     ) -> str:
         """
         Invoke a specialist bot to handle a task.
@@ -216,6 +217,7 @@ class BotInvoker:
             origin_channel: Channel to send notification when complete
             origin_chat_id: Chat ID to send notification when complete
             origin_room_id: Room ID to associate with the result
+            conversation_history: Previous conversation messages for context
 
         Returns:
             Confirmation message that the bot was invoked
@@ -240,6 +242,7 @@ class BotInvoker:
             origin_chat_id=origin_chat_id,
             origin_room_id=origin_room_id,
             room_task_id=room_task_id,
+            conversation_history=conversation_history,
         )
 
     async def _invoke_async(
@@ -253,6 +256,7 @@ class BotInvoker:
         origin_chat_id: str,
         origin_room_id: str | None,
         room_task_id: str | None,
+        conversation_history: Optional[list] = None,
     ) -> str:
         """Asynchronous invocation - fires off task and notifies when complete."""
         logger.info(f"Invoking {bot_role} (id: {invocation_id}, async): {task[:50]}...")
@@ -279,6 +283,7 @@ class BotInvoker:
                 origin_channel=origin_channel,
                 origin_chat_id=origin_chat_id,
                 origin_room_id=origin_room_id,
+                conversation_history=conversation_history,
             )
         )
         self._active_invocations[invocation_id] = task_handle
@@ -300,6 +305,7 @@ class BotInvoker:
         origin_channel: str,
         origin_chat_id: str,
         origin_room_id: str | None,
+        conversation_history: Optional[list] = None,
     ) -> None:
         """Process a bot invocation and announce result when complete."""
         result: str = ""
@@ -321,6 +327,7 @@ class BotInvoker:
                 user_message,
                 session_id,
                 room_id=origin_room_id,
+                conversation_history=conversation_history,
             )
             result = response or "Task completed but no response generated."
 
@@ -605,6 +612,7 @@ Focus only on your domain expertise and provide a helpful response.
         max_tokens: int | None = None,
         allow_sidekicks: bool = True,
         model: str | None = None,
+        conversation_history: Optional[list] = None,
     ) -> str:
         """Call LLM with bot's context and execute tools if needed.
 
@@ -630,10 +638,13 @@ Focus only on your domain expertise and provide a helpful response.
                 sidekick_tool.set_context(room_id)
 
         # Build initial messages
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ]
+        messages = [{"role": "system", "content": system_prompt}]
+
+        # Add conversation history if provided
+        if conversation_history:
+            messages.extend(conversation_history)
+
+        messages.append({"role": "user", "content": user_message})
 
         # Maximum tool call iterations to prevent infinite loops
         max_iterations = 10

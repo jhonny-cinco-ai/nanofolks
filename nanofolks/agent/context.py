@@ -53,7 +53,7 @@ class ContextBuilder:
         self,
         skill_names: list[str] | None = None,
         bot_name: Optional[str] = None,
-        connected_mcp_servers: set[str] | None = None
+        connected_mcp_servers: set[str] | None = None,
     ) -> str:
         """
         Build the system prompt from bootstrap files, memory, and skills.
@@ -159,7 +159,7 @@ Tools for servers marked as 'connected' are already registered and available for
 
             lines.append("")
             lines.append("Use these symbolic references when calling tools that require API keys.")
-            lines.append("Example: To use web search, pass api_key=\"{{brave_key}}\"")
+            lines.append('Example: To use web search, pass api_key="{{brave_key}}"')
 
             return "\n".join(lines)
 
@@ -168,24 +168,23 @@ Tools for servers marked as 'connected' are already registered and available for
             return ""
 
     def build_mcp_summary(
-        self, 
-        bot_name: Optional[str] = None, 
-        connected_mcp_servers: set[str] | None = None
+        self, bot_name: Optional[str] = None, connected_mcp_servers: set[str] | None = None
     ) -> str:
         """Build summary of available but not necessarily connected MCP servers.
-        
+
         Mirroring the skills discovery pattern for MCP.
         """
+
         def escape_xml(s: str) -> str:
             return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
         config = load_config()
         available = {}
-        
+
         # 1. Global servers
         for name, cfg in config.tools.mcp_servers.items():
             available[name] = cfg
-            
+
         # 2. Bot-specific servers
         if bot_name and bot_name in config.tools.bot_mcp_servers:
             for name, cfg in config.tools.bot_mcp_servers[bot_name].items():
@@ -202,8 +201,8 @@ Tools for servers marked as 'connected' are already registered and available for
             # Only list servers that are NOT connected, or show them as connected
             status = "connected" if is_connected else "available"
             desc = escape_xml(getattr(cfg, "description", "") or "Specialized tools")
-            
-            lines.append(f"  <mcp_server name=\"{escape_xml(name)}\" status=\"{status}\">")
+
+            lines.append(f'  <mcp_server name="{escape_xml(name)}" status="{status}">')
             lines.append(f"    <description>{desc}</description>")
             lines.append("  </mcp_server>")
 
@@ -245,7 +244,9 @@ Tools for servers marked as 'connected' are already registered and available for
             sections.append(f"## Restricted Tools\n\nYou do NOT have access to: {tools_list}")
 
         if perms.custom_tools:
-            custom_list = "\n".join(f"- **{name}**: {desc}" for name, desc in perms.custom_tools.items())
+            custom_list = "\n".join(
+                f"- **{name}**: {desc}" for name, desc in perms.custom_tools.items()
+            )
             sections.append(f"## Custom Tools\n\n{custom_list}")
 
         return "---\n\n" + "\n\n".join(sections)
@@ -254,6 +255,7 @@ Tools for servers marked as 'connected' are already registered and available for
         """Get the core identity section customized for the bot."""
         import time as _time
         from datetime import datetime
+
         now = datetime.now().strftime("%Y-%m-%d %H:%M (%A)")
         tz = _time.strftime("%Z") or "UTC"
         workspace_path = str(self.workspace.expanduser().resolve())
@@ -325,7 +327,9 @@ Tools for servers marked as 'connected' are already registered and available for
             # Use the loaded identity (from workspace or team template)
             # Remove the "## IDENTITY.md" header to get just the content
             if identity_content.startswith("## IDENTITY.md"):
-                identity_body = identity_content.split("\n\n", 1)[1] if "\n\n" in identity_content else ""
+                identity_body = (
+                    identity_content.split("\n\n", 1)[1] if "\n\n" in identity_content else ""
+                )
             else:
                 identity_body = identity_content
 
@@ -535,6 +539,7 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
         # Fall back to template IDENTITY.md from team
         try:
             from nanofolks.templates import get_identity_template_for_bot
+
             template_content = get_identity_template_for_bot(bot_name)
             if template_content:
                 # For templates, create a temp path for caching
@@ -597,7 +602,7 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
             cleaned_len = len(cleaned_content)
             if cleaned_len < original_len * 0.5:
                 logger.warning(
-                    f"File {filename} was reduced to {cleaned_len/original_len:.1%} of original size. "
+                    f"File {filename} was reduced to {cleaned_len / original_len:.1%} of original size. "
                     "May have lost important content."
                 )
 
@@ -625,7 +630,7 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
         limit: int = 10,
         threshold: float = 0.5,
         include_recent: bool = True,
-        recent_limit: int = 5
+        recent_limit: int = 5,
     ) -> str:
         """Get memory context using semantic search for relevance.
 
@@ -656,15 +661,15 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
 
             # Search for semantically relevant events
             relevant_events = self.memory.search_events(
-                query_embedding=query_embedding,
-                limit=limit,
-                threshold=threshold
+                query_embedding=query_embedding, limit=limit, threshold=threshold
             )
 
             if relevant_events:
                 parts.append("## Relevant Past Activity")
                 for event, similarity in relevant_events:
-                    relevance = "high" if similarity > 0.7 else "medium" if similarity > 0.5 else "low"
+                    relevance = (
+                        "high" if similarity > 0.7 else "medium" if similarity > 0.5 else "low"
+                    )
                     parts.append(
                         f"- [{event.timestamp.strftime('%Y-%m-%d %H:%M')}] "
                         f"({relevance} relevance) {event.event_type}: {event.content[:150]}"
@@ -684,8 +689,9 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
                         query_lower = query.lower()
 
                         # Check if entity is mentioned in query or vice versa
-                        if (entity.name.lower() in query_lower or
-                            any(word in entity_lower for word in query_lower.split()[:5])):
+                        if entity.name.lower() in query_lower or any(
+                            word in entity_lower for word in query_lower.split()[:5]
+                        ):
                             relevant_entities.append(entity)
 
                 # Sort by event count (importance) and take top 5
@@ -803,9 +809,7 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
 
         # System prompt with optional bot personality
         system_prompt = self.build_system_prompt(
-            skill_names=skill_names,
-            bot_name=bot_name,
-            connected_mcp_servers=connected_mcp_servers
+            skill_names=skill_names, bot_name=bot_name, connected_mcp_servers=connected_mcp_servers
         )
 
         # Add API keys section (symbolic references only - keys never exposed to LLM)
@@ -826,7 +830,7 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
             system_prompt += "\n\nYou are collaborating in this room with other bots. Use @botname to mention specific bots when you need their expertise."
 
         # Add tool usage guidance for better UX
-        system_prompt += "\n\n## Tool Usage Guidelines\nBefore calling any tools, briefly tell the user what you're about to do (e.g., 'I'll search for that information'). This helps users understand what the agent is doing during tool execution."
+        system_prompt += "\n\n## Tool Usage Guidelines\nWhen using tools: First briefly tell the user what you're about to do (e.g., 'I'll search for that information'), then IMMEDIATELY call the appropriate tool. Do NOT just say you will do something - you must actually invoke the tool in the same response."
 
         # Add external content security guidance
         system_prompt += """
@@ -856,7 +860,7 @@ When you fetch content from the web (via web_search or web_fetch):
                     limit=10,
                     threshold=0.5,
                     include_recent=True,
-                    recent_limit=3
+                    recent_limit=3,
                 )
                 if semantic_memory:
                     system_prompt += f"\n\n## Memory Context\n{semantic_memory}"
@@ -918,11 +922,7 @@ When you fetch content from the web (via web_search or web_fetch):
         return images + [{"type": "text", "text": text}]
 
     def add_tool_result(
-        self,
-        messages: list[dict[str, Any]],
-        tool_call_id: str,
-        tool_name: str,
-        result: str
+        self, messages: list[dict[str, Any]], tool_call_id: str, tool_name: str, result: str
     ) -> list[dict[str, Any]]:
         """
         Add a tool result to the message list.
@@ -936,12 +936,9 @@ When you fetch content from the web (via web_search or web_fetch):
         Returns:
             Updated message list.
         """
-        messages.append({
-            "role": "tool",
-            "tool_call_id": tool_call_id,
-            "name": tool_name,
-            "content": result
-        })
+        messages.append(
+            {"role": "tool", "tool_call_id": tool_call_id, "name": tool_name, "content": result}
+        )
         return messages
 
     def add_assistant_message(

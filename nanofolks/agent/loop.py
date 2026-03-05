@@ -1637,7 +1637,11 @@ Current conversation history:
             return MessageEnvelope(
                 channel=msg.channel,
                 chat_id=msg.chat_id,
-                content="🐈 nanofolks commands:\n/new — Start a new conversation\n/help — Show available commands",
+                content="🐈 nanofolks commands:\n"
+                "/new — Start a new conversation\n"
+                "/help — Show available commands\n"
+                "/stop — Stop running tasks\n"
+                "/nto-stats — Show token optimization statistics",
                 room_id=msg.room_id or self._current_room_id,
             )
         if cmd == "/stop":
@@ -1652,6 +1656,47 @@ Current conversation history:
                     f"sidekicks: {summary.get('sidekicks', 0)}."
                 ),
                 room_id=room_id,
+            )
+        if cmd == "/nto-stats":
+            from nanofolks.agent.tools.nto import create_nto_wrapper
+
+            nto = create_nto_wrapper()
+            stats = nto.get_stats()
+
+            if stats["operations"] == 0:
+                return MessageEnvelope(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content="📊 No NTO operations recorded yet.\n"
+                    "Token optimization will begin when tools are used.",
+                    room_id=msg.room_id or self._current_room_id,
+                )
+
+            response_lines = [
+                "📊 **NTO (Nanofolks Token Optimizer) Statistics**",
+                "",
+                f"**Total Operations:** {stats['operations']}",
+                f"**Original Tokens:** {stats['total_original_tokens']:,}",
+                f"**Compressed Tokens:** {stats['total_compressed_tokens']:,}",
+                f"**Tokens Saved:** {stats['total_saved']:,}",
+                f"**Average Savings:** {stats['average_savings_percent']:.1f}%",
+            ]
+
+            if stats.get("by_operation"):
+                response_lines.append("")
+                response_lines.append("**By Operation:**")
+                for op_name, op_stats in stats["by_operation"].items():
+                    response_lines.append(
+                        f"  • {op_name}: {op_stats['count']} ops, "
+                        f"{op_stats['total_saved']:,} saved, "
+                        f"{op_stats['average_savings_percent']:.1f}% avg"
+                    )
+
+            return MessageEnvelope(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content="\n".join(response_lines),
+                room_id=msg.room_id or self._current_room_id,
             )
 
         # Unified orchestrator pipeline (tag -> intent -> dispatch -> collect -> final)
@@ -1687,6 +1732,14 @@ Current conversation history:
             set_memory_store = getattr(invoke_tool, "set_memory_store", None)
             if set_memory_store and callable(set_memory_store):
                 set_memory_store(self.memory_store)
+            # Set conversation history for context
+            set_history = getattr(invoke_tool, "set_conversation_history", None)
+            if set_history and callable(set_history):
+                try:
+                    history = session.get_history(max_messages=10)
+                    set_history(history)
+                except Exception as e:
+                    logger.debug(f"Could not set conversation history for invoke tool: {e}")
 
         room_task_tool = self.tools.get("room_task")
         if room_task_tool:
@@ -2316,6 +2369,14 @@ Current conversation history:
             set_memory_store = getattr(invoke_tool, "set_memory_store", None)
             if set_memory_store and callable(set_memory_store):
                 set_memory_store(self.memory_store)
+            # Set conversation history for context
+            set_history = getattr(invoke_tool, "set_conversation_history", None)
+            if set_history and callable(set_history):
+                try:
+                    history = session.get_history(max_messages=10)
+                    set_history(history)
+                except Exception as e:
+                    logger.debug(f"Could not set conversation history for invoke tool: {e}")
 
         room_task_tool = self.tools.get("room_task")
         if room_task_tool:

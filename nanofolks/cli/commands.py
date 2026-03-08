@@ -193,6 +193,49 @@ def _is_exit_command(command: str) -> bool:
     return command.lower() in EXIT_COMMANDS
 
 
+def _resolve_chat_room_and_session(
+    room: str,
+    session_id: str | None,
+    room_manager,
+) -> tuple[str, object, str]:
+    """Resolve canonical room + session IDs for CLI chat startup."""
+    from nanofolks.utils.ids import normalize_room_id, room_to_session_id, session_to_room_id
+
+    requested_room = normalize_room_id(room) or "general"
+    resolved_room = requested_room
+
+    if session_id:
+        session_room = session_to_room_id(session_id)
+        if session_room:
+            resolved_room = session_room
+            if session_room != requested_room:
+                console.print(
+                    f"[dim]Using room '{session_room}' from --session (overriding --room '{requested_room}').[/dim]"
+                )
+        else:
+            console.print(
+                f"[yellow]Session '{session_id}' is not room-centric. Falling back to room '{requested_room}'.[/yellow]"
+            )
+
+    current_room = room_manager.get_room(resolved_room)
+    if not current_room:
+        console.print(f"[yellow]Room '{resolved_room}' not found. Using 'general' room.[/yellow]")
+        current_room = room_manager.default_room
+        resolved_room = current_room.id
+
+    resolved_session = room_to_session_id(resolved_room)
+    return resolved_room, current_room, resolved_session
+
+
+def _parse_switch_target(command: str) -> str | None:
+    """Parse `/switch` command target, allowing empty target for room list."""
+    stripped = command.strip()
+    if stripped != "/switch" and not stripped.startswith("/switch "):
+        return None
+    parts = stripped.split(maxsplit=1)
+    return parts[1].strip().lower() if len(parts) > 1 else ""
+
+
 async def _read_interactive_input_async(room_id: str = "general") -> str:
     """Read user input using prompt_toolkit (handles paste, history, display).
 
@@ -1536,20 +1579,13 @@ def chat(
     from nanofolks.channels.cli import CLIChannel
     from nanofolks.bus.events import MessageEnvelope
     from nanofolks.bus.queue import MessageBus
-    from nanofolks.utils.ids import normalize_room_id, room_to_session_id
+    from nanofolks.utils.ids import room_to_session_id
 
     config = load_config()
 
     # Load room context
     room_manager = get_room_manager()
-    current_room = room_manager.get_room(room)
-    if not current_room:
-        console.print(f"[yellow]Room '{room}' not found. Using 'general' room.[/yellow]")
-        current_room = room_manager.default_room
-        room = current_room.id
-    room = normalize_room_id(room) or "general"
-    if not session_id:
-        session_id = room_to_session_id(room)
+    room, current_room, session_id = _resolve_chat_room_and_session(room, session_id, room_manager)
 
     bus = MessageBus()
     bus.set_room_manager(room_manager)  # Enable cross-channel broadcast
@@ -1765,7 +1801,7 @@ def chat(
             streaming_content += chunk
             newline_needed = True
             # Show content directly (not just preview)
-            console.print(f"[{ACCENT_COLOR}]{chunk}[/{ACCENT_COLOR}]", end="", highlight=False)
+            console.print(Text(chunk, style=ACCENT_COLOR), end="", highlight=False)
 
     async def _await_cli_response(
         chat_id: str, room_id: str | None = None
@@ -1839,9 +1875,7 @@ def chat(
         _init_prompt_session()
 
         def _exit_on_sigint(signum, frame):
-            _restore_terminal()
-            console.print("\nGoodbye!")
-            os._exit(0)
+            raise KeyboardInterrupt()
 
         signal.signal(signal.SIGINT, _exit_on_sigint)
 
@@ -2200,10 +2234,11 @@ def chat(
                         continue
 
                     # Handle /switch command
-                    if command.startswith("/switch "):
+                    switch_target = _parse_switch_target(command)
+                    if switch_target is not None:
                         from nanofolks.bots.room_manager import get_room_manager
 
-                        new_room_id = command[8:].strip().lower()
+                        new_room_id = switch_target
 
                         if not new_room_id:
                             # Show available rooms if no argument provided
@@ -2351,6 +2386,7 @@ def chat(
                         # Display room info
                         console.print("[bold cyan]Room Details:[/bold cyan]")
                         console.print(f"  Name: #{current_room.id}")
+                        console.print(f"  Session: {session_id}")
                         console.print(f"  Type: {current_room.type.value}")
                         console.print(f"  Owner: {current_room.owner}")
                         console.print(

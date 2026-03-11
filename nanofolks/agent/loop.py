@@ -1292,6 +1292,42 @@ Current conversation history:
             except asyncio.TimeoutError:
                 continue
 
+    async def process_message(self, msg: MessageEnvelope) -> MessageEnvelope:
+        """Process a message and return the response (for MessageRouter integration).
+
+        This is the entry point used by MessageRouter when routing messages to bots
+        in the multi-bot architecture. Unlike process_inbound, this returns the
+        response directly instead of publishing to the bus.
+
+        Args:
+            msg: The inbound message to process.
+
+        Returns:
+            The response message envelope.
+        """
+        try:
+            response = await self._process_message(msg)
+            if response is None:
+                # Create empty response if None
+                return MessageEnvelope(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content="",
+                    room_id=msg.room_id or self._current_room_id,
+                    bot_name=self.bot_name,
+                )
+            return response
+        except Exception as e:
+            logger.error(f"Error processing message in bot {self.bot_name}: {e}")
+            return MessageEnvelope(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content=f"❌ Bot '{self.bot_name}' encountered an error: {str(e)}",
+                room_id=msg.room_id or self._current_room_id,
+                bot_name=self.bot_name,
+                metadata={"error": str(e)},
+            )
+
     async def process_inbound(self, msg: MessageEnvelope) -> None:
         """Public entry-point for per-room broker message delivery.
 

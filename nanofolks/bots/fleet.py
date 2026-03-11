@@ -248,6 +248,51 @@ class BotFleet:
         """
         return bot_name in self.bots
 
+    async def send_proactive_message(
+        self,
+        room_id: str,
+        bot_name: str,
+        message: str,
+        metadata: Optional[Dict] = None,
+    ) -> bool:
+        """Send a proactive message from a bot (e.g., after timeout).
+
+        This is used by the proactive loop to send messages when a bot
+        decides to proceed without user input.
+
+        Args:
+            room_id: Room ID to send to
+            bot_name: Bot sending the message
+            message: Message content
+            metadata: Optional metadata about the proactive decision
+
+        Returns:
+            True if message was sent successfully
+        """
+        try:
+            # Create message envelope
+            proactive_msg = MessageEnvelope(
+                channel="proactive",
+                chat_id=room_id,
+                content=message,
+                bot_name=bot_name,
+                room_id=room_id,
+                metadata={
+                    "is_proactive": True,
+                    **(metadata or {}),
+                },
+            )
+
+            # Publish to bus
+            await self.bus.publish_outbound(proactive_msg)
+
+            self.logger.info(f"Sent proactive message from {bot_name} in room {room_id}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to send proactive message: {e}")
+            return False
+
     async def broadcast_to_bots(
         self, bot_names: List[str], message: MessageEnvelope
     ) -> List[MessageEnvelope]:

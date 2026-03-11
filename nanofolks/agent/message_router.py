@@ -74,6 +74,16 @@ class MessageRouter:
         self._running = False
         self._current_room_id = "general"
 
+        # Initialize proactive bot loop (enabled by default)
+        from nanofolks.bots.proactive_loop import ProactiveBotLoop
+
+        self.proactive_loop = ProactiveBotLoop(
+            fleet_manager=fleet,
+            turbo_memory=None,  # Will be set later if available
+            timeout_seconds=10.0,
+            proactive_enabled=True,
+        )
+
         self.logger = logger.bind(component="MessageRouter")
         self.logger.info("MessageRouter initialized")
 
@@ -140,6 +150,15 @@ class MessageRouter:
         """
         # Update current room context
         self._current_room_id = msg.room_id or self._current_room_id
+
+        # Check if this is a response to a pending clarification
+        responding_bot = await self.proactive_loop.check_user_response(
+            room_id=self._current_room_id,
+            user_message=msg.content,
+        )
+
+        if responding_bot:
+            self.logger.info(f"User responding to {responding_bot}'s clarification")
 
         self.logger.info(
             f"Routing message in room '{self._current_room_id}': {msg.content[:50]}..."
@@ -217,6 +236,15 @@ class MessageRouter:
         # Route to the bot
         try:
             response = await self.fleet.bots[bot_name].process_message(msg)
+
+            # Check if this is a clarifying question and register with proactive loop
+            await self._check_and_register_clarification(
+                room_id=msg.room_id or self._current_room_id,
+                bot_name=bot_name,
+                original_request=msg.content,
+                response=response,
+            )
+
             return response
         except Exception as e:
             self.logger.error(f"Error from bot '{bot_name}': {e}")
@@ -478,7 +506,185 @@ class MessageRouter:
             "current_room_id": self._current_room_id,
             "active_bots": self.fleet.get_active_bots() if self.fleet else [],
             "bot_count": len(self.fleet.get_active_bots()) if self.fleet else 0,
+            "active_clarifications": len(self.proactive_loop.get_active_clarifications()),
         }
+
+    async def _check_and_register_clarification(
+        self,
+        room_id: str,
+        bot_name: str,
+        original_request: str,
+        response: MessageEnvelope,
+    ) -> None:
+        """Check if bot response is a clarifying question and register with proactive loop.
+
+        Args:
+            room_id: Room ID
+            bot_name: Bot that responded
+            original_request: User's original request
+            response: Bot's response message
+        """
+        from nanofolks.bots.proactive_loop import IntentHypothesis
+
+        content = response.content if hasattr(response, "content") else str(response)
+
+        # Heuristic: Check if response contains a question mark and seems to be asking for clarification
+        is_clarifying = self._is_clarifying_question(content)
+
+        if is_clarifying:
+            self.logger.info(f"Detected clarifying question from {bot_name} in room {room_id}")
+
+            # Generate possible intent hypotheses based on original request
+            possible_intents = self._generate_intent_hypotheses(original_request, bot_name)
+
+            # Register with proactive loop
+            await self.proactive_loop.register_clarification(
+                room_id=room_id,
+                bot_name=bot_name,
+                original_request=original_request,
+                clarifying_question=content,
+                possible_intents=possible_intents,
+            )
+
+    def _is_clarifying_question(self, content: str) -> bool:
+        """Check if content is a clarifying question.
+
+        Heuristics:
+        - Contains question mark
+        - Asks for specification (which, what, how, where)
+        - Doesn't provide a solution or answer
+        """
+        content_lower = content.lower()
+
+        # Must have a question mark
+        if "?" not in content:
+            return False
+
+        # Check for clarification indicators
+        clarification_indicators = [
+            "which",
+            "what",
+            "how would you like",
+            "could you specify",
+            "can you clarify",
+            "do you mean",
+            "are you referring to",
+            "would you prefer",
+        ]
+
+        has_indicator = any(ind in content_lower for ind in clarification_indicators)
+
+        # Check it's not just a rhetorical question at the end of a long answer
+        sentences = content.split(".")
+        last_sentence = sentences[-1] if sentences else content
+
+        # If question is at the very end and preceded by substantial content, it might be rhetorical
+        if len(content) > 200 and "?" in last_sentence and not has_indicator:
+            return False
+
+        return has_indicator
+
+    def _generate_intent_hypotheses(
+        self,
+        original_request: str,
+        bot_name: str,
+    ) -> List[IntentHypothesis]:
+        """Generate possible intent interpretations.
+
+        Args:
+            original_request: User's request
+            bot_name: Bot that will handle the request
+
+        Returns:
+            List of intent hypotheses with confidence scores
+        """
+        from nanofolks.bots.proactive_loop import IntentHypothesis
+
+        # Get bot-specific keywords
+        domain_keywords = self._get_bot_keywords(bot_name)
+
+        # Analyze request for possible intents
+        request_lower = original_request.lower()
+
+        hypotheses = []
+
+        # Check for action keywords
+        action_keywords = {
+            "create": ["create", "make", "build", "generate", "new"],
+            "update": ["update", "change", "modify", "edit", "fix"],
+            "delete": ["delete", "remove", "clean", "clear"],
+            "analyze": ["analyze", "check", "review", "audit", "inspect"],
+            "implement": ["implement", "add", "integrate", "setup", "configure"],
+        }
+
+        detected_action = None
+        for action, keywords in action_keywords.items():
+            if any(kw in request_lower for kw in keywords):
+                detected_action = action
+                break
+
+        # Generate hypotheses based on detected action and bot domain
+        if detected_action:
+            # High confidence: specific action in bot's domain
+            confidence = 0.75
+            if any(kw in request_lower for kw in domain_keywords[:5]):
+                confidence = 0.85
+
+            hypotheses.append(
+                IntentHypothesis(
+                    intent=f"{detected_action}_{bot_name}_task",
+                    confidence=confidence,
+                    reasoning=f"Detected '{detected_action}' action in {bot_name}'s domain",
+                    suggested_action=f"Proceed with {detected_action} using best practices",
+                )
+            )
+
+        # Medium confidence: general request in bot's domain
+        domain_match = sum(1 for kw in domain_keywords if kw in request_lower)
+        if domain_match >= 2:
+            hypotheses.append(
+                IntentHypothesis(
+                    intent=f"general_{bot_name}_assistance",
+                    confidence=0.6,
+                    reasoning=f"Multiple domain keywords match ({domain_match} matches)",
+                    suggested_action=f"Provide general {bot_name} assistance",
+                )
+            )
+
+        # Low confidence: vague request
+        if len(original_request.split()) <= 3:
+            hypotheses.append(
+                IntentHypothesis(
+                    intent="vague_request_needs_clarification",
+                    confidence=0.3,
+                    reasoning="Request is too vague",
+                    suggested_action="Ask for more details",
+                )
+            )
+
+        # Always add a fallback
+        hypotheses.append(
+            IntentHypothesis(
+                intent=f"{bot_name}_best_effort",
+                confidence=0.4,
+                reasoning="Make best effort based on available context",
+                suggested_action="Attempt to help with available information",
+            )
+        )
+
+        return hypotheses
+
+    def _get_bot_keywords(self, bot_name: str) -> List[str]:
+        """Get domain keywords for a bot."""
+        keywords = {
+            "leader": ["plan", "strategy", "coordinate", "manage", "decision", "team"],
+            "coder": ["code", "implement", "build", "technical", "api", "database", "bug"],
+            "researcher": ["research", "analyze", "data", "market", "study", "insight"],
+            "creative": ["design", "visual", "color", "ui", "ux", "brand", "mockup"],
+            "social": ["social", "marketing", "audience", "content", "community"],
+            "auditor": ["audit", "security", "compliance", "review", "quality"],
+        }
+        return keywords.get(bot_name, [])
 
 
 class MessageRouterConfig:

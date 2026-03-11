@@ -811,6 +811,29 @@ class FeatureFlags(Base):
     use_bot_coordination: bool = False  # Enable BotCoordinationChannel for bot-to-bot comms
 
 
+class ProactiveConfig(Base):
+    """Proactive behavior configuration for multi-bot clarification system."""
+
+    # Enable/disable proactive mode globally
+    enabled: bool = True
+
+    # Timeout settings
+    timeout_seconds: float = 10.0  # How long to wait for user response
+
+    # Confidence thresholds
+    high_confidence_threshold: float = 0.8  # Proceed with intent above this
+    medium_confidence_threshold: float = 0.5  # Offer options above this
+    low_confidence_threshold: float = 0.3  # Try alternate question above this
+
+    # Learning integration
+    enable_learning: bool = True  # Learn from proactive decisions
+    learning_window_days: int = 30  # Historical window for success patterns
+
+    # Bot-specific overrides (bots not listed use defaults)
+    bot_thresholds: dict[str, float] = Field(default_factory=dict)
+    # Example: {"auditor": 0.9, "creative": 0.4}
+
+
 class FleetConfig(Base):
     """Bot fleet configuration for multi-bot architecture."""
 
@@ -830,6 +853,9 @@ class FleetConfig(Base):
     enable_leader_first: bool = True  # Default to leader-first routing
     max_parallel_bots: int = 6  # Max bots to invoke in parallel
     response_timeout: int = 30  # seconds
+
+    # Proactive clarification system
+    proactive: ProactiveConfig = Field(default_factory=ProactiveConfig)
 
     # Bot specific configs
     default_model: str | None = None  # Uses provider default if None

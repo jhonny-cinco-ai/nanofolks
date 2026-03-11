@@ -4,6 +4,8 @@
 **Scope**: Full parity with Python architecture + deep macOS system control  
 **Rationale**: Desktop agent requiring real filesystem, browser, and app automation
 
+**Status**: Python True Multi-Bot Architecture - COMPLETE ✅ | Swift Port - Planning Phase
+
 ---
 
 ## Architecture Overview
@@ -17,10 +19,12 @@
 │  - Bot configuration panels                                         │
 │  - Settings & preferences                                           │
 ├─────────────────────────────────────────────────────────────────────┤
-│  Agent Core (Swift)                                                 │
-│  - Agent loop & orchestration                                       │
+│  Fleet Core (Swift)                                                 │
+│  - FleetManager (replaces Agent orchestrator)                       │
+│  - Independent bot instances (Actor-based)                          │
+│  - MessageRouter & SmartDispatch                                    │
 │  - Intent detection & flow routing                                  │
-│  - Multi-bot generator & coordination                               │
+│  - SmartDiscuss (@discuss LLM-based selection)                      │
 │  - Memory & embeddings                                              │
 ├─────────────────────────────────────────────────────────────────────┤
 │  System Integration (Swift/macOS APIs)                             │
@@ -119,101 +123,255 @@
 
 ## Swift Layout
 
+### File-Based Modular Bot Architecture
+
+The Swift port uses a **data-driven, file-based bot system** where adding new bots requires **zero code changes** - just create a folder with configuration files.
+
 ```
- nanofolks-swift/
- ├── Sources/
- │   ├── nanofolks/                    # Main app target
- │   │   ├── App/                      # App entry, main window
- │   │   ├── Views/                    # SwiftUI views
- │   │   ├── ViewModels/               # ObservableObject view models
- │   │   └── Resources/                # Assets, localizations
- │   ├── Agent/                        # Core agent logic
- │   │   ├── Loop.swift                # Agent loop
- │   │   ├── Intent/                   # Intent detection & routing
- │   │   ├── Context/                  # Context building
- │   │   ├── MultiBot/                 # Multi-bot coordination
- │   │   └── Orchestration/            # Pipeline orchestration
- │   ├── Bots/                         # Bot definitions & dispatch
- │   │   ├── Definitions.swift         # Bot registry
- │   │   ├── Dispatch.swift            # Bot dispatching
- │   │   ├── Coordinator.swift         # Multi-bot coordination
- │   │   └── Reasoning/                # Per-bot reasoning configs
- │   ├── Memory/                       # Memory & knowledge
- │   │   ├── Store.swift               # Memory store
- │   │   ├── Models.swift              # Memory models
- │   │   ├── Embeddings.swift          # Embedding generation
- │   │   ├── VectorIndex.swift         # Vector indexing
- │   │   ├── Retrieval.swift           # Context retrieval
- │   │   ├── Summaries.swift           # Memory summarization
- │   │   └── Preferences.swift         # User preferences
- │   ├── Rooms/                        # Room management
- │   │   ├── Manager.swift              # Room manager
- │   │   ├── Models.swift              # Room models
- │   │   ├── Sessions.swift            # Room-centric sessions
- │   │   └── DMRooms.swift              # Bot-to-bot DM rooms
- │   ├── Broker/                       # Message broker
- │   │   ├── RoomBroker.swift          # Per-room FIFO broker
- │   │   ├── GroupCommit.swift         # Batch durability
- │   │   └── Queue.swift               # Message queue
- │   ├── Bus/                          # Event bus
- │   │   ├── Events.swift              # MessageEnvelope types
- │   │   └── Bus.swift                 # Event distribution
- │   ├── Providers/                    # LLM providers
- │   │   ├── Registry.swift            # Provider registry
- │   │   ├── Base.swift                # Provider protocol
- │   │   ├── OpenAI.swift              # OpenAI provider
- │   │   ├── Anthropic.swift           # Anthropic provider
- │   │   └── LiteLLM.swift             # LiteLLM compatibility
- │   ├── Backend/                      # Control plane integration
- │   │   ├── Client.swift              # HTTP client to Nanofolks Cloud
- │   │   ├── Auth.swift                # Login/session + refresh + device registration
- │   │   ├── Entitlements.swift        # Plan/limits + usage remaining
- │   │   └── Models.swift              # DTOs (Codable)
- │   ├── Channels/                     # Channel connectors
- │   │   ├── Manager.swift            # Channel manager
- │   │   ├── Base.swift               # Channel protocol
- │   │   ├── Telegram.swift           # Telegram connector
- │   │   ├── Discord.swift            # Discord connector
- │   │   ├── Slack.swift              # Slack connector
- │   │   └── CLI.swift                # CLI channel
- │   ├── SystemControl/               # macOS-specific (DIFFERENT FROM GO)
- │   │   ├── Workspace.swift           # NSWorkspace wrappers
- │   │   ├── Browser.swift             # Safari/browser automation
- │   │   ├── Filesystem.swift          # File operations
- │   │   ├── Shell.swift               # Shell execution
- │   │   ├── Accessibility.swift      # UI automation
- │   │   ├── AppleScript.swift        # Scripting bridge
- │   │   └── Notifications.swift      # System notifications
- │   ├── Tools/                        # Agent tools
- │   │   ├── Registry.swift            # Tool registry
- │   │   ├── Base.swift               # Tool protocol
- │   │   ├── Permissions.swift        # Per-bot tool permissions
- │   │   ├── MCP.swift                # MCP client
- │   │   └── Skills/                  # Skill execution
- │   ├── Security/                    # Security layer
- │   │   ├── Keyring.swift            # Keychain access
- │   │   ├── KeyVault.swift           # Secret storage
- │   │   ├── Sanitizer.swift          # Log sanitization
- │   │   ├── CredentialDetector.swift # Credential detection
- │   │   └── AuditLogger.swift       # Audit trail
- │   ├── Routines/                    # Scheduling
- │   │   ├── Service.swift            # Routine service
- │   │   ├── Engine.swift             # Routine execution engine
- │   │   ├── TeamRoutines.swift       # Team routines
- │   │   └── Dashboard.swift          # Dashboard server
- │   ├── Identity/                    # Identity & teams
- │   │   ├── TeamManager.swift        # Team management
- │   │   ├── SoulManager.swift        # SOUL.md management
- │   │   ├── Templates.swift          # Identity templates
- │   │   └── RoleParser.swift         # Role card parsing
- │   ├── Config/                      # Configuration
- │   │   ├── Schema.swift             # Config schema
- │   │   └── Loader.swift             # Config loading
- │   └── Utils/                       # Utilities
- │       ├── IDs.swift                # ID normalization
- │       └── Logging.swift            # Logging setup
- └── Tests/
-     └── nanofolks-tests/
+nanofolks-swift/
+├── Bots/                              # BOT DEFINITIONS (Data-Driven)
+│   ├── _templates/                    # Templates for creating new bots
+│   │   ├── template.json              # Base bot template
+│   │   └── README.md                  # How to create a bot
+│   │
+│   ├── leader/                        # Each bot = one folder
+│   │   ├── bot.json                   # Core configuration (name, icon, capabilities)
+│   │   ├── soul.md                    # Personality & values
+│   │   ├── role.md                    # Role definition & responsibilities
+│   │   ├── identity.md                # Identity card (SOUL/IDENTITY.md)
+│   │   ├── tools.json                 # Tool permissions
+│   │   └── reasoning.json             # Reasoning behavior config
+│   │
+│   ├── coder/                         # Coder bot
+│   │   ├── bot.json
+│   │   ├── soul.md
+│   │   ├── role.md
+│   │   └── ...
+│   │
+│   ├── creative/                      # Creative bot
+│   ├── researcher/                    # Researcher bot
+│   ├── auditor/                       # Auditor bot
+│   └── social/                        # Social bot
+│
+├── Sources/
+│   ├── nanofolks/                     # Main app (SwiftUI)
+│   │   ├── App/
+│   │   ├── Views/
+│   │   ├── ViewModels/
+│   │   └── Resources/
+│   │
+│   ├── Fleet/                         # FLEET MANAGEMENT (replaces Agent/)
+│   │   ├── FleetManager.swift         # Manages all bot instances
+│   │   ├── MessageRouter.swift        # Routes messages between bots/users
+│   │   ├── SmartDispatch.swift        # @discuss intelligent selection
+│   │   ├── ResponseCombiner.swift     # Combines multi-bot responses
+│   │   └── RoomSessionManager.swift   # Shared room-centric sessions
+│   │
+│   ├── BotLoader/                     # DYNAMIC BOT LOADING
+│   │   ├── BotLoader.swift            # Scans Bots/ folder, loads configs
+│   │   ├── BotParser.swift            # Parses bot.json files
+│   │   ├── BotValidator.swift         # Validates bot configurations
+│   │   ├── BotConfiguration.swift     # Data models for bot configs
+│   │   └── BotFactory.swift           # Creates bot instances from config
+│   │
+│   ├── BotCore/                       # BOT INFRASTRUCTURE (shared)
+│   │   ├── BotProtocol.swift          # Protocol all bots implement
+│   │   ├── ConcreteBot.swift          # Generic bot implementation
+│   │   ├── BotContext.swift           # Context passed to bots
+│   │   ├── BotToolsResolver.swift     # Resolves tool permissions
+│   │   └── BotReasoningEngine.swift   # Generic reasoning engine
+│   │
+│   ├── Coordination/                  # BOT-TO-BOT COMMUNICATION
+│   │   ├── BotCoordinationChannel.swift
+│   │   ├── DMRoomManager.swift
+│   │   ├── InsightTypes.swift
+│   │   └── CoordinationMessage.swift
+│   │
+│   ├── Dispatch/                      # MESSAGE DISPATCH
+│   │   ├── DispatchTarget.swift       # enum: leader, direct, multi, team, smart_discuss
+│   │   ├── BotDispatch.swift          # Dispatch logic
+│   │   └── RoomManager.swift
+│   │
+│   ├── Memory/                        # SHARED MEMORY
+│   │   ├── Store.swift
+│   │   ├── Embeddings.swift
+│   │   ├── VectorIndex.swift
+│   │   └── Models.swift
+│   │
+│   ├── Providers/                     # LLM PROVIDERS
+│   │   ├── LLMProvider.swift
+│   │   ├── OpenAIProvider.swift
+│   │   ├── AnthropicProvider.swift
+│   │   └── AppleIntelligenceProvider.swift  # Native Apple LLM
+│   │
+│   ├── Tools/                         # SHARED TOOLS
+│   │   ├── Registry.swift
+│   │   ├── Base/
+│   │   ├── Permissions.swift
+│   │   └── MCP/
+│   │
+│   ├── SystemControl/                 # macOS INTEGRATION
+│   │   ├── Workspace.swift
+│   │   ├── Browser.swift
+│   │   ├── Filesystem.swift
+│   │   ├── Shell.swift
+│   │   ├── Accessibility.swift
+│   │   ├── AppleScript.swift
+│   │   └── Notifications.swift
+│   │
+│   ├── Security/
+│   ├── Routines/
+│   ├── Identity/
+│   ├── Config/
+│   └── Utils/
+│
+└── Tests/
+    └── nanofolks-tests/
+```
+
+### Key Architectural Changes
+
+**REMOVED:**
+- ❌ `Agent/` folder - No master controller
+- ❌ `Bots/Definitions.swift` - No hardcoded bot registry
+- ❌ `Bots/Coordinator.swift` - Coordination moved to Fleet/
+
+**ADDED:**
+- ✅ `Bots/` at root - File-based bot definitions (data, not code)
+- ✅ `Fleet/` - Fleet management layer (replaces Agent)
+- ✅ `BotLoader/` - Dynamic loading system
+- ✅ `BotCore/` - Shared bot infrastructure
+
+### How Adding a New Bot Works
+
+**Step 1: Create folder and files**
+```bash
+mkdir Bots/security
+
+# Create bot.json
+cat > Bots/security/bot.json << 'EOF'
+{
+  "name": "security",
+  "display_name": "Security Expert",
+  "icon": "🔒",
+  "description": "Security and compliance specialist",
+  "version": "1.0.0",
+  "enabled": true,
+  "capabilities": {
+    "can_audit": true,
+    "can_code": false,
+    "can_design": false
+  },
+  "behavior": {
+    "response_style": "cautionary",
+    "speak_threshold": 0.6,
+    "max_response_length": 400
+  },
+  "tools": ["security.scan", "compliance.check", "vulnerability.assess"]
+}
+EOF
+
+# Create soul.md
+cat > Bots/security/soul.md << 'EOF'
+# SOUL - Security Expert
+
+## Core Values
+- Security is never optional
+- Privacy by design
+- Defense in depth
+
+## Communication Style
+- Clear about risks
+- Provides actionable fixes
+- Never alarmist
+EOF
+
+# Create role.md
+cat > Bots/security/role.md << 'EOF'
+# ROLE - Security Expert
+
+## Responsibilities
+- Security audits
+- Vulnerability assessments
+- Compliance reviews
+- Privacy guidance
+EOF
+```
+
+**Step 2: Restart app** - Bot is automatically loaded!
+
+No code changes required. The bot appears immediately with:
+- Full personality (from soul.md)
+- Defined role (from role.md)
+- Tool permissions (from tools.json)
+- Behavior config (from bot.json)
+
+### Bot Protocol
+
+```swift
+protocol Bot: Actor {
+    nonisolated var configuration: BotConfiguration { get }
+    nonisolated var name: String { get }
+    nonisolated var icon: String { get }
+    
+    func process(message: Message, context: BotContext) async throws -> Response
+    func evaluateUrgency(for message: Message) async -> Double
+}
+
+struct BotConfiguration: Codable {
+    let name: String
+    let display_name: String
+    let icon: String
+    let description: String
+    let enabled: Bool
+    var capabilities: BotCapabilities
+    var behavior: BotBehavior
+    var tools: [String]
+    var soul: String?        // Loaded from soul.md
+    var role: String?        // Loaded from role.md
+    var identity: String?    // Loaded from identity.md
+}
+```
+
+### Fleet Manager
+
+```swift
+actor FleetManager {
+    private var activeBots: [String: any Bot] = [:]
+    private let botLoader: BotLoader
+    private let provider: LLMProvider
+    
+    // Load all bots from Bots/ folder
+    func loadBots() async throws {
+        let configs = try await botLoader.loadAllBots()
+        
+        for config in configs where config.enabled {
+            let bot = BotFactory.create(from: config, provider: provider)
+            activeBots[config.name] = bot
+        }
+    }
+    
+    // Dynamic reload (no restart needed)
+    func reloadBots() async throws {
+        // Stop current bots
+        // Reload configurations
+        // Restart with new configs
+    }
+    
+    // Dispatch to selected bots
+    func dispatch(message: Message, mode: DispatchMode) async -> [Response] {
+        let selectedBots = await selectBots(for: message, mode: mode)
+        
+        return await withTaskGroup(of: Response.self) { group in
+            for bot in selectedBots {
+                group.addTask {
+                    await bot.process(message: message, context: context)
+                }
+            }
+            // Collect responses...
+        }
+    }
+}
 ```
 
 ---
@@ -224,11 +382,13 @@
 
 | Subsystem | Python Source | Swift v1 Target | Parity Notes | Swift-Specific |
 |---|---|---|---|---|
-| Agent loop + orchestration | `agent/loop.py` | `Agent/Loop.swift` | Must preserve multi-bot pipeline | Use Swift actors for concurrency |
-| Intent detection + flow router | `agent/intent_detector.py`, `agent/intent_flow_router.py` | `Agent/Intent/` | QUICK/FULL flows and cancellation | Swift regex / NaturalLanguage |
-| Project state + phases | `agent/project_state.py` | `Agent/ProjectState.swift` | Persist flow state by room/session | SwiftData persistence |
-| Multi-bot generator | `agent/multi_bot_generator.py` | `Agent/MultiBot/` | Simultaneous responses | Swift AsyncSequence |
-| Tag parsing system | `systems/tag_handler.py` | `Agent/TagHandler.swift` | `@bot` and `#room` tags | Native Swift string processing |
+| **Fleet management** (replaces Agent) | `bots/fleet.py` ✅ COMPLETE | `Fleet/FleetManager.swift` | Manages independent bot instances | Swift actors for concurrency |
+| Message routing | `agent/message_router.py` ✅ COMPLETE | `Fleet/MessageRouter.swift` | Central message router | async/await with TaskGroup |
+| Intent detection + flow router | `agent/intent_detector.py`, `agent/intent_flow_router.py` | `Fleet/Intent/` | QUICK/FULL flows and cancellation | Swift regex / NaturalLanguage |
+| Project state + phases | `agent/project_state.py` | `Fleet/ProjectState.swift` | Persist flow state by room/session | SwiftData persistence |
+| Multi-bot coordination | `agent/multi_bot_generator.py`, `bots/coordination.py` ✅ COMPLETE | `Fleet/MultiBot/` | Smart dispatch & coordination | Swift AsyncSequence |
+| Tag parsing system | `systems/tag_handler.py` | `Fleet/TagHandler.swift` | `@bot` and `#room` tags | Native Swift string processing |
+| SmartDiscuss | `bots/smart_dispatch.py` ✅ COMPLETE | `Fleet/SmartDispatch.swift` | @discuss LLM-based selection | Apple Intelligence framework |
 
 ---
 
@@ -238,7 +398,7 @@
 |---|---|---|---|---|
 | Room manager + mappings | `bots/room_manager.py` | `Rooms/Manager.swift` | Channel↔room mapping | SwiftData @Model |
 | Room model | `models/room.py` | `Rooms/Models.swift` | Schema matching | @Model class |
-| Room-centric sessions | `session/dual_mode.py` | `Rooms/Sessions.swift` | Room-keyed sessions | SQLite.swift |
+| Room-centric sessions | `session/room_session_manager.py` ✅ NEW | `Rooms/Sessions.swift` | Room-keyed sessions | SQLite.swift |
 | CAS storage | `storage/cas_storage.py` | `Storage/CASStorage.swift` | Conflict-free writes | Swift actor + SQLite |
 | Per-room broker | `broker/room_broker.py` | `Broker/RoomBroker.swift` | FIFO per room | Swift actor |
 | Group commit | `broker/group_commit.py` | `Broker/GroupCommit.swift` | Batch durability | Swift async/await |
@@ -247,13 +407,277 @@
 
 ---
 
-### Bots & Coordination
+### Bots & Fleet Architecture
 
 | Subsystem | Python Source | Swift v1 Target | Parity Notes | Swift-Specific |
 |---|---|---|---|---|
-| Bot definitions + registry | `bots/definitions.py` | `Bots/Definitions.swift` | Preserve roles and configs | Swift enum/struct |
-| Dispatch + coordinator | `bots/dispatch.py`, `coordinator/*` | `Bots/Dispatch.swift`, `Bots/Coordinator.swift` | Audit, decisions | Swift actor for thread safety |
-| Bot reasoning configs | `bots/reasoning_configs.py`, `reasoning/config.py` | `Bots/Reasoning/` | Per-bot reasoning modes | Configuration objects |
+| **File-Based Bot System** | N/A (new) ✅ COMPLETE | `Bots/` folder | Zero-code bot creation | Markdown + JSON configs |
+| Bot loader + factory | `bots/dispatch.py` ✅ COMPLETE | `BotLoader/` | Dynamic loading from files | Actor-based concurrent loading |
+| Bot protocol + core | `agent/loop.py` ✅ REFACTORED | `BotCore/` | Generic bot implementation | Swift protocol-oriented design |
+| Fleet management | `bots/fleet.py` ✅ COMPLETE | `Fleet/FleetManager.swift` | Manages independent bot instances | Swift actors for thread safety |
+| Message routing | `agent/message_router.py` ✅ COMPLETE | `Fleet/MessageRouter.swift` | Central message router | async/await with TaskGroup |
+| Dispatch logic | `bots/dispatch.py` ✅ MODIFIED | `Dispatch/` | Routing decisions | enum-based dispatch targets |
+| **SmartDiscuss** | `bots/smart_dispatch.py` ✅ COMPLETE | `Fleet/SmartDispatch.swift` | LLM-based urgency evaluation | Native Apple LLM framework |
+| Bot coordination | `bots/coordination.py` ✅ COMPLETE | `Coordination/` | Bot-to-bot communication | AsyncStream for real-time |
+| Room-centric sessions | `session/room_session_manager.py` ✅ COMPLETE | `Rooms/Sessions.swift` | Room-keyed sessions | SwiftData @Model |
+
+---
+
+## File-Based Bot Architecture Benefits
+
+> **Validated by Python Implementation**: The file-based approach was successfully implemented in Python and proved practical for zero-code bot creation. Each bot folder contains configuration files (JSON) and personality definitions (Markdown), enabling rapid customization without code changes.
+
+### Traditional vs. File-Based Approach
+
+| Aspect | Traditional (Hardcoded) | File-Based (New) |
+|---|---|---|
+| **Adding a bot** | Edit source code, recompile | Create folder + files |
+| **Bot customization** | Requires code changes | Edit markdown files |
+| **Version control** | Code commits | Data files tracked separately |
+| **Community sharing** | Share code | Share bot bundles |
+| **Hot reloading** | Requires restart | Can reload without restart |
+| **User extensibility** | Limited | Power users can create bots |
+
+### Example: Adding "Security" Bot
+
+**Traditional Approach:**
+```swift
+// 1. Edit Definitions.swift
+enum BotType {
+    case leader, coder, creative, researcher, social, auditor
+    case security  // <-- Add this
+}
+
+// 2. Edit BotFactory.swift
+func createBot(_ type: BotType) -> Bot {
+    switch type {
+    case .security:  // <-- Add case
+        return SecurityBot()  // <-- Create new class
+    }
+}
+
+// 3. Create SecurityBot.swift
+class SecurityBot: Bot {  // <-- New file
+    override func process(...) { ... }
+}
+
+// 4. Rebuild app
+// 5. Restart app
+```
+
+**File-Based Approach:**
+```bash
+# Just create folder and files
+mkdir Bots/security
+cat > Bots/security/bot.json << 'JSON'
+{
+  "name": "security",
+  "display_name": "Security Expert",
+  "icon": "🔒",
+  "enabled": true
+}
+JSON
+
+cat > Bots/security/soul.md << 'MD'
+# SOUL - Security Expert
+## Core Values
+- Security first
+- Privacy by design
+MD
+
+# Restart app - bot is automatically loaded!
+```
+
+### Bot Configuration Files
+
+**bot.json** - Core configuration
+```json
+{
+  "name": "coder",
+  "display_name": "Coder",
+  "icon": "💻",
+  "description": "Technical implementation expert",
+  "version": "1.0.0",
+  "enabled": true,
+  
+  "capabilities": {
+    "can_code": true,
+    "can_debug": true,
+    "can_architect": true
+  },
+  
+  "behavior": {
+    "response_style": "technical",
+    "speak_threshold": 0.5,
+    "max_response_length": 500,
+    "voice_tone": "professional"
+  },
+  
+  "tools": [
+    "filesystem.read",
+    "filesystem.write", 
+    "shell.execute",
+    "code.analyze"
+  ],
+  
+  "llm_config": {
+    "model": "gpt-4",
+    "temperature": 0.7,
+    "system_prompt_additions": [
+      "You are an expert software engineer.",
+      "Always consider edge cases."
+    ]
+  }
+}
+```
+
+**soul.md** - Personality & values
+```markdown
+# SOUL - Coder
+
+## Core Values
+- Write clean, maintainable code
+- Prioritize performance and security
+- Explain technical concepts clearly
+
+## Communication Style
+- Direct and concise
+- Uses technical terminology appropriately
+- Provides code examples when relevant
+
+## Constraints
+- Never suggests unsafe practices
+- Always considers edge cases
+- Prefers standard libraries over dependencies
+```
+
+**role.md** - Role definition
+```markdown
+# ROLE - Coder
+
+## Primary Responsibilities
+- Code review and architecture
+- Debugging and optimization
+- API design and implementation
+- Technical documentation
+
+## Expertise Areas
+- Python, JavaScript, TypeScript
+- System architecture
+- Database design
+- DevOps and deployment
+
+## Collaboration Patterns
+- Works closely with Creative on UI implementation
+- Consults Researcher for technical decisions
+- Reports to Leader on technical blockers
+```
+
+**tools.json** - Tool permissions
+```json
+{
+  "allowed_tools": [
+    "filesystem.read",
+    "filesystem.write",
+    "shell.execute",
+    "git.status",
+    "code.analyze"
+  ],
+  "restricted_paths": [
+    "~/.ssh",
+    "/etc",
+    "**/.env"
+  ],
+  "max_file_size": 1048576,
+  "allowed_commands": [
+    "git",
+    "npm",
+    "python",
+    "docker"
+  ]
+}
+```
+
+**reasoning.json** - Reasoning configuration
+```json
+{
+  "mode": "analytical",
+  "step_by_step": true,
+  "considers_alternatives": true,
+  "provides_tradeoffs": true,
+  "confidence_threshold": 0.8
+}
+```
+
+### Dynamic Reloading
+
+```swift
+// Hot reload bots without app restart
+class BotLoader {
+    func startWatching() {
+        let monitor = FolderMonitor(url: botsDirectory)
+        
+        monitor.onChange = { [weak self] in
+            Task {
+                await self?.reloadBots()
+                NotificationCenter.default.post(
+                    name: .botsReloaded,
+                    object: nil
+                )
+            }
+        }
+    }
+    
+    func reloadBots() async {
+        // Stop current bots gracefully
+        // Reload configurations
+        // Start new bots
+        // Update UI
+    }
+}
+```
+
+### Validation
+
+```swift
+struct BotValidator {
+    func validate(_ config: BotConfiguration) throws {
+        // Required fields
+        guard !config.name.isEmpty else {
+            throw BotError.missingName
+        }
+        
+        // Valid name (no spaces, special chars)
+        guard config.name.matches(/^[a-z0-9_]+$/) else {
+            throw BotError.invalidName(config.name)
+        }
+        
+        // Valid tool references
+        for tool in config.tools {
+            guard ToolRegistry.hasTool(named: tool) else {
+                throw BotError.unknownTool(tool)
+            }
+        }
+        
+        // Required files exist
+        guard FileManager.default.fileExists(
+            atPath: config.folder.appendingPathComponent("soul.md").path
+        ) else {
+            throw BotError.missingSoulFile
+        }
+    }
+}
+```
+
+### Benefits Summary
+
+1. **Zero-Code Bot Creation**: Add bots by creating folders/files
+2. **Version Control Friendly**: Bots are data, easily versioned
+3. **Community Sharing**: Share bot configurations as bundles
+4. **Hot Reloading**: Update bots without app restart  
+5. **User Extensibility**: Power users can create custom bots
+6. **Easy Customization**: Edit markdown to change personality
+7. **Modular**: Enable/disable bots via `enabled: false`
 
 ---
 
@@ -657,6 +1081,204 @@ class FilesystemTool {
 
 ---
 
+## SmartDiscuss: LLM-Based Bot Selection
+
+### Overview
+
+**SmartDiscuss** is a new dispatch mode (`@discuss`) that enables intelligent group chat where:
+1. **All room participants** evaluate their urgency to respond
+2. **Only high-urgency bots** (threshold >= 0.5) generate responses
+3. **Micro-turn responses** (1-3 sentences) create natural conversational flow
+4. **LLM-based evaluation** understands nuanced context better than regex
+
+### How It Works
+
+```
+User: "@discuss How should we implement dark mode in our design canvas?"
+
+Phase 1: Urgency Evaluation (Single LLM Call)
+├─ LLM analyzes: "design canvas" needs creative + coder expertise
+├─ LLM evaluates all 6 bots in parallel:
+│   creative: 0.90 - "Color theory and design expertise essential"
+│   coder: 0.75 - "Canvas implementation needs technical knowledge"
+│   researcher: 0.60 - "Could research user preferences"
+│   leader: 0.50 - "Strategic coordination valuable"
+│   auditor: 0.20 - "Accessibility review not immediately needed"
+│   social: 0.10 - "Marketing not relevant to technical question"
+└─ Returns: urgency scores for all bots
+
+Phase 2: Response Generation (Selected Bots Only)
+├─ Filter: urgency >= 0.5
+├─ Sort: by urgency (highest first)
+└─ Selected bots respond in micro-turns:
+    🎨 creative: "We need a semantic color system that maps light theme colors to dark equivalents..."
+    💻 coder: "For canvas implementation, CSS custom properties work best..."
+    📊 researcher: "Studies show 73% of users prefer dark mode at night..."
+    👑 leader: "Let's prioritize the semantic system first. Timeline: 3 days."
+```
+
+### Swift Implementation
+
+```swift
+// SmartDispatch.swift
+actor SmartDispatch {
+    private let roomManager: RoomManager
+    private let llmProvider: LLMProvider
+    private let speakThreshold: Double = 0.5
+    
+    func dispatchSmartDiscuss(
+        message: String,
+        roomId: String,
+        participants: [Bot]
+    ) async throws -> DispatchResult {
+        // Phase 1: LLM evaluates all bots
+        let urgencies = await evaluateUrgencyWithLLM(
+            message: message,
+            participants: participants
+        )
+        
+        // Phase 2: Select high-urgency bots
+        let selectedBots = urgencies
+            .filter { $0.score >= speakThreshold }
+            .sorted { $0.score > $1.score }
+        
+        return DispatchResult(
+            target: .smartDiscuss,
+            primaryBot: selectedBots.first?.name ?? "leader",
+            secondaryBots: selectedBots.dropFirst().map { $0.name },
+            reason: "SmartDiscuss: \(selectedBots.count) bots by urgency",
+            urgencies: urgencies  // Include all scores for debugging
+        )
+    }
+    
+    private func evaluateUrgencyWithLLM(
+        message: String,
+        participants: [Bot]
+    ) async -> [BotUrgency] {
+        // Single LLM call evaluates all bots - cost efficient!
+        let prompt = createUrgencyPrompt(message: message, bots: participants)
+        
+        let response = await llmProvider.chat(
+            messages: [
+                .system("""
+                You are a relevance assessor for a multi-bot system.
+                Rate each bot's urgency to respond (0.0-1.0).
+                0.0 = not relevant, 1.0 = highly relevant
+                Be decisive - most scores should be 0.0-0.3 with 2-4 bots above 0.5
+                """),
+                .user(prompt)
+            ],
+            temperature: 0.1  // Low temp for consistent evaluation
+        )
+        
+        return parseUrgencyResponse(response.content)
+    }
+    
+    private func createUrgencyPrompt(
+        message: String,
+        bots: [Bot]
+    ) -> String {
+        var prompt = "Message: \"\(message)\"\n\n"
+        prompt += "Rate each bot's urgency to respond (0.0-1.0):\n\n"
+        
+        for bot in bots {
+            prompt += "- \(bot.name): \(bot.description)\n"
+        }
+        
+        prompt += "\nReturn as JSON: {\"botname\": {\"score\": 0.8, \"reason\": \"why\"}}"
+        return prompt
+    }
+}
+
+// Usage in MessageRouter
+actor MessageRouter {
+    func route(message: String, roomId: String) async -> [Response] {
+        let dispatchResult = await dispatch(message: message, roomId: roomId)
+        
+        switch dispatchResult.target {
+        case .smartDiscuss:
+            return await routeSmartDiscuss(message, dispatchResult)
+        case .multiBot:
+            return await routeToMultipleBots(message, dispatchResult)
+        case .leader:
+            return await routeToLeader(message)
+        case .direct(let botName):
+            return await routeToBot(message, botName: botName)
+        // ... other cases
+        }
+    }
+    
+    private func routeSmartDiscuss(
+        _ message: String,
+        _ dispatch: DispatchResult
+    ) async -> [Response] {
+        let selectedBots = await getBots(dispatch.secondaryBots)
+        
+        return await withTaskGroup(of: Response.self) { group in
+            for bot in selectedBots {
+                group.addTask {
+                    await bot.process(
+                        message: message,
+                        context: BotContext(
+                            roomId: roomId,
+                            mode: .microTurn  // 1-3 sentences
+                        )
+                    )
+                }
+            }
+            
+            var responses: [Response] = []
+            for await response in group {
+                responses.append(response)
+            }
+            return responses.sorted { 
+                dispatch.urgencies[$0.botName] > dispatch.urgencies[$1.botName]
+            }
+        }
+    }
+}
+```
+
+### Comparison with Other Dispatch Modes
+
+| Mode | Trigger | Who Responds | Response Style | Use Case |
+|------|---------|--------------|----------------|----------|
+| **@all** | `@all` | Everyone (6 bots) | Full independent answers | Maximum coverage |
+| **@team** | `@team` | Keyword-matched bots | Full answers by relevance | Topic-based selection |
+| **@discuss** | `@discuss` | LLM-selected bots (2-4) | Micro-turns (1-3 sentences) | **Deep focused discussion** |
+| **Default** | No tag | Leader only | Full answer | Simple questions |
+
+### Key Advantages
+
+1. **Contextual Understanding**: LLM understands nuanced implications
+   - "design canvas" → creative (0.9) + **coder (0.75)** (regex would miss coder)
+   - "collaborative editing" → **coder (0.9)** + researcher (0.6)
+
+2. **Cost Efficient**: 1 LLM call evaluates all 6 bots vs 6 separate calls
+
+3. **Natural Flow**: Micro-turns create conversational dynamics
+
+4. **Explicit Control**: User chooses when to use smart discussion
+
+### Fallback Strategy
+
+```swift
+if llmProvider.available {
+    return await evaluateWithLLM(message, participants)
+} else {
+    // Fallback to rule-based keyword matching
+    return evaluateWithRules(message, participants)
+}
+```
+
+### Integration with Swift Features
+
+- **Apple Intelligence**: Uses local on-device LLM for urgency evaluation
+- **Swift Concurrency**: Parallel urgency evaluation with async/await
+- **SwiftData**: Cache urgency patterns for repeated queries
+
+---
+
 ## macOS-Specific Features
 
 ### Menu Bar Agent Mode
@@ -725,6 +1347,33 @@ class NanofolksApp: App {
 
 > **Design Philosophy**: CLI-first approach. Build a solid command-line core before adding UI, external channels, or backend dependencies. The CLI serves as the foundation that everything else builds upon.
 
+### Lessons from Python Implementation
+
+**What Worked Well:**
+1. **Fleet Architecture**: Independent bot instances coordinated by FleetManager is much cleaner than a master Agent orchestrator
+2. **File-Based Bots**: Zero-code bot creation via folders/files is practical and maintainable
+3. **SmartDispatch**: LLM-based urgency evaluation (0.5 threshold) successfully identifies relevant bots
+4. **Single LLM Call**: Evaluating all bots in one call is cost-effective (vs 6 separate calls)
+5. **Two-Phase Architecture**: Phase 1 (eval) → Phase 2 (respond) creates clear separation of concerns
+
+**Implementation Details:**
+- **Urgency Prompt Template**: System prompt emphasizes decisive scoring (most bots should score 0.0-0.3, only 2-4 above 0.5)
+- **Temperature**: Use 0.1 for consistent evaluation
+- **Fallback**: Rule-based keyword matching if LLM unavailable
+- **Response Ordering**: Sort by urgency score (highest first) for natural conversation flow
+
+**What Needs Refinement:**
+1. **Micro-Turn Enforcement**: System prompt constraints help but need stronger enforcement
+2. **Threshold Tuning**: 0.5 works well but may need per-bot customization
+3. **Interrupt Logic**: Bot-to-bot interruption not yet implemented (future enhancement)
+4. **Dynamic Selection**: Currently only at dispatch time, not mid-conversation
+
+**Swift-Specific Considerations:**
+- Use Swift Actors for bot instances (thread-safe, concurrent)
+- Leverage Apple Intelligence for urgency evaluation (local, fast)
+- Use SwiftData for room sessions (native persistence)
+- Combine framework for event bus (replaces Python asyncio queues)
+
 ### Phase 0: Control Plane MVP (Weeks 0-1)
 - [ ] Choose backend hosting (Railway/Vercel/VPS) and DB (Supabase/Convex)
 - [ ] Implement OpenAuth login flow + session issuance
@@ -733,13 +1382,22 @@ class NanofolksApp: App {
 - [ ] Minimal admin UI/pages (user lookup + status + usage + revoke device)
 
 ### Phase 1: Core CLI Foundation (Weeks 1-3)
+
+**Note**: Starting with Fleet architecture (not Agent loop) based on Python implementation success
+
 - [ ] Swift CLI project setup (not app target - pure command-line)
-- [ ] Agent loop implementation
+- [ ] **Fleet architecture** (replaces Agent loop)
+  - [ ] FleetManager for bot coordination (Actor-based)
+  - [ ] MessageRouter for message dispatch
+  - [ ] Single-bot mode (leader only) - start simple
 - [ ] Intent detection & routing
 - [ ] Basic LLM integration (direct providers - no backend yet)
+  - [ ] OpenAI provider via URLSession
+  - [ ] Simple chat completion API
 - [ ] Simple REPL-style CLI interface
-- [ ] Room/session management (in-memory + SQLite)
+- [ ] Room/session management (in-memory + SQLite.swift)
 - [ ] Basic logging and error handling
+- [ ] Load single "leader" bot from file (BOTS/leader/bot.json)
 
 ### Phase 2: Core Tools & System Integration (Weeks 4-5)
 - [ ] Tool registry & base protocol
@@ -756,12 +1414,52 @@ class NanofolksApp: App {
 - [ ] Context building & summarization
 - [ ] Session compaction
 
-### Phase 4: Multi-Bot & Coordination (Weeks 8-9)
-- [ ] Bot definitions & registry
-- [ ] Multi-bot coordination
-- [ ] Message broker (per-room FIFO)
-- [ ] DM rooms between bots
-- [ ] Bot reasoning configs
+### Phase 4: File-Based Bot Architecture (Weeks 8-10)
+
+**Implementation notes based on Python completion:**
+- Threshold 0.5 works well for urgency filtering
+- Single LLM call for all bots is cost-effective
+- Micro-turns (1-3 sentences) create natural flow
+- Fallback to rule-based if LLM unavailable
+
+- [ ] **File-based bot system** (zero-code bot creation)
+  - [ ] Bots/ folder structure with templates
+  - [ ] bot.json schema (name, icon, capabilities, behavior, speak_threshold)
+  - [ ] soul.md, role.md, identity.md support
+  - [ ] tools.json for tool permissions
+  - [ ] reasoning.json for behavior config
+- [ ] **BotLoader** dynamic loading system
+  - [ ] Scan Bots/ folder on startup
+  - [ ] Parse JSON + markdown files
+  - [ ] Validate bot configurations (name format, tool existence)
+  - [ ] Hot reload capability (watch folder changes)
+- [ ] **BotCore** infrastructure
+  - [ ] Bot protocol (Actor-based for Swift)
+  - [ ] ConcreteBot generic implementation
+  - [ ] BotContext for shared state
+  - [ ] Tool resolution from permissions
+  - [ ] Bot evaluateUrgency() method for SmartDiscuss
+- [ ] **Fleet** management layer
+  - [ ] FleetManager (replaces Agent)
+  - [ ] MessageRouter for dispatch (handles SMART_DISCUSS)
+  - [ ] RoomSessionManager for shared sessions
+  - [ ] Bot-to-bot coordination channel
+  - [ ] RoomBroker for FIFO per-room processing
+- [ ] **SmartDispatch** (@discuss trigger)
+  - [ ] Two-phase architecture: Phase 1 (LLM urgency eval), Phase 2 (selected bots respond)
+  - [ ] Urgency evaluation prompt template (single LLM call)
+  - [ ] Threshold filtering (>= 0.5 to speak)
+  - [ ] Fallback to rule-based keyword matching
+  - [ ] Sort by urgency score (highest first)
+- [ ] **ResponseCombiner** (multi-bot responses)
+  - [ ] Format single vs multiple responses
+  - [ ] Include bot icons/names
+  - [ ] Handle overlapping content intelligently
+  - [ ] Configurable response ordering (urgency-based)
+- [ ] **Micro-turn enforcement**
+  - [ ] System prompt constraints (1-3 sentences)
+  - [ ] Optional max token limits
+  - [ ] Natural conversation flow indicator
 
 ### Phase 5: CLI Channel (Weeks 10-11)
 - [ ] Formalize CLI as a first-class channel
@@ -811,7 +1509,7 @@ class NanofolksApp: App {
 
 ## Comparison: Swift vs Go vs Python
 
-| Aspect | Swift | Go | Python (current) |
+| Aspect | Swift | Go | Python (current - Multi-Bot) |
 |--------|-------|-----|-------------------|
 | **macOS Integration** | ✅ Native APIs | ❌ Shell only | ❌ Shell only |
 | **Cross-platform** | Apple only | ✅ Excellent | ✅ Excellent |
@@ -821,6 +1519,9 @@ class NanofolksApp: App {
 | **UI Development** | ✅ SwiftUI | ⚠️ Web | ⚠️ Web |
 | **Build size** | Medium | Small | Medium |
 | **Startup time** | Fast | Fastest | Slow |
+| **Multi-Bot Architecture** | ✅ Fleet-based (planned) | N/A | ✅ Fleet-based (COMPLETE) |
+| **SmartDiscuss (@discuss)** | ✅ LLM-based (planned) | N/A | ✅ LLM-based (COMPLETE) |
+| **File-Based Bots** | ✅ Zero-code (planned) | N/A | ✅ Zero-code (COMPLETE) |
 
 ---
 
@@ -857,8 +1558,45 @@ class NanofolksApp: App {
 
 ---
 
-**Status**: Planning  
+**Status**: Planning (Python Implementation COMPLETE)  
 **Next Step**: Confirm backend stack (hosting + DB + billing) and implement Phase 0, then begin Phase 1 CLI foundation
+
+---
+
+## Implementation Status
+
+### Python True Multi-Bot Architecture: COMPLETE ✅
+
+The Python implementation has been completed with the following components:
+
+**New Modules Created:**
+- `agent/response_combiner.py` - Combines multi-bot responses with smart formatting
+- `agent/message_router.py` - Routes messages to bots, handles SMART_DISCUSS dispatch mode
+- `bots/fleet.py` - Manages independent bot instances (replaces Agent orchestrator)
+- `bots/coordination.py` - Bot-to-bot communication channel (DM rooms, insights)
+- `bots/smart_dispatch.py` - LLM-based urgency evaluation for @discuss
+- `session/room_session_manager.py` - Room-centric sessions shared across bots
+- `config/schema.py` - Feature flags for gradual rollout
+- `multi_bot_integration.py` - Helper functions for integration
+
+**Modified Modules:**
+- `bots/dispatch.py` - Added SMART_DISCUSS dispatch target, @discuss trigger recognition
+
+**Migration & Documentation:**
+- `scripts/migrate_sessions_to_rooms.py` - Session to room migration tool
+- `docs/MULTI_BOT_ARCHITECTURE_README.md` - Complete architecture documentation
+- `IMPLEMENTATION_SUMMARY.md` - Implementation summary with examples
+
+**Tests:**
+- `tests/test_response_combiner.py` - Response combiner unit tests
+
+### Key Insights from Python Implementation
+
+1. **SmartDispatch Works**: LLM-based urgency evaluation (0.5 threshold) successfully identifies relevant bots
+2. **Single LLM Call Efficiency**: Evaluating all bots in one call is cost-effective vs 6 separate calls
+3. **Micro-Turns Matter**: Limiting responses to 1-3 sentences creates natural conversation flow
+4. **File-Based Bots**: Zero-code bot creation via folders/files is practical and maintainable
+5. **Fleet Architecture**: Independent bot instances coordinated by FleetManager is cleaner than master Agent
 
 ---
 

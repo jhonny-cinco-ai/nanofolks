@@ -19,21 +19,24 @@ from nanofolks.models.room import Room
 
 class DispatchTarget(Enum):
     """Who should receive the message."""
-    LEADER_FIRST = "leader_first"      # Route through Leader
-    DIRECT_BOT = "direct_bot"          # User tagged a specific bot
-    DM = "dm"                          # Direct message to specific bot
-    MULTI_BOT = "multi_bot"            # All specified bots respond (@all)
-    TEAM_CONTEXT = "team_context"      # Relevant bots respond (@team)
+
+    LEADER_FIRST = "leader_first"  # Route through Leader
+    DIRECT_BOT = "direct_bot"  # User tagged a specific bot
+    DM = "dm"  # Direct message to specific bot
+    MULTI_BOT = "multi_bot"  # All specified bots respond (@all)
+    TEAM_CONTEXT = "team_context"  # Relevant bots respond (@team)
+    SMART_DISCUSS = "smart_discuss"  # Smart group discussion (@discuss)
 
 
 @dataclass
 class DispatchResult:
     """Result of dispatch decision."""
+
     target: DispatchTarget
-    primary_bot: str                   # Who responds first
-    secondary_bots: List[str]          # Who gets notified after
+    primary_bot: str  # Who responds first
+    secondary_bots: List[str]  # Who gets notified after
     room_id: Optional[str] = None
-    reason: str = ""                   # Why this dispatch decision
+    reason: str = ""  # Why this dispatch decision
 
 
 class BotDispatch:
@@ -61,12 +64,83 @@ class BotDispatch:
 
     # Keywords that trigger specific bots for @team mode
     BOT_KEYWORDS = {
-        "coder": ["code", "programming", "bug", "fix", "python", "javascript", "api", "database", "sql", "develop", "function", "class", "module"],
-        "researcher": ["research", "data", "analyze", "market", "competitor", "trend", "survey", "study", "investigate", "report"],
-        "creative": ["design", "visual", "logo", "brand", "color", "ui", "ux", "mockup", "creative", "image", "art", "style"],
-        "social": ["post", "tweet", "engagement", "audience", "viral", "hashtag", "content", "social", "media", "marketing", "community"],
-        "auditor": ["audit", "quality", "compliance", "security", "review", "check", "test", "validate", "verify", "standard"],
-        "leader": ["plan", "coordinate", "delegate", "prioritize", "team", "schedule", "manage", "organize", "strategy"],
+        "coder": [
+            "code",
+            "programming",
+            "bug",
+            "fix",
+            "python",
+            "javascript",
+            "api",
+            "database",
+            "sql",
+            "develop",
+            "function",
+            "class",
+            "module",
+        ],
+        "researcher": [
+            "research",
+            "data",
+            "analyze",
+            "market",
+            "competitor",
+            "trend",
+            "survey",
+            "study",
+            "investigate",
+            "report",
+        ],
+        "creative": [
+            "design",
+            "visual",
+            "logo",
+            "brand",
+            "color",
+            "ui",
+            "ux",
+            "mockup",
+            "creative",
+            "image",
+            "art",
+            "style",
+        ],
+        "social": [
+            "post",
+            "tweet",
+            "engagement",
+            "audience",
+            "viral",
+            "hashtag",
+            "content",
+            "social",
+            "media",
+            "marketing",
+            "community",
+        ],
+        "auditor": [
+            "audit",
+            "quality",
+            "compliance",
+            "security",
+            "review",
+            "check",
+            "test",
+            "validate",
+            "verify",
+            "standard",
+        ],
+        "leader": [
+            "plan",
+            "coordinate",
+            "delegate",
+            "prioritize",
+            "team",
+            "schedule",
+            "manage",
+            "organize",
+            "strategy",
+        ],
     }
 
     def __init__(self, leader_bot=None, room_manager=None):
@@ -104,7 +178,7 @@ class BotDispatch:
                 primary_bot=dm_target,
                 secondary_bots=[],
                 room_id=None,
-                reason=f"Direct message to @{dm_target}"
+                reason=f"Direct message to @{dm_target}",
             )
 
         # Case 2: User tagged specific bot - bypass leader
@@ -112,24 +186,46 @@ class BotDispatch:
         if mentioned:
             if "all" in mentioned:
                 # @all - all bots respond simultaneously
-                participants = room.participants if room else ["leader", "coder", "researcher", "creative", "social", "auditor"]
+                participants = (
+                    room.participants
+                    if room
+                    else ["leader", "coder", "researcher", "creative", "social", "auditor"]
+                )
                 return DispatchResult(
                     target=DispatchTarget.MULTI_BOT,
                     primary_bot="leader",
                     secondary_bots=[p for p in participants if p != "leader"],
                     room_id=room.id if room else None,
-                    reason="User tagged @all - all bots respond"
+                    reason="User tagged @all - all bots respond",
                 )
             elif "team" in mentioned:
                 # @team - relevant bots based on keywords
-                participants = room.participants if room else ["leader", "coder", "researcher", "creative", "social", "auditor"]
+                participants = (
+                    room.participants
+                    if room
+                    else ["leader", "coder", "researcher", "creative", "social", "auditor"]
+                )
                 relevant_bots = self._select_relevant_bots(message, participants)
                 return DispatchResult(
                     target=DispatchTarget.TEAM_CONTEXT,
                     primary_bot="leader",
                     secondary_bots=relevant_bots,
                     room_id=room.id if room else None,
-                    reason="User tagged @team - relevant bots respond"
+                    reason="User tagged @team - relevant bots respond",
+                )
+            elif "discuss" in mentioned:
+                # @discuss - smart group discussion mode
+                participants = (
+                    room.participants
+                    if room
+                    else ["leader", "coder", "researcher", "creative", "social", "auditor"]
+                )
+                return DispatchResult(
+                    target=DispatchTarget.SMART_DISCUSS,
+                    primary_bot="leader",
+                    secondary_bots=[p for p in participants if p != "leader"],
+                    room_id=room.id if room else None,
+                    reason="User triggered @discuss - smart group discussion mode",
                 )
             elif len(mentioned) == 1:
                 # Single bot mentioned
@@ -138,7 +234,7 @@ class BotDispatch:
                     primary_bot=mentioned[0],
                     secondary_bots=[],
                     room_id=room.id if room else None,
-                    reason=f"User tagged @{mentioned[0]} directly"
+                    reason=f"User tagged @{mentioned[0]} directly",
                 )
             else:
                 # Multiple specific bots mentioned
@@ -147,7 +243,7 @@ class BotDispatch:
                     primary_bot="leader",
                     secondary_bots=mentioned,
                     room_id=room.id if room else None,
-                    reason=f"Multiple mentions: {', '.join(mentioned)}"
+                    reason=f"Multiple mentions: {', '.join(mentioned)}",
                 )
 
         # Case 3: Default - Route through Leader first
@@ -159,7 +255,7 @@ class BotDispatch:
             primary_bot="leader",
             secondary_bots=secondary,
             room_id=room.id if room else None,
-            reason="Default: Leader coordinates response"
+            reason="Default: Leader coordinates response",
         )
 
     def _extract_mentions(self, message: str) -> List[str]:
@@ -184,6 +280,10 @@ class BotDispatch:
         # Check for @team
         if "@team" in message_lower:
             mentions.append("team")
+
+        # Check for @discuss
+        if "@discuss" in message_lower:
+            mentions.append("discuss")
 
         # Check for specific bot mentions (excluding @all/@team)
         for mention, bot_name in self.BOT_MENTIONS.items():
@@ -344,6 +444,92 @@ class BotDispatch:
         lines.append(f"   Reason: {result.reason}")
 
         return "\n".join(lines)
+
+    def get_all_participants(self, room: Optional[Room] = None) -> List[str]:
+        """Get all bot participants for a room.
+
+        Args:
+            room: Room context (uses default if None)
+
+        Returns:
+            List of bot names that are participants
+        """
+        if room and room.participants:
+            return room.participants
+        # Default to all available bots
+        return ["leader", "coder", "researcher", "creative", "social", "auditor"]
+
+    def is_valid_bot(self, bot_name: str) -> bool:
+        """Check if a bot name is valid.
+
+        Args:
+            bot_name: Name to check
+
+        Returns:
+            True if valid bot name
+        """
+        valid_bots = set(self.BOT_MENTIONS.values())
+        valid_bots.discard("all")
+        valid_bots.discard("team")
+        return bot_name in valid_bots
+
+    def get_available_bots(self) -> List[str]:
+        """Get list of all available bot names.
+
+        Returns:
+            List of bot names
+        """
+        return ["leader", "coder", "researcher", "creative", "social", "auditor"]
+
+    def get_bot_display_name(self, bot_name: str) -> str:
+        """Get display name for a bot.
+
+        Args:
+            bot_name: Bot name
+
+        Returns:
+            Display name (capitalized bot name)
+        """
+        return bot_name.capitalize()
+
+    def analyze_message(self, message: str) -> Dict:
+        """Analyze a message for routing information.
+
+        Args:
+            message: User message
+
+        Returns:
+            Dict with analysis results
+        """
+        mentions = self._extract_mentions(message)
+
+        return {
+            "mentions": mentions,
+            "has_mentions": len(mentions) > 0,
+            "mentioned_all": "all" in mentions,
+            "mentioned_team": "team" in mentions,
+            "specific_bots": [m for m in mentions if m not in ["all", "team"]],
+            "keywords_matched": self._analyze_keywords(message),
+        }
+
+    def _analyze_keywords(self, message: str) -> Dict[str, int]:
+        """Analyze keyword matches for each bot.
+
+        Args:
+            message: User message
+
+        Returns:
+            Dict mapping bot names to keyword match counts
+        """
+        message_lower = message.lower()
+        scores = {}
+
+        for bot, keywords in self.BOT_KEYWORDS.items():
+            score = sum(1 for kw in keywords if kw in message_lower)
+            if score > 0:
+                scores[bot] = score
+
+        return scores
 
 
 # Convenience function

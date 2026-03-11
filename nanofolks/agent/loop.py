@@ -954,8 +954,12 @@ Current conversation history:
         dispatch = BotDispatch(room_manager=room_mgr)
         result = dispatch.dispatch_message(message, room=current_room, is_dm=False)
 
-        # Only handle MULTI_BOT and TEAM_CONTEXT modes
-        if result.target in [DispatchTarget.MULTI_BOT, DispatchTarget.TEAM_CONTEXT]:
+        # Only handle MULTI_BOT, TEAM_CONTEXT, and SMART_DISCUSS modes
+        if result.target in [
+            DispatchTarget.MULTI_BOT,
+            DispatchTarget.TEAM_CONTEXT,
+            DispatchTarget.SMART_DISCUSS,
+        ]:
             # Get all bots to respond (primary + secondary)
             all_bots = [result.primary_bot] + result.secondary_bots
             # Remove duplicates while preserving order

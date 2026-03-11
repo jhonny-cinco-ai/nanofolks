@@ -798,6 +798,45 @@ class StorageConfig(Base):
     beta: bool = False  # Beta flag for gradual rollout
 
 
+class FeatureFlags(Base):
+    """Feature flags for gradual rollout of multi-bot architecture.
+
+    These flags allow gradual migration from the current single-bot architecture
+    to the new multi-bot fleet architecture. Each flag can be enabled independently.
+    """
+
+    use_fleet_architecture: bool = False  # Enable BotFleet for multi-bot management
+    use_room_sessions: bool = False  # Enable RoomSessionManager for shared room sessions
+    use_message_router: bool = False  # Enable MessageRouter for routing
+    use_bot_coordination: bool = False  # Enable BotCoordinationChannel for bot-to-bot comms
+
+
+class FleetConfig(Base):
+    """Bot fleet configuration for multi-bot architecture."""
+
+    # Auto-start these bots on startup
+    auto_start_bots: list[str] = Field(default_factory=lambda: ["leader", "coder", "researcher"])
+
+    # Resource limits
+    max_concurrent_bots: int = 10
+    cleanup_idle_bots: bool = True
+    idle_timeout_seconds: int = 300  # Stop bots idle for 5 minutes
+
+    # Health monitoring
+    health_check_interval: int = 30  # seconds
+    bot_timeout: int = 60  # seconds
+
+    # Behavior
+    enable_leader_first: bool = True  # Default to leader-first routing
+    max_parallel_bots: int = 6  # Max bots to invoke in parallel
+    response_timeout: int = 30  # seconds
+
+    # Bot specific configs
+    default_model: str | None = None  # Uses provider default if None
+    default_temperature: float = 0.7
+    default_max_tokens: int = 4096
+
+
 class Config(BaseSettings):
     """Root configuration for nanofolks."""
 
@@ -812,6 +851,10 @@ class Config(BaseSettings):
     security: SecurityConfig = Field(default_factory=SecurityConfig)
     work_logs: WorkLogsConfig = Field(default_factory=WorkLogsConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
+
+    # Multi-bot architecture feature flags
+    features: FeatureFlags = Field(default_factory=FeatureFlags)
+    fleet: FleetConfig = Field(default_factory=FleetConfig)
 
     @property
     def workspace_path(self) -> Path:

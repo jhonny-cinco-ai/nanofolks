@@ -620,6 +620,41 @@ Then restart nanofolks for secure access.
         except Exception as e:
             console.print(f"[yellow]⚠ Could not save model: {e}[/yellow]")
 
+    async def _save_multi_bot_config(self) -> None:
+        """Save multi-bot architecture configuration.
+
+        Sets up the new multi-bot fleet architecture with:
+        - Feature flags enabled for gradual rollout
+        - Auto-start with just the leader bot initially
+        - Room-based sessions enabled
+        """
+        try:
+            from nanofolks.agent.tools.update_config import UpdateConfigTool
+
+            tool = UpdateConfigTool()
+
+            # Enable multi-bot architecture feature flags
+            await tool.execute(path="features.use_fleet_architecture", value=True)
+            await tool.execute(path="features.use_room_sessions", value=True)
+            await tool.execute(path="features.use_message_router", value=True)
+            await tool.execute(path="features.use_bot_coordination", value=True)
+
+            # Configure fleet - start with just leader initially
+            await tool.execute(path="fleet.auto_start_bots", value=["leader"])
+            await tool.execute(path="fleet.max_concurrent_bots", value=10)
+            await tool.execute(path="fleet.cleanup_idle_bots", value=True)
+            await tool.execute(path="fleet.idle_timeout_seconds", value=300)
+            await tool.execute(path="fleet.health_check_interval", value=30)
+            await tool.execute(path="fleet.bot_timeout", value=60)
+            await tool.execute(path="fleet.enable_leader_first", value=True)
+            await tool.execute(path="fleet.max_parallel_bots", value=6)
+            await tool.execute(path="fleet.response_timeout", value=30)
+
+            console.print("[dim]✓ Multi-bot architecture enabled (starting with leader)[/dim]")
+
+        except Exception as e:
+            console.print(f"[yellow]⚠ Could not save multi-bot config: {e}[/yellow]")
+
     def _get_available_models(self, provider: str) -> list:
         """Get available models for a provider."""
         # Simplified - in production would query provider schema
@@ -791,7 +826,12 @@ Then restart nanofolks for secure access.
 
         console.print(team_table)
         console.print()
-        console.print("[dim]All 6 bots will be created and ready to use.[/dim]\n")
+        console.print(
+            "[dim]All 6 bots are available. Starting with @leader in #general room.[/dim]"
+        )
+        console.print(
+            "[dim]Use '@botname' to message other bots, or '@all' to message everyone.[/dim]\n"
+        )
 
     def _confirm_and_create(self) -> None:
         """Final confirmation and room creation."""
@@ -812,7 +852,7 @@ Then restart nanofolks for secure access.
         team_obj = self.team_manager.get_current_team()
         team_name = team_obj["name"] if team_obj else self.selected_team or "Unknown"
         summary_table.add_row("Team", team_name)
-        summary_table.add_row("Bots", "6 (all ready)")
+        summary_table.add_row("Bots", "6 available (starting with leader)")
         summary_table.add_row("Room", "#general")
 
         console.print(summary_table)
@@ -820,6 +860,8 @@ Then restart nanofolks for secure access.
 
         if self._confirm("🚀 Launch your team?", default=True):
             console.print()
+            # Save multi-bot architecture configuration
+            asyncio.run(self._save_multi_bot_config())
         else:
             console.print("[yellow]Setup cancelled[/yellow]\n")
 

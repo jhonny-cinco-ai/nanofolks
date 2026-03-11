@@ -1,0 +1,523 @@
+"""MessageRouter: Routes messages to bots without being a bot itself.
+
+This module provides the MessageRouter class, which is the central routing
+component in the multi-bot architecture. It receives messages from the bus,
+determines which bot(s) should handle them, and routes accordingly.
+
+Unlike the current AgentLoop, the MessageRouter has no bot identity of its own.
+It is purely a routing layer that coordinates multiple independent bot instances.
+"""
+
+import asyncio
+from pathlib import Path
+from typing import TYPE_CHECKING, Dict, List, Optional
+
+from loguru import logger
+
+from nanofolks.bots.dispatch import BotDispatch, DispatchResult, DispatchTarget
+from nanofolks.bots.room_manager import RoomManager, get_room_manager
+from nanofolks.bus.events import MessageEnvelope
+from nanofolks.bus.queue import MessageBus
+
+if TYPE_CHECKING:
+    from nanofolks.agent.loop import AgentLoop
+
+
+class MessageRouter:
+    """Routes messages to appropriate bot(s) without being a bot itself.
+
+    The MessageRouter is the central routing component in the multi-bot architecture.
+    It receives messages from the bus, uses BotDispatch to determine which bot(s)
+    should handle the message, and routes to those bots.
+
+    Key responsibilities:
+    - Receive messages from the message bus
+    - Determine dispatch strategy using BotDispatch
+    - Route to single bot or broadcast to multiple bots
+    - Combine responses when multiple bots respond
+    - Manage room context
+    - Coordinate bot fleet (via BotFleet)
+
+    Attributes:
+        fleet: BotFleet instance managing all bot instances
+        room_manager: RoomManager for room operations
+        bus: MessageBus for sending/receiving messages
+        dispatch: BotDispatch for routing decisions
+        response_combiner: ResponseCombiner for formatting multi-bot responses
+        _running: Whether the router loop is running
+        _current_room_id: Currently active room for routing context
+    """
+
+    def __init__(
+        self,
+        bus: MessageBus,
+        fleet: "BotFleet",
+        room_manager: Optional[RoomManager] = None,
+    ):
+        """Initialize the MessageRouter.
+
+        Args:
+            bus: MessageBus for sending/receiving messages
+            fleet: BotFleet managing all bot instances
+            room_manager: Optional RoomManager (uses singleton if not provided)
+        """
+        self.bus = bus
+        self.fleet = fleet
+        self.room_manager = room_manager or get_room_manager()
+        self.dispatch = BotDispatch(room_manager=self.room_manager)
+
+        # Import ResponseCombiner here to avoid circular imports
+        from nanofolks.agent.response_combiner import ResponseCombiner
+
+        self.response_combiner = ResponseCombiner()
+
+        self._running = False
+        self._current_room_id = "general"
+
+        self.logger = logger.bind(component="MessageRouter")
+        self.logger.info("MessageRouter initialized")
+
+    async def run(self) -> None:
+        """Run the router loop, processing messages from the bus.
+
+        This is the main entry point for the router. It continuously
+        consumes messages from the bus and routes them to appropriate bots.
+        """
+        self._running = True
+        self.logger.info("MessageRouter started - listening for messages")
+
+        while self._running:
+            try:
+                # Wait for next message (with timeout to allow clean shutdown)
+                msg = await asyncio.wait_for(self.bus.consume_inbound(), timeout=1.0)
+
+                if msg is None:
+                    continue
+
+                # Process the message
+                try:
+                    response = await self.route_message(msg)
+                    if response:
+                        await self.bus.publish_outbound(response)
+                        self.logger.debug(f"Published response from {response.bot_name}")
+                except Exception as e:
+                    self.logger.error(f"Error routing message: {e}")
+                    # Send error response
+                    error_response = MessageEnvelope(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        content=f"❌ I encountered an error: {str(e)}",
+                        bot_name="system",
+                        room_id=msg.room_id or self._current_room_id,
+                    )
+                    await self.bus.publish_outbound(error_response)
+
+            except asyncio.TimeoutError:
+                # Normal timeout - just continue
+                continue
+            except Exception as e:
+                self.logger.error(f"Error in router loop: {e}")
+                await asyncio.sleep(0.1)
+
+    async def stop(self) -> None:
+        """Stop the router loop."""
+        self._running = False
+        self.logger.info("MessageRouter stopped")
+
+    async def route_message(self, msg: MessageEnvelope) -> Optional[MessageEnvelope]:
+        """Route message to appropriate bot(s).
+
+        This is the core routing method. It:
+        1. Determines the dispatch strategy using BotDispatch
+        2. Routes to single bot or multiple bots
+        3. Combines responses if needed
+
+        Args:
+            msg: The incoming message to route
+
+        Returns:
+            Response MessageEnvelope, or None if no response needed
+        """
+        # Update current room context
+        self._current_room_id = msg.room_id or self._current_room_id
+
+        self.logger.info(
+            f"Routing message in room '{self._current_room_id}': {msg.content[:50]}..."
+        )
+
+        # Get room context
+        room = None
+        if self.room_manager and self._current_room_id:
+            room = self.room_manager.get_room(self._current_room_id)
+
+        # Determine dispatch strategy
+        dispatch_result = self.dispatch.dispatch_message(
+            message=msg.content,
+            room=room,
+            is_dm=msg.is_dm if hasattr(msg, "is_dm") else False,
+            dm_target=msg.dm_target if hasattr(msg, "dm_target") else None,
+        )
+
+        self.logger.info(
+            f"Dispatch decision: {dispatch_result.target.value} -> {dispatch_result.primary_bot}"
+        )
+
+        # Route based on dispatch mode
+        if dispatch_result.target == DispatchTarget.DIRECT_BOT:
+            return await self._route_to_single_bot(msg, dispatch_result)
+
+        elif dispatch_result.target in [DispatchTarget.MULTI_BOT, DispatchTarget.TEAM_CONTEXT]:
+            return await self._route_to_multiple_bots(msg, dispatch_result)
+
+        elif dispatch_result.target == DispatchTarget.SMART_DISCUSS:
+            # Use SmartDispatch for intelligent bot selection
+            return await self._route_smart_discuss(msg, dispatch_result)
+
+        elif dispatch_result.target == DispatchTarget.LEADER_FIRST:
+            return await self._route_through_leader(msg, dispatch_result)
+
+        elif dispatch_result.target == DispatchTarget.DM:
+            return await self._route_to_dm(msg, dispatch_result)
+
+        else:
+            # Unknown dispatch target - default to leader
+            self.logger.warning(
+                f"Unknown dispatch target: {dispatch_result.target}, defaulting to leader"
+            )
+            return await self._route_through_leader(msg, dispatch_result)
+
+    async def _route_to_single_bot(
+        self, msg: MessageEnvelope, dispatch_result: DispatchResult
+    ) -> MessageEnvelope:
+        """Route message to a single bot.
+
+        Args:
+            msg: The incoming message
+            dispatch_result: Dispatch decision
+
+        Returns:
+            Bot response
+        """
+        bot_name = dispatch_result.primary_bot
+
+        # Ensure bot is running
+        if bot_name not in self.fleet.get_active_bots():
+            self.logger.info(f"Bot '{bot_name}' not active, attempting to start")
+            try:
+                await self.fleet.start_bot(bot_name)
+            except Exception as e:
+                self.logger.error(f"Failed to start bot '{bot_name}': {e}")
+                return MessageEnvelope(
+                    content=f"❌ Bot '{bot_name}' is not available",
+                    bot_name="system",
+                    room_id=msg.room_id,
+                    metadata={"error": "bot_not_available", "bot_name": bot_name},
+                )
+
+        # Route to the bot
+        try:
+            response = await self.fleet.bots[bot_name].process_message(msg)
+            return response
+        except Exception as e:
+            self.logger.error(f"Error from bot '{bot_name}': {e}")
+            return MessageEnvelope(
+                content=f"❌ Bot '{bot_name}' encountered an error: {str(e)}",
+                bot_name=bot_name,
+                room_id=msg.room_id,
+                metadata={"error": str(e)},
+            )
+
+    async def _route_to_multiple_bots(
+        self, msg: MessageEnvelope, dispatch_result: DispatchResult
+    ) -> MessageEnvelope:
+        """Route message to multiple bots in parallel.
+
+        Args:
+            msg: The incoming message
+            dispatch_result: Dispatch decision
+
+        Returns:
+            Combined response from all bots
+        """
+        # Get all bots to respond (primary + secondary)
+        all_bots = [dispatch_result.primary_bot] + dispatch_result.secondary_bots
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_bots = []
+        for bot in all_bots:
+            if bot and bot not in seen:
+                seen.add(bot)
+                unique_bots.append(bot)
+
+        self.logger.info(f"Broadcasting to {len(unique_bots)} bots: {', '.join(unique_bots)}")
+
+        # Ensure all bots are running
+        for bot_name in unique_bots:
+            if bot_name not in self.fleet.get_active_bots():
+                try:
+                    await self.fleet.start_bot(bot_name)
+                except Exception as e:
+                    self.logger.warning(f"Could not start bot '{bot_name}': {e}")
+
+        # Broadcast to all active bots
+        active_bots = [b for b in unique_bots if b in self.fleet.get_active_bots()]
+
+        if not active_bots:
+            return MessageEnvelope(
+                content="❌ No bots are available to respond",
+                bot_name="system",
+                room_id=msg.room_id,
+                metadata={"error": "no_bots_available"},
+            )
+
+        try:
+            responses = await self.fleet.broadcast_to_bots(active_bots, msg)
+
+            # Combine responses
+            combined = self.response_combiner.combine(responses, dispatch_result.target)
+
+            # Add metadata about which bots were asked vs responded
+            combined.metadata = combined.metadata or {}
+            combined.metadata["asked_bots"] = unique_bots
+            combined.metadata["active_bots"] = active_bots
+
+            return combined
+
+        except Exception as e:
+            self.logger.error(f"Error in multi-bot routing: {e}")
+            return MessageEnvelope(
+                content=f"❌ Error coordinating bots: {str(e)}",
+                bot_name="system",
+                room_id=msg.room_id,
+                metadata={"error": str(e)},
+            )
+
+    async def _route_through_leader(
+        self, msg: MessageEnvelope, dispatch_result: DispatchResult
+    ) -> MessageEnvelope:
+        """Route message through leader bot (Leader-First mode).
+
+        In Leader-First mode, the leader bot coordinates the response.
+        The leader may invoke other bots via tools or coordination.
+
+        Args:
+            msg: The incoming message
+            dispatch_result: Dispatch decision
+
+        Returns:
+            Leader response
+        """
+        # This is essentially the same as _route_to_single_bot but with logging
+        self.logger.info("Routing through leader (Leader-First mode)")
+        return await self._route_to_single_bot(msg, dispatch_result)
+
+    async def _route_to_dm(
+        self, msg: MessageEnvelope, dispatch_result: DispatchResult
+    ) -> MessageEnvelope:
+        """Route direct message to specific bot.
+
+        DM mode bypasses leader and goes directly to the target bot.
+
+        Args:
+            msg: The incoming message
+            dispatch_result: Dispatch decision
+
+        Returns:
+            Bot response
+        """
+        self.logger.info(f"Routing DM to bot '{dispatch_result.primary_bot}'")
+        return await self._route_to_single_bot(msg, dispatch_result)
+
+    async def _route_smart_discuss(
+        self, msg: MessageEnvelope, dispatch_result: DispatchResult
+    ) -> MessageEnvelope:
+        """Route message using SmartDispatch for intelligent bot selection.
+
+        Two-phase process:
+        1. All room bots evaluate urgency in parallel
+        2. Only high-urgency bots respond (in micro-turns)
+
+        Args:
+            msg: The incoming message
+            dispatch_result: Initial dispatch decision (may be overridden by SmartDispatch)
+
+        Returns:
+            Combined response from selected bots
+        """
+        from nanofolks.bots.smart_dispatch import SmartDispatch
+
+        self.logger.info("SmartDiscuss mode - evaluating bot urgency with LLM")
+
+        # Remove @discuss trigger from message for processing
+        clean_message = msg.content.replace("@discuss", "").strip()
+
+        # Get LLM provider from fleet
+        llm_provider = None
+        if hasattr(self.fleet, "provider"):
+            llm_provider = self.fleet.provider
+
+        if llm_provider:
+            self.logger.debug("Using LLM-based urgency evaluation")
+        else:
+            self.logger.warning("No LLM provider available, using rule-based evaluation")
+
+        # Create SmartDispatch instance with LLM provider
+        smart_dispatch = SmartDispatch(
+            room_manager=self.room_manager,
+            llm_provider=llm_provider,
+            speak_threshold=0.5,
+            use_llm=llm_provider is not None,
+        )
+
+        # Run SmartDispatch to select bots based on urgency
+        smart_result = await smart_dispatch.dispatch_smart_discuss(
+            message=clean_message,
+            room_id=msg.room_id or self._current_room_id,
+        )
+
+        # Log selection results
+        self.logger.info(
+            f"SmartDispatch selected {len(smart_result.secondary_bots) + 1} bots: "
+            f"{smart_result.primary_bot}"
+            + (
+                f" + {', '.join(smart_result.secondary_bots)}"
+                if smart_result.secondary_bots
+                else ""
+            )
+        )
+
+        # Use the smart dispatch result instead of original
+        # Ensure all selected bots are running
+        all_selected = [smart_result.primary_bot] + smart_result.secondary_bots
+        for bot_name in all_selected:
+            if bot_name not in self.fleet.get_active_bots():
+                try:
+                    await self.fleet.start_bot(bot_name)
+                except Exception as e:
+                    self.logger.warning(f"Could not start bot '{bot_name}': {e}")
+
+        # Filter to only active bots
+        active_bots = [b for b in all_selected if b in self.fleet.get_active_bots()]
+
+        if not active_bots:
+            return MessageEnvelope(
+                content="❌ No bots are available for discussion",
+                bot_name="system",
+                room_id=msg.room_id,
+                metadata={"error": "no_bots_available"},
+            )
+
+        # Broadcast to selected bots
+        try:
+            # Create message without @discuss for bot processing
+            msg_for_bots = MessageEnvelope(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content=clean_message,
+                bot_name=msg.bot_name,
+                room_id=msg.room_id,
+                metadata={
+                    **(msg.metadata or {}),
+                    "smart_discuss": True,
+                    "dispatch_mode": "smart_discuss",
+                },
+            )
+
+            responses = await self.fleet.broadcast_to_bots(active_bots, msg_for_bots)
+
+            # Combine responses using ResponseCombiner
+            combined = self.response_combiner.combine(
+                responses,
+                DispatchTarget.SMART_DISCUSS,
+            )
+
+            # Add metadata about the smart selection
+            combined.metadata = combined.metadata or {}
+            combined.metadata["smart_discuss"] = True
+            combined.metadata["asked_bots"] = all_selected
+            combined.metadata["active_bots"] = active_bots
+            combined.metadata["dispatch_reason"] = smart_result.reason
+
+            return combined
+
+        except Exception as e:
+            self.logger.error(f"Error in SmartDiscuss routing: {e}")
+            return MessageEnvelope(
+                content=f"❌ Error in smart discussion: {str(e)}",
+                bot_name="system",
+                room_id=msg.room_id,
+                metadata={"error": str(e)},
+            )
+
+    def get_current_room_id(self) -> str:
+        """Get the currently active room ID.
+
+        Returns:
+            Current room ID
+        """
+        return self._current_room_id
+
+    def set_current_room(self, room_id: str) -> None:
+        """Set the current room for routing context.
+
+        Args:
+            room_id: Room ID to set as current
+        """
+        self._current_room_id = room_id
+        self.logger.debug(f"Current room set to: {room_id}")
+
+    def get_stats(self) -> Dict:
+        """Get router statistics.
+
+        Returns:
+            Dictionary with router stats
+        """
+        return {
+            "running": self._running,
+            "current_room_id": self._current_room_id,
+            "active_bots": self.fleet.get_active_bots() if self.fleet else [],
+            "bot_count": len(self.fleet.get_active_bots()) if self.fleet else 0,
+        }
+
+
+class MessageRouterConfig:
+    """Configuration for the MessageRouter.
+
+    Attributes:
+        default_routing: Default routing strategy
+        max_parallel_bots: Maximum number of bots to invoke in parallel
+        response_timeout: Timeout for bot responses (seconds)
+        enable_leader_first: Whether Leader-First mode is enabled
+    """
+
+    def __init__(
+        self,
+        default_routing: str = "leader_first",
+        max_parallel_bots: int = 6,
+        response_timeout: int = 30,
+        enable_leader_first: bool = True,
+    ):
+        self.default_routing = default_routing
+        self.max_parallel_bots = max_parallel_bots
+        self.response_timeout = response_timeout
+        self.enable_leader_first = enable_leader_first
+
+
+# Convenience function
+def create_message_router(
+    bus: MessageBus,
+    fleet: "BotFleet",
+    room_manager: Optional[RoomManager] = None,
+) -> MessageRouter:
+    """Create a MessageRouter instance.
+
+    Args:
+        bus: MessageBus for sending/receiving messages
+        fleet: BotFleet managing all bot instances
+        room_manager: Optional RoomManager
+
+    Returns:
+        MessageRouter instance
+    """
+    return MessageRouter(bus, fleet, room_manager)

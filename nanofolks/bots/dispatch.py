@@ -12,7 +12,7 @@ The Leader acts as the nexus between user and team, with powers to:
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from nanofolks.models.room import Room
 

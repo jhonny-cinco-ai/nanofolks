@@ -76,8 +76,11 @@ class BotFleet:
         self.session_manager = session_manager
         self.config = config
 
-        # Bot instances keyed by bot_name
+        # Bot instances keyed by "room_id:bot_name" for room-scoped parallelism
         self.bots: Dict[str, "AgentLoop"] = {}
+
+        # Track which bots are active per room
+        self._room_bots: Dict[str, Set[str]] = {}  # room_id -> set of "room_id:bot_name"
 
         # Health tracking
         self._bot_health: Dict[str, Dict] = {}
@@ -119,7 +122,24 @@ class BotFleet:
 
         self.logger.info("BotFleet stopped")
 
-    async def start_bot(self, bot_name: str) -> "AgentLoop":
+    def _get_bot_key(self, bot_name: str, room_id: Optional[str] = None) -> str:
+        """Get the storage key for a bot.
+
+        For room-scoped parallelism, uses "room_id:bot_name" format.
+        For global bots, uses just "bot_name".
+
+        Args:
+            bot_name: Name of the bot
+            room_id: Optional room ID for room-scoped bots
+
+        Returns:
+            Storage key for the bot
+        """
+        if room_id:
+            return f"{room_id}:{bot_name}"
+        return bot_name
+
+    async def start_bot(self, bot_name: str, room_id: Optional[str] = None) -> "AgentLoop":
         """Start a bot instance.
 
         If the bot is already running, returns the existing instance.
@@ -127,6 +147,9 @@ class BotFleet:
 
         Args:
             bot_name: Name of the bot to start
+            room_id: Optional room ID for room-scoped bot instances.
+                    If provided, creates a room-specific bot instance
+                    for true parallelism between rooms.
 
         Returns:
             The AgentLoop instance
@@ -135,13 +158,15 @@ class BotFleet:
             ValueError: If bot_name is invalid
             RuntimeError: If bot cannot be started
         """
+        bot_key = self._get_bot_key(bot_name, room_id)
+
         async with self._lock:
             # Check if already running
-            if bot_name in self.bots:
-                self.logger.debug(f"Bot '{bot_name}' already running")
-                return self.bots[bot_name]
+            if bot_key in self.bots:
+                self.logger.debug(f"Bot '{bot_key}' already running")
+                return self.bots[bot_key]
 
-            self.logger.info(f"Starting bot: {bot_name}")
+            self.logger.info(f"Starting bot: {bot_key}")
 
             try:
                 # Import here to avoid circular dependencies
@@ -150,7 +175,7 @@ class BotFleet:
                 # Create bot configuration
                 bot_config = self._create_bot_config(bot_name)
 
-                # Create AgentLoop instance
+                # Create AgentLoop instance with room context
                 bot = AgentLoop(
                     bot_name=bot_name,
                     bus=self.bus,
@@ -160,93 +185,182 @@ class BotFleet:
                     **bot_config,
                 )
 
+                # Set room context if provided
+                if room_id:
+                    bot._current_room_id = room_id
+
                 # Store and track
-                self.bots[bot_name] = bot
-                self._bot_health[bot_name] = {
+                self.bots[bot_key] = bot
+                self._bot_health[bot_key] = {
                     "status": "starting",
                     "started_at": asyncio.get_event_loop().time(),
                     "errors": 0,
                 }
 
-                # Record activity
-                self._last_activity[bot_name] = asyncio.get_event_loop().time()
+                # Track per-room bots
+                if room_id:
+                    if room_id not in self._room_bots:
+                        self._room_bots[room_id] = set()
+                    self._room_bots[room_id].add(bot_key)
 
-                self.logger.info(f"Bot '{bot_name}' started successfully")
+                # Record activity
+                self._last_activity[bot_key] = asyncio.get_event_loop().time()
+
+                self.logger.info(f"Bot '{bot_key}' started successfully")
                 return bot
 
             except Exception as e:
-                self.logger.error(f"Failed to start bot '{bot_name}': {e}")
-                raise RuntimeError(f"Failed to start bot '{bot_name}': {e}")
+                self.logger.error(f"Failed to start bot '{bot_key}': {e}")
+                raise RuntimeError(f"Failed to start bot '{bot_key}': {e}")
 
-    async def stop_bot(self, bot_name: str) -> bool:
+    async def stop_bot(self, bot_name: str, room_id: Optional[str] = None) -> bool:
         """Stop a bot instance.
 
         Args:
             bot_name: Name of the bot to stop
+            room_id: Optional room ID for room-scoped bots
 
         Returns:
             True if bot was stopped, False if not found
         """
+        bot_key = self._get_bot_key(bot_name, room_id)
         async with self._lock:
-            return await self._stop_bot_internal(bot_name)
+            return await self._stop_bot_internal(bot_key)
 
-    async def _stop_bot_internal(self, bot_name: str) -> bool:
+    async def stop_room_bots(self, room_id: str) -> int:
+        """Stop all bots for a specific room.
+
+        Args:
+            room_id: Room ID to stop bots for
+
+        Returns:
+            Number of bots stopped
+        """
+        async with self._lock:
+            if room_id not in self._room_bots:
+                return 0
+
+            bot_keys = list(self._room_bots[room_id])
+            stopped_count = 0
+
+            for bot_key in bot_keys:
+                if await self._stop_bot_internal(bot_key):
+                    stopped_count += 1
+
+            # Clean up room tracking
+            del self._room_bots[room_id]
+
+            self.logger.info(f"Stopped {stopped_count} bots for room {room_id}")
+            return stopped_count
+
+    async def _stop_bot_internal(self, bot_key: str) -> bool:
         """Internal method to stop a bot (must hold lock).
 
         Args:
-            bot_name: Name of the bot to stop
+            bot_key: Key of the bot to stop (can be "bot_name" or "room_id:bot_name")
 
         Returns:
             True if bot was stopped, False if not found
         """
-        if bot_name not in self.bots:
+        if bot_key not in self.bots:
             return False
 
-        self.logger.info(f"Stopping bot: {bot_name}")
+        self.logger.info(f"Stopping bot: {bot_key}")
 
         try:
-            bot = self.bots[bot_name]
+            bot = self.bots[bot_key]
 
             # Stop the bot
             if hasattr(bot, "stop"):
                 await bot.stop()
 
-            # Clean up
-            del self.bots[bot_name]
-            if bot_name in self._bot_health:
-                del self._bot_health[bot_name]
-            if bot_name in self._last_activity:
-                del self._last_activity[bot_name]
+            # Clean up room tracking if room-scoped
+            if ":" in bot_key:
+                room_id = bot_key.split(":")[0]
+                if room_id in self._room_bots:
+                    self._room_bots[room_id].discard(bot_key)
 
-            self.logger.info(f"Bot '{bot_name}' stopped successfully")
+            # Clean up
+            del self.bots[bot_key]
+            if bot_key in self._bot_health:
+                del self._bot_health[bot_key]
+            if bot_key in self._last_activity:
+                del self._last_activity[bot_key]
+
+            self.logger.info(f"Bot '{bot_key}' stopped successfully")
             return True
 
         except Exception as e:
-            self.logger.error(f"Error stopping bot '{bot_name}': {e}")
+            self.logger.error(f"Error stopping bot '{bot_key}': {e}")
             # Still remove from tracking
-            self.bots.pop(bot_name, None)
-            self._bot_health.pop(bot_name, None)
-            self._last_activity.pop(bot_name, None)
+            self.bots.pop(bot_key, None)
+            self._bot_health.pop(bot_key, None)
+            self._last_activity.pop(bot_key, None)
             return False
 
     def get_active_bots(self) -> List[str]:
-        """Get list of active bot names.
+        """Get list of active bot keys.
 
         Returns:
-            List of active bot names
+            List of active bot keys (can be "bot_name" or "room_id:bot_name")
         """
         return list(self.bots.keys())
 
-    def is_bot_active(self, bot_name: str) -> bool:
+    def get_room_bots(self, room_id: str) -> List[str]:
+        """Get list of active bot keys for a specific room.
+
+        Args:
+            room_id: Room ID to get bots for
+
+        Returns:
+            List of bot keys active in the room
+        """
+        return list(self._room_bots.get(room_id, set()))
+
+    def is_bot_active(self, bot_name: str, room_id: Optional[str] = None) -> bool:
         """Check if a bot is currently active.
 
         Args:
             bot_name: Name of the bot to check
+            room_id: Optional room ID for room-scoped bots
 
         Returns:
             True if bot is active, False otherwise
         """
-        return bot_name in self.bots
+        bot_key = self._get_bot_key(bot_name, room_id)
+        return bot_key in self.bots
+
+    def is_room_active(self, room_id: str) -> bool:
+        """Check if a room has any active bots.
+
+        Args:
+            room_id: Room ID to check
+
+        Returns:
+            True if room has active bots, False otherwise
+        """
+        return room_id in self._room_bots and len(self._room_bots[room_id]) > 0
+
+    async def get_or_create_room_bot(self, room_id: str, bot_name: str) -> "AgentLoop":
+        """Get an existing room bot or create a new one.
+
+        This is the primary method for room-scoped bot access.
+        Ensures the bot exists for the room, creating it if needed.
+
+        Args:
+            room_id: Room ID
+            bot_name: Name of the bot
+
+        Returns:
+            The AgentLoop instance for the room bot
+        """
+        bot_key = self._get_bot_key(bot_name, room_id)
+
+        if bot_key in self.bots:
+            return self.bots[bot_key]
+
+        # Bot doesn't exist, create it
+        return await self.start_bot(bot_name, room_id=room_id)
 
     async def send_proactive_message(
         self,

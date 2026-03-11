@@ -390,6 +390,12 @@ class MessageRouter:
         else:
             self.logger.warning("No LLM provider available, using rule-based evaluation")
 
+        # Get active bots from fleet for SmartDispatch
+        active_bots = self.fleet.get_active_bots() if self.fleet else ["leader"]
+        self.logger.debug(
+            f"SmartDispatch will evaluate {len(active_bots)} active bots: {active_bots}"
+        )
+
         # Create SmartDispatch instance with LLM provider
         smart_dispatch = SmartDispatch(
             room_manager=self.room_manager,
@@ -402,6 +408,7 @@ class MessageRouter:
         smart_result = await smart_dispatch.dispatch_smart_discuss(
             message=clean_message,
             room_id=msg.room_id or self._current_room_id,
+            available_bots=active_bots,  # Pass active bots from fleet
         )
 
         # Log selection results

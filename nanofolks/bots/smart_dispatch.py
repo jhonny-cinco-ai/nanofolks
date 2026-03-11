@@ -93,6 +93,7 @@ class SmartDispatch:
         self,
         message: str,
         room_id: str,
+        available_bots: Optional[List[str]] = None,
     ) -> DispatchResult:
         """Execute smart group discussion dispatch.
 
@@ -103,27 +104,33 @@ class SmartDispatch:
         Args:
             message: User's message (with @discuss trigger removed)
             room_id: Room ID
+            available_bots: Optional list of available bot names (from fleet)
 
         Returns:
             DispatchResult with selected bots ordered by urgency
         """
         self.logger.info(f"SmartDiscuss triggered in room {room_id}")
 
-        # Get room and participants
-        room = self.room_manager.get_room(room_id)
-        if not room:
-            self.logger.warning(f"Room {room_id} not found, defaulting to leader")
-            return DispatchResult(
-                target=DispatchTarget.SMART_DISCUSS,
-                primary_bot="leader",
-                secondary_bots=[],
-                room_id=room_id,
-                reason="Room not found",
-            )
+        # Get participants - use available_bots if provided, otherwise from room
+        if available_bots:
+            participants = available_bots
+            self.logger.info(f"Using {len(participants)} bots from fleet: {participants}")
+        else:
+            # Fallback to room participants
+            room = self.room_manager.get_room(room_id)
+            if not room:
+                self.logger.warning(f"Room {room_id} not found, defaulting to leader")
+                return DispatchResult(
+                    target=DispatchTarget.SMART_DISCUSS,
+                    primary_bot="leader",
+                    secondary_bots=[],
+                    room_id=room_id,
+                    reason="Room not found",
+                )
 
-        participants = room.participants
-        if not participants:
-            participants = ["leader"]
+            participants = room.participants
+            if not participants:
+                participants = ["leader"]
 
         self.logger.info(f"Evaluating urgency for {len(participants)} bots")
 

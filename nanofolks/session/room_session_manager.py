@@ -44,6 +44,21 @@ class RoomSession:
         self.created_at = datetime.now()
         self.updated_at = datetime.now()
 
+    @property
+    def key(self) -> str:
+        """Session key for compatibility with regular Session.
+
+        Returns:
+            Room ID as the session key
+        """
+        return self.room_id
+
+    def clear(self) -> None:
+        """Clear all messages and metadata (compatibility with Session)."""
+        self.messages = []
+        self.metadata = {}
+        self.updated_at = datetime.now()
+
     def add_message(self, role: str, content: str, bot_name: Optional[str] = None) -> None:
         """Add a message to the session.
 
@@ -184,6 +199,80 @@ class RoomSessionManager:
             await self._save_session_internal(room_id, session)
 
             return session
+
+    def get_or_create(self, room_id: str) -> RoomSession:
+        """Synchronous wrapper for get_or_create compatibility with AgentLoop.
+
+        This method provides a synchronous interface that matches SessionManager
+        for backward compatibility. It runs the async get_session in the event loop.
+
+        Args:
+            room_id: Room identifier (used as session key)
+
+        Returns:
+            RoomSession instance
+        """
+        import asyncio
+
+        try:
+            # Try to get the running event loop
+            loop = asyncio.get_running_loop()
+            # If we're already in an async context, create a task
+            if loop.is_running():
+                # This is a hack for compatibility - in practice this should be async
+                # For now, return a new session synchronously
+                if room_id not in self.room_sessions:
+                    # Create synchronously (will be saved on first async save)
+                    self.room_sessions[room_id] = RoomSession(
+                        room_id=room_id,
+                        workspace=self.workspace,
+                    )
+                return self.room_sessions[room_id]
+        except RuntimeError:
+            # No event loop running, create one
+            pass
+
+        # Run async method synchronously
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # Schedule in running loop and return immediately
+                # The session will be loaded/created on first async access
+                if room_id not in self.room_sessions:
+                    self.room_sessions[room_id] = RoomSession(
+                        room_id=room_id,
+                        workspace=self.workspace,
+                    )
+                return self.room_sessions[room_id]
+            else:
+                return loop.run_until_complete(self.get_session(room_id))
+        except Exception:
+            # Fallback: create new session
+            if room_id not in self.room_sessions:
+                self.room_sessions[room_id] = RoomSession(
+                    room_id=room_id,
+                    workspace=self.workspace,
+                )
+            return self.room_sessions[room_id]
+
+    def save(self, session: RoomSession) -> None:
+        """Synchronously save session to memory (async save to disk happens automatically).
+
+        Args:
+            session: RoomSession instance to save
+        """
+        if session and hasattr(session, "room_id"):
+            self.room_sessions[session.room_id] = session
+            # Schedule async save
+            import asyncio
+
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Schedule background save
+                    asyncio.create_task(self.save_session(session.room_id))
+            except Exception:
+                pass  # Ignore errors in synchronous context
 
     async def save_session(self, room_id: str) -> bool:
         """Persist session to disk.

@@ -584,6 +584,9 @@ class ProactiveBotLoop:
         # Track clarification states by (room_id, bot_name)
         self._clarification_states: Dict[str, ClarificationState] = {}
 
+        # Track room-level proactive state (for "latest message wins" logic)
+        self._room_proactive_state: Dict[str, str] = {}  # room_id -> state_key
+
         self.logger = logger.bind(component="ProactiveBotLoop")
 
         if self.proactive_enabled:
@@ -599,8 +602,14 @@ class ProactiveBotLoop:
         clarifying_question: str,
         possible_intents: List[IntentHypothesis],
         context_hash: Optional[str] = None,
+        metadata: Optional[Dict] = None,
     ) -> None:
         """Register a new clarification request and start timeout.
+
+        Implements "latest message wins" logic:
+        - Only the most recent clarifying question in a room triggers proactive
+        - In @discuss mode, only the leader bot can trigger proactive
+        - New questions cancel previous proactive timers
 
         Args:
             room_id: Room ID
@@ -609,14 +618,33 @@ class ProactiveBotLoop:
             clarifying_question: Question being asked
             possible_intents: List of possible intent interpretations
             context_hash: Hash of conversation context (for detecting changes)
+            metadata: Optional metadata including context flags
         """
         if not self.proactive_enabled:
             self.logger.debug("Proactive mode disabled, not registering clarification")
             return
 
+        # Check if we're in @discuss mode
+        is_discuss_mode = metadata and metadata.get("smart_discuss", False)
+
+        if is_discuss_mode and bot_name != "leader":
+            # In @discuss mode, only leader bot can trigger proactive
+            self.logger.debug(f"Skipping proactive for {bot_name} in @discuss (not leader)")
+            return
+
         state_key = f"{room_id}:{bot_name}"
 
-        # Cancel any existing clarification from this bot in this room
+        # Cancel any existing clarification in this room ("latest message wins")
+        if room_id in self._room_proactive_state:
+            existing_key = self._room_proactive_state[room_id]
+            if existing_key != state_key:
+                self.timeout_manager.cancel_timeout(existing_key)
+                self._clarification_states.pop(existing_key, None)
+                self.logger.info(
+                    f"Cancelled previous proactive in {room_id} - newer question from {bot_name}"
+                )
+
+        # Also cancel any from this specific bot (redundant but safe)
         if state_key in self._clarification_states:
             self.timeout_manager.cancel_timeout(state_key)
             self.logger.debug(f"Cancelled previous clarification for {state_key}")
@@ -636,11 +664,19 @@ class ProactiveBotLoop:
 
         self._clarification_states[state_key] = state
 
+        # Update room state to track this as the latest clarification
+        self._room_proactive_state[room_id] = state_key
+
         # Start timeout
         self.timeout_manager.start_timeout(
             timeout_id=state_key,
             timeout_seconds=self.timeout_seconds,
             on_timeout=lambda: asyncio.create_task(self._handle_timeout(state_key)),
+        )
+
+        self.logger.info(
+            f"Registered clarification for {bot_name} in room {room_id} "
+            f"({self.timeout_seconds}s timeout, is_discuss={is_discuss_mode})"
         )
 
         self.logger.info(
@@ -655,6 +691,9 @@ class ProactiveBotLoop:
     ) -> Optional[str]:
         """Check if user message is a response to a pending clarification.
 
+        When a user responds, cancels any pending proactive in the room
+        ("latest message wins" logic).
+
         Returns:
             Bot name if this is a response to their clarification, None otherwise
         """
@@ -667,6 +706,10 @@ class ProactiveBotLoop:
                     self.timeout_manager.cancel_timeout(state_key)
                     self._clarification_states.pop(state_key, None)
 
+                    # Clear room state
+                    if room_id in self._room_proactive_state:
+                        del self._room_proactive_state[room_id]
+
                     self.logger.info(
                         f"User responded to {state.bot_name}'s clarification in room {room_id}"
                     )
@@ -676,7 +719,58 @@ class ProactiveBotLoop:
 
                     return state.bot_name
 
+        # Check if there's any pending proactive in this room
+        # Even if not directly addressed, a user message cancels pending clarifications
+        if room_id in self._room_proactive_state:
+            state_key = self._room_proactive_state[room_id]
+            if state_key in self._clarification_states:
+                state = self._clarification_states[state_key]
+                # Check if this is a short response (likely replying to the question)
+                if len(user_message.split()) <= 10:
+                    self.timeout_manager.cancel_timeout(state_key)
+                    self._clarification_states.pop(state_key, None)
+                    del self._room_proactive_state[room_id]
+
+                    self.logger.info(
+                        f"User message likely responded to {state.bot_name} in room {room_id}"
+                    )
+                    await self._record_learning(state, user_responded=True)
+                    return state.bot_name
+
         return None
+
+    async def cancel_room_proactive(self, room_id: str, reason: str = "context changed") -> bool:
+        """Cancel any pending proactive clarification in a room.
+
+        This should be called when:
+        - Another bot speaks (new context)
+        - The discussion continues
+        - User sends any message
+
+        Args:
+            room_id: Room ID to cancel proactive in
+            reason: Reason for cancellation (for logging)
+
+        Returns:
+            True if a proactive was cancelled, False otherwise
+        """
+        if room_id not in self._room_proactive_state:
+            return False
+
+        state_key = self._room_proactive_state[room_id]
+        if state_key in self._clarification_states:
+            state = self._clarification_states.pop(state_key)
+            self.timeout_manager.cancel_timeout(state_key)
+            del self._room_proactive_state[room_id]
+
+            self.logger.info(
+                f"Cancelled proactive for {state.bot_name} in room {room_id}: {reason}"
+            )
+            return True
+
+        # Clean up stale room state
+        del self._room_proactive_state[room_id]
+        return False
 
     async def _handle_timeout(self, state_key: str) -> None:
         """Handle timeout - make proactive decision."""
@@ -684,7 +778,15 @@ class ProactiveBotLoop:
         if not state:
             return
 
-        self.logger.info(f"Timeout triggered for {state.bot_name} in room {state.room_id}")
+        # Clean up room state
+        room_id = state.room_id
+        if (
+            room_id in self._room_proactive_state
+            and self._room_proactive_state[room_id] == state_key
+        ):
+            del self._room_proactive_state[room_id]
+
+        self.logger.info(f"Timeout triggered for {state.bot_name} in room {room_id}")
 
         # Get room history for context
         room_history = await self._get_room_history(state.room_id)

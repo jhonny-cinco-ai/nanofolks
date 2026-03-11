@@ -462,11 +462,22 @@ class MessageRouter:
             # Use streaming for multi-bot discussions
             # This yields responses as they arrive instead of waiting for all
             responses = []
+            first_response_received = False
             async for response in self.fleet.broadcast_to_bots_streaming(active_bots, msg_for_bots):
                 # Publish each response immediately for streaming UX
                 await self.bus.publish_outbound(response)
                 self.logger.info(f"Streamed response from {response.bot_name}")
                 responses.append(response)
+
+                # Cancel any pending proactive when bots respond
+                # (new context means the clarification is answered)
+                if not first_response_received:
+                    first_response_received = True
+                    room_id = msg.room_id or self._current_room_id
+                    if self.proactive_loop.is_clarification_pending(room_id, response.bot_name):
+                        await self.proactive_loop.cancel_room_proactive(
+                            room_id, reason=f"Bot {response.bot_name} responded"
+                        )
 
             # Combine responses using ResponseCombiner (for metadata/logging)
             combined = self.response_combiner.combine(
@@ -554,12 +565,15 @@ class MessageRouter:
             possible_intents = self._generate_intent_hypotheses(original_request, bot_name)
 
             # Register with proactive loop
+            # Pass metadata from response to detect @discuss mode
+            metadata = response.metadata if hasattr(response, "metadata") else {}
             await self.proactive_loop.register_clarification(
                 room_id=room_id,
                 bot_name=bot_name,
                 original_request=original_request,
                 clarifying_question=content,
                 possible_intents=possible_intents,
+                metadata=metadata,
             )
 
     def _is_clarifying_question(self, content: str) -> bool:

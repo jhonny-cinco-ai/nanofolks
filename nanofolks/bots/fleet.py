@@ -350,6 +350,74 @@ class BotFleet:
 
         return processed_responses
 
+    async def broadcast_to_bots_streaming(self, bot_names: List[str], message: MessageEnvelope):
+        """Send message to multiple bots and yield responses as they arrive.
+
+        This is the streaming version of broadcast_to_bots. Instead of waiting
+        for all bots to finish, it yields each response immediately when ready.
+        This provides better UX for multi-bot discussions.
+
+        Args:
+            bot_names: List of bot names to broadcast to
+            message: The message to broadcast
+
+        Yields:
+            MessageEnvelope responses as they arrive from each bot
+
+        Example:
+            async for response in fleet.broadcast_to_bots_streaming(bots, msg):
+                print(f"{response.bot_name}: {response.content}")
+        """
+        tasks = {}
+
+        for bot_name in bot_names:
+            if bot_name in self.bots:
+                # Record activity
+                self._last_activity[bot_name] = asyncio.get_event_loop().time()
+
+                # Create task
+                task = asyncio.create_task(
+                    self.bots[bot_name].process_message(message), name=f"bot_{bot_name}"
+                )
+                tasks[task] = bot_name
+            else:
+                # Bot not active - yield error immediately
+                self.logger.warning(f"Cannot broadcast to inactive bot: {bot_name}")
+                error_response = await self._create_error_response(
+                    bot_name, message, "Bot not active"
+                )
+                yield error_response
+
+        if not tasks:
+            return
+
+        # Wait for tasks as they complete (streaming)
+        pending = set(tasks.keys())
+        while pending:
+            # Wait for the next task to complete
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+
+            for task in done:
+                bot_name = tasks.get(task, "unknown")
+                try:
+                    response = task.result()
+                    if isinstance(response, Exception):
+                        # Handle exception result
+                        self.logger.error(f"Bot '{bot_name}' failed: {response}")
+                        error_response = await self._create_error_response(
+                            bot_name, message, str(response)
+                        )
+                        yield error_response
+                    else:
+                        # Yield successful response
+                        self.logger.debug(f"Bot '{bot_name}' responded (streaming)")
+                        yield response
+                except Exception as e:
+                    # Handle task exception
+                    self.logger.error(f"Bot '{bot_name}' task failed: {e}")
+                    error_response = await self._create_error_response(bot_name, message, str(e))
+                    yield error_response
+
     async def _create_error_response(
         self, bot_name: str, original_msg: MessageEnvelope, error: str
     ) -> MessageEnvelope:

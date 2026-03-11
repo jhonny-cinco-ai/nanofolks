@@ -86,12 +86,21 @@ class ResponseCombiner:
                 error_count += 1
                 self.logger.warning(f"Empty response received")
 
+        # Extract channel and chat_id from first valid response (all should have same)
+        first_response = valid_responses[0] if valid_responses else None
+        channel = first_response.channel if first_response else "cli"
+        chat_id = first_response.chat_id if first_response else "default"
+        room_id = first_response.room_id if first_response else None
+
         if not valid_responses:
             # All bots failed
             self.logger.error(f"All {len(responses)} bots failed to respond")
             return MessageEnvelope(
+                channel=channel,
+                chat_id=chat_id,
                 content="❌ All bots failed to respond. Please try again.",
                 bot_name="system",
+                room_id=room_id,
                 metadata={"error": "all_bots_failed", "error_count": error_count},
             )
 
@@ -140,8 +149,11 @@ class ResponseCombiner:
         responding_bots = [r.bot_name for r in responses]
 
         return MessageEnvelope(
+            channel=channel,
+            chat_id=chat_id,
             content="\n".join(parts).strip(),
             bot_name="multi",
+            room_id=room_id,
             metadata={
                 "multi_bot": True,
                 "responding_bots": responding_bots,
@@ -179,9 +191,18 @@ class ResponseCombiner:
 
         responding_bots = [r.bot_name for r in responses]
 
+        # Extract channel/chat_id from first response
+        first = responses[0] if responses else None
+        channel = first.channel if first else "cli"
+        chat_id = first.chat_id if first else "default"
+        room_id = first.room_id if first else None
+
         return MessageEnvelope(
+            channel=channel,
+            chat_id=chat_id,
             content="\n".join(parts).strip(),
             bot_name="team",
+            room_id=room_id,
             metadata={
                 "multi_bot": True,
                 "responding_bots": responding_bots,
@@ -226,9 +247,22 @@ class ResponseCombiner:
             combined.content += error_section
             combined.metadata["errors"] = errors
         elif errors and not valid_responses:
+            # Extract channel/chat_id from first error response if available
+            first_error = None
+            for r in responses:
+                if hasattr(r, "channel"):
+                    first_error = r
+                    break
+            channel = first_error.channel if first_error else "cli"
+            chat_id = first_error.chat_id if first_error else "default"
+            room_id = first_error.room_id if first_error else None
+
             return MessageEnvelope(
+                channel=channel,
+                chat_id=chat_id,
                 content="❌ All bots failed:\n" + "\n".join(f"- {e}" for e in errors[:3]),
                 bot_name="system",
+                room_id=room_id,
                 metadata={"errors": errors, "error_count": len(errors)},
             )
 
@@ -264,9 +298,18 @@ class ResponseCombiner:
         # Gather metadata
         responding_bots = [r.bot_name for r in responses if r.bot_name]
 
+        # Extract channel/chat_id from first response
+        first = responses[0] if responses else None
+        channel = first.channel if first else "cli"
+        chat_id = first.chat_id if first else "default"
+        room_id = first.room_id if first else None
+
         return MessageEnvelope(
+            channel=channel,
+            chat_id=chat_id,
             content="\n".join(parts).strip(),
             bot_name="smart_discuss",
+            room_id=room_id,
             metadata={
                 "multi_bot": True,
                 "responding_bots": responding_bots,

@@ -443,7 +443,7 @@ class MessageRouter:
                 metadata={"error": "no_bots_available"},
             )
 
-        # Broadcast to selected bots
+        # Broadcast to selected bots with streaming
         try:
             # Create message without @discuss for bot processing
             msg_for_bots = MessageEnvelope(
@@ -459,9 +459,16 @@ class MessageRouter:
                 },
             )
 
-            responses = await self.fleet.broadcast_to_bots(active_bots, msg_for_bots)
+            # Use streaming for multi-bot discussions
+            # This yields responses as they arrive instead of waiting for all
+            responses = []
+            async for response in self.fleet.broadcast_to_bots_streaming(active_bots, msg_for_bots):
+                # Publish each response immediately for streaming UX
+                await self.bus.publish_outbound(response)
+                self.logger.info(f"Streamed response from {response.bot_name}")
+                responses.append(response)
 
-            # Combine responses using ResponseCombiner
+            # Combine responses using ResponseCombiner (for metadata/logging)
             combined = self.response_combiner.combine(
                 responses,
                 DispatchTarget.SMART_DISCUSS,
@@ -473,6 +480,8 @@ class MessageRouter:
             combined.metadata["asked_bots"] = all_selected
             combined.metadata["active_bots"] = active_bots
             combined.metadata["dispatch_reason"] = smart_result.reason
+            combined.metadata["streaming"] = True
+            combined.metadata["response_count"] = len(responses)
 
             return combined
 

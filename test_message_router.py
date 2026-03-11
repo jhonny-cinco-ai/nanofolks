@@ -148,31 +148,49 @@ async def test_message_router():
     await bus.publish_inbound(discuss_msg)
 
     # Collect multiple responses (SmartDiscuss might trigger multiple bots)
-    print(f"→ Waiting for responses (15s timeout)...")
+    # With streaming, responses arrive as each bot finishes processing
+    print(f"→ Waiting for streaming responses (45s total timeout)...")
+    print(f"  (Responses will appear as each bot replies)\n")
     responses = []
-    try:
-        for i in range(3):  # Try to collect up to 3 responses
-            response = await asyncio.wait_for(bus.consume_outbound(), timeout=5.0)
-            responses.append(response)
-            print(f"\n  Response {i + 1} from {response.bot_name}:")
-            print(f"    {response.content[:150]}...")
+    start_time = asyncio.get_event_loop().time()
+    total_timeout = 45.0  # Total time to wait for all responses
 
-            # Check if more responses coming
-            await asyncio.sleep(0.1)
-            # Try to get next message without blocking
-            try:
-                next_msg = bus.consume_outbound()
-                # If we get here immediately, there's another message
-                # Put it back by not awaiting
-            except:
+    try:
+        # Wait for first response (this takes longest due to LLM evaluation)
+        first_response_timeout = 20.0
+        response = await asyncio.wait_for(bus.consume_outbound(), timeout=first_response_timeout)
+        responses.append(response)
+        print(f"  💬 {response.bot_name}: {response.content[:200]}...")
+        print(f"     (First response received, waiting for more...)\n")
+
+        # Collect additional responses with shorter timeouts
+        while True:
+            elapsed = asyncio.get_event_loop().time() - start_time
+            remaining = total_timeout - elapsed
+
+            if remaining <= 0:
                 break
 
-        print(f"\n✓ Collected {len(responses)} responses")
+            # Short timeout for subsequent responses
+            try:
+                response = await asyncio.wait_for(
+                    bus.consume_outbound(), timeout=min(3.0, remaining)
+                )
+                responses.append(response)
+                print(f"  💬 {response.bot_name}: {response.content[:200]}...")
+            except asyncio.TimeoutError:
+                # No more responses coming
+                break
+
+        print(
+            f"\n✓ Collected {len(responses)} response(s) from {len(set(r.bot_name for r in responses))} bot(s)"
+        )
+
     except asyncio.TimeoutError:
         if responses:
-            print(f"\n✓ Collected {len(responses)} responses (timeout after last)")
+            print(f"\n✓ Collected {len(responses)} response(s) (timeout waiting for more)")
         else:
-            print(f"\n✗ No responses received")
+            print(f"\n✗ No responses received (timeout waiting for first response)")
             return False
 
     # Test 3: Direct bot mention

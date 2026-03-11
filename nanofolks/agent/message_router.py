@@ -218,14 +218,18 @@ class MessageRouter:
             Bot response
         """
         bot_name = dispatch_result.primary_bot
+        room_id = msg.room_id or self._current_room_id
 
-        # Ensure bot is running
-        if bot_name not in self.fleet.get_active_bots():
-            self.logger.info(f"Bot '{bot_name}' not active, attempting to start")
+        # Use room-scoped bot for true parallelism
+        bot_key = self.fleet._get_bot_key(bot_name, room_id)
+
+        # Ensure bot is running (room-scoped)
+        if bot_key not in self.fleet.get_active_bots():
+            self.logger.info(f"Bot '{bot_key}' not active, attempting to start")
             try:
-                await self.fleet.start_bot(bot_name)
+                await self.fleet.start_bot(bot_name, room_id=room_id)
             except Exception as e:
-                self.logger.error(f"Failed to start bot '{bot_name}': {e}")
+                self.logger.error(f"Failed to start bot '{bot_key}': {e}")
                 return MessageEnvelope(
                     content=f"❌ Bot '{bot_name}' is not available",
                     bot_name="system",
@@ -233,9 +237,9 @@ class MessageRouter:
                     metadata={"error": "bot_not_available", "bot_name": bot_name},
                 )
 
-        # Route to the bot
+        # Route to the room-scoped bot
         try:
-            response = await self.fleet.bots[bot_name].process_message(msg)
+            response = await self.fleet.bots[bot_key].process_message(msg)
 
             # Check if this is a clarifying question and register with proactive loop
             await self._check_and_register_clarification(
@@ -268,28 +272,37 @@ class MessageRouter:
             Combined response from all bots
         """
         # Get all bots to respond (primary + secondary)
+        room_id = msg.room_id or self._current_room_id
         all_bots = [dispatch_result.primary_bot] + dispatch_result.secondary_bots
 
         # Remove duplicates while preserving order
         seen = set()
-        unique_bots = []
+        unique_bot_names = []
         for bot in all_bots:
             if bot and bot not in seen:
                 seen.add(bot)
-                unique_bots.append(bot)
+                unique_bot_names.append(bot)
 
-        self.logger.info(f"Broadcasting to {len(unique_bots)} bots: {', '.join(unique_bots)}")
+        self.logger.info(
+            f"Broadcasting to {len(unique_bot_names)} bots in room {room_id}: {', '.join(unique_bot_names)}"
+        )
 
-        # Ensure all bots are running
-        for bot_name in unique_bots:
-            if bot_name not in self.fleet.get_active_bots():
+        # Ensure all room-scoped bots are running
+        active_bot_keys = []
+        for bot_name in unique_bot_names:
+            bot_key = self.fleet._get_bot_key(bot_name, room_id)
+            if bot_key not in self.fleet.get_active_bots():
                 try:
-                    await self.fleet.start_bot(bot_name)
+                    await self.fleet.start_bot(bot_name, room_id=room_id)
                 except Exception as e:
-                    self.logger.warning(f"Could not start bot '{bot_name}': {e}")
+                    self.logger.warning(f"Could not start bot '{bot_key}': {e}")
+            if bot_key in self.fleet.get_active_bots():
+                active_bot_keys.append(bot_key)
 
-        # Broadcast to all active bots
-        active_bots = [b for b in unique_bots if b in self.fleet.get_active_bots()]
+        # Broadcast to all active room-scoped bots
+        active_bots = [
+            b for b in unique_bot_names if self.fleet._get_bot_key(b, room_id) in active_bot_keys
+        ]
 
         if not active_bots:
             return MessageEnvelope(
@@ -307,7 +320,7 @@ class MessageRouter:
 
             # Add metadata about which bots were asked vs responded
             combined.metadata = combined.metadata or {}
-            combined.metadata["asked_bots"] = unique_bots
+            combined.metadata["asked_bots"] = unique_bot_names
             combined.metadata["active_bots"] = active_bots
 
             return combined
@@ -423,17 +436,25 @@ class MessageRouter:
         )
 
         # Use the smart dispatch result instead of original
-        # Ensure all selected bots are running
+        # Ensure all selected room-scoped bots are running
         all_selected = [smart_result.primary_bot] + smart_result.secondary_bots
+        room_id = msg.room_id or self._current_room_id
+        active_bot_keys = []
+
         for bot_name in all_selected:
-            if bot_name not in self.fleet.get_active_bots():
+            bot_key = self.fleet._get_bot_key(bot_name, room_id)
+            if bot_key not in self.fleet.get_active_bots():
                 try:
-                    await self.fleet.start_bot(bot_name)
+                    await self.fleet.start_bot(bot_name, room_id=room_id)
                 except Exception as e:
-                    self.logger.warning(f"Could not start bot '{bot_name}': {e}")
+                    self.logger.warning(f"Could not start bot '{bot_key}': {e}")
+            if bot_key in self.fleet.get_active_bots():
+                active_bot_keys.append(bot_key)
 
         # Filter to only active bots
-        active_bots = [b for b in all_selected if b in self.fleet.get_active_bots()]
+        active_bots = [
+            b for b in all_selected if self.fleet._get_bot_key(b, room_id) in active_bot_keys
+        ]
 
         if not active_bots:
             return MessageEnvelope(
@@ -443,7 +464,7 @@ class MessageRouter:
                 metadata={"error": "no_bots_available"},
             )
 
-        # Broadcast to selected bots with streaming
+        # Broadcast to selected room-scoped bots with streaming
         try:
             # Create message without @discuss for bot processing
             msg_for_bots = MessageEnvelope(
@@ -463,7 +484,9 @@ class MessageRouter:
             # This yields responses as they arrive instead of waiting for all
             responses = []
             first_response_received = False
-            async for response in self.fleet.broadcast_to_bots_streaming(active_bots, msg_for_bots):
+            async for response in self.fleet.broadcast_to_bots_streaming(
+                active_bot_keys, msg_for_bots
+            ):
                 # Publish each response immediately for streaming UX
                 await self.bus.publish_outbound(response)
                 self.logger.info(f"Streamed response from {response.bot_name}")

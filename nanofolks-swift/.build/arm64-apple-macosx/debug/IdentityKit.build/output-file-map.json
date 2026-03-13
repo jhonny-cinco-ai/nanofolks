@@ -1,0 +1,19 @@
+{
+  "": {
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/master.swiftdeps"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/IdentityKit/IdentityKit.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/IdentityKit.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/IdentityKit.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/IdentityKit~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/IdentityKit.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/IdentityKit.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/IdentityKit/TeamManager.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/TeamManager.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/TeamManager.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/TeamManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/TeamManager.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/IdentityKit.build/TeamManager.dia"
+  }
+}

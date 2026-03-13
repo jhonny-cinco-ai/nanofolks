@@ -271,27 +271,23 @@ def create_default_registry(
             )
         )
 
-    # Message tool
+    # Message tool - enabled for legitimate communication
     if bus:
         registry.register(MessageTool(send_callback=bus.publish_outbound))
 
-    # Invoke tool
+    # Invoke tool - enabled for bot delegation when appropriate
     if invoker:
         from nanofolks.agent.tools.invoke import InvokeTool
 
         registry.register(InvokeTool(invoker=invoker))
 
-    # Room task tool
-    room_task_tool = RoomTaskTool()
-    if canceller:
-        room_task_tool.set_canceller(canceller)
-    registry.register(room_task_tool)
+    # Room task tool - DISABLED (was causing infinite task loops)
+    # room_task_tool = RoomTaskTool()
+    # if canceller:
+    #     room_task_tool.set_canceller(canceller)
+    # registry.register(room_task_tool)
 
-    # Routines tool
-    if cron_service:
-        registry.register(RoutinesTool(cron_service, default_timezone=system_timezone))
-
-    # Config update
+    # Config update - enabled for legitimate configuration changes
     registry.register(UpdateConfigTool())
 
     # Memory tools
@@ -302,14 +298,14 @@ def create_default_registry(
         for tool in memory_tools:
             registry.register(tool)
 
-    # Security tools
+    # Security tools - enabled but with anti-panic guardrails in prompts
     from nanofolks.agent.tools.security import create_security_tools
 
     security_tools = create_security_tools()
     for tool in security_tools:
         registry.register(tool)
 
-    # REPL tool (programmable Python environment)
+    # REPL tool (programmable Python environment) - enabled for coding tasks
     if repl_manager is not None and room_id:
         from nanofolks.agent.tools.repl import REPLTool
 

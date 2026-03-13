@@ -1287,6 +1287,7 @@ Current conversation history:
                             channel=msg.channel,
                             chat_id=msg.chat_id,
                             content=f"Sorry, I encountered an error: {str(e)}",
+                            bot_name=self.bot_name,
                         )
                     )
             except asyncio.TimeoutError:
@@ -1349,6 +1350,7 @@ Current conversation history:
                     channel=msg.channel,
                     chat_id=msg.chat_id,
                     content=f"Sorry, I encountered an error: {str(e)}",
+                    bot_name=self.bot_name,
                 )
             )
 
@@ -1703,6 +1705,7 @@ Current conversation history:
                 chat_id=msg.chat_id,
                 content="🐈 New session started.",
                 room_id=msg.room_id or self._current_room_id,
+                bot_name=self.bot_name,
             )
         if cmd == "/help":
             return MessageEnvelope(
@@ -1714,6 +1717,7 @@ Current conversation history:
                 "/stop — Stop running tasks\n"
                 "/nto-stats — Show token optimization statistics",
                 room_id=msg.room_id or self._current_room_id,
+                bot_name=self.bot_name,
             )
         if cmd == "/stop":
             room_id = msg.room_id or self._current_room_id or "general"
@@ -1727,6 +1731,7 @@ Current conversation history:
                     f"sidekicks: {summary.get('sidekicks', 0)}."
                 ),
                 room_id=room_id,
+                bot_name=self.bot_name,
             )
         if cmd == "/nto-stats":
             from nanofolks.agent.tools.nto import create_nto_wrapper
@@ -1741,6 +1746,7 @@ Current conversation history:
                     content="📊 No NTO operations recorded yet.\n"
                     "Token optimization will begin when tools are used.",
                     room_id=msg.room_id or self._current_room_id,
+                    bot_name=self.bot_name,
                 )
 
             response_lines = [
@@ -1768,6 +1774,7 @@ Current conversation history:
                 chat_id=msg.chat_id,
                 content="\n".join(response_lines),
                 room_id=msg.room_id or self._current_room_id,
+                bot_name=self.bot_name,
             )
 
         # Unified orchestrator pipeline (tag -> intent -> dispatch -> collect -> final)
@@ -2541,6 +2548,7 @@ Current conversation history:
             chat_id=origin_chat_id,
             content=final_content,
             room_id=msg.room_id or self._current_room_id,
+            bot_name=self.bot_name,
         )
 
     async def _check_and_register_clarification(
@@ -3001,4 +3009,5 @@ Once configured, we can start chatting! 🤖"""
             content=content,
             room_id=msg.room_id or self._current_room_id,
             metadata=msg.metadata or {},
+            bot_name=self.bot_name,
         )

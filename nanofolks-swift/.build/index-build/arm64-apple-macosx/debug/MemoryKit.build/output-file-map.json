@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/MemoryKit.build/master.swiftdeps"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/MemoryKit/MemoryStore.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/MemoryKit.build/MemoryStore.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/MemoryKit.build/MemoryStore.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/MemoryKit.build/MemoryStore~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/MemoryKit.build/MemoryStore.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/MemoryKit.build/MemoryStore.dia"
+  }
+}

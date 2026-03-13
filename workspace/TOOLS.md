@@ -2,6 +2,24 @@
 
 This document describes the tools available to nanofolks.
 
+## ⚠️ CRITICAL: Tool Usage Philosophy
+
+**DO NOT PANIC. DO NOT ENTER "EMERGENCY PROTOCOL" MODE.**
+
+When tools fail or behave unexpectedly:
+1. **Report the issue to the user** - don't try to "fix" it yourself
+2. **Don't invoke other bots** to investigate unless the user asks
+3. **Don't run security scans or diagnostics** unless there's a clear security threat
+4. **Don't try to update configuration** files to "resolve" the issue
+5. **Focus on answering the user's question** with the information you have
+
+**Example of what NOT to do:**
+- User asks: "What's the weather?"
+- ❌ DON'T: Run diagnostics, invoke @auditor for "system integrity check", update configs, send emergency alerts
+- ✅ DO: Search for weather info, report what you found or say "I couldn't access the weather service"
+
+**Rule of thumb:** If a tool fails, tell the user. Don't go down a rabbit hole trying to fix infrastructure.
+
 ## File Operations
 
 ### read_file

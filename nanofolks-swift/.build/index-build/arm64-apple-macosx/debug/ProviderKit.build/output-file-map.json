@@ -1,0 +1,19 @@
+{
+  "": {
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/master.swiftdeps"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/ProviderKit/OpenAIProvider.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/OpenAIProvider.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/OpenAIProvider.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/OpenAIProvider~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/OpenAIProvider.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/OpenAIProvider.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/ProviderKit/ProviderKit.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/ProviderKit.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/ProviderKit.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/ProviderKit~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/ProviderKit.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/ProviderKit.build/ProviderKit.dia"
+  }
+}

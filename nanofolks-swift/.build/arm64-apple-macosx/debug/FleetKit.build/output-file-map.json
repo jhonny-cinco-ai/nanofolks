@@ -1,0 +1,47 @@
+{
+  "": {
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/master.swiftdeps"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/FleetKit/FleetKit.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetKit.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetKit.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetKit~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetKit.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetKit.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/FleetKit/FleetManager.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetManager.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetManager.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetManager.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/FleetManager.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/FleetKit/MessageRouter.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/MessageRouter.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/MessageRouter.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/MessageRouter~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/MessageRouter.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/MessageRouter.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/FleetKit/ResponseCombiner.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/ResponseCombiner.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/ResponseCombiner.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/ResponseCombiner~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/ResponseCombiner.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/ResponseCombiner.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/FleetKit/RoomSessionManager.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/RoomSessionManager.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/RoomSessionManager.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/RoomSessionManager~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/RoomSessionManager.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/RoomSessionManager.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/FleetKit/SmartDispatch.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/SmartDispatch.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/SmartDispatch.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/SmartDispatch~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/SmartDispatch.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/arm64-apple-macosx/debug/FleetKit.build/SmartDispatch.dia"
+  }
+}

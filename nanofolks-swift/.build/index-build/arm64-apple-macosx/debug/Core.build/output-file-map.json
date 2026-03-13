@@ -1,0 +1,47 @@
+{
+  "": {
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/master.swiftdeps"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/Core/BotProtocol.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/BotProtocol.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/BotProtocol.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/BotProtocol~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/BotProtocol.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/BotProtocol.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/Core/ChannelProtocol.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ChannelProtocol.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ChannelProtocol.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ChannelProtocol~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ChannelProtocol.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ChannelProtocol.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/Core/CoreTypes.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/CoreTypes.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/CoreTypes.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/CoreTypes~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/CoreTypes.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/CoreTypes.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/Core/LLMProviderProtocol.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/LLMProviderProtocol.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/LLMProviderProtocol.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/LLMProviderProtocol~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/LLMProviderProtocol.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/LLMProviderProtocol.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/Core/MemoryProtocol.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/MemoryProtocol.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/MemoryProtocol.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/MemoryProtocol~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/MemoryProtocol.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/MemoryProtocol.dia"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/Core/ToolProtocol.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ToolProtocol.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ToolProtocol.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ToolProtocol~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ToolProtocol.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/Core.build/ToolProtocol.dia"
+  }
+}

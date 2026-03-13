@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 from loguru import logger
 
 from nanofolks.bots.dispatch import BotDispatch, DispatchResult, DispatchTarget
+from nanofolks.bots.proactive_loop import IntentHypothesis
 from nanofolks.bots.room_manager import RoomManager, get_room_manager
 from nanofolks.bus.events import MessageEnvelope
 from nanofolks.bus.queue import MessageBus
@@ -74,14 +75,14 @@ class MessageRouter:
         self._running = False
         self._current_room_id = "general"
 
-        # Initialize proactive bot loop (enabled by default)
+        # Initialize proactive bot loop (disabled by default for stability)
         from nanofolks.bots.proactive_loop import ProactiveBotLoop
 
         self.proactive_loop = ProactiveBotLoop(
             fleet_manager=fleet,
             turbo_memory=None,  # Will be set later if available
             timeout_seconds=10.0,
-            proactive_enabled=True,
+            proactive_enabled=False,  # Disabled to avoid fleet manager warnings
         )
 
         self.logger = logger.bind(component="MessageRouter")

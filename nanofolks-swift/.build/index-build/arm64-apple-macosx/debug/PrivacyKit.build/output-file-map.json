@@ -1,0 +1,12 @@
+{
+  "": {
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/PrivacyKit.build/master.swiftdeps"
+  },
+  "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/Sources/PrivacyKit/PrivacyKit.swift": {
+    "dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/PrivacyKit.build/PrivacyKit.d",
+    "object": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/PrivacyKit.build/PrivacyKit.swift.o",
+    "swiftmodule": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/PrivacyKit.build/PrivacyKit~partial.swiftmodule",
+    "swift-dependencies": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/PrivacyKit.build/PrivacyKit.swiftdeps",
+    "diagnostics": "/Users/rickovelar/Desktop/WORK/AI_Experiments/nanofolks-project/nanofolks/nanofolks-swift/.build/index-build/arm64-apple-macosx/debug/PrivacyKit.build/PrivacyKit.dia"
+  }
+}

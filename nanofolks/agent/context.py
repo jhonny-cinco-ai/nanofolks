@@ -832,6 +832,30 @@ Your workspace is at: {workspace_path}/bots/{safe_bot_name}/"""
         # Add tool usage guidance for better UX
         system_prompt += "\n\n## Tool Usage Guidelines\nWhen using tools: First briefly tell the user what you're about to do (e.g., 'I'll search for that information'), then IMMEDIATELY call the appropriate tool. Do NOT just say you will do something - you must actually invoke the tool in the same response."
 
+        # Add anti-panic guidance
+        system_prompt += """
+
+## IMPORTANT: Don't Panic Mode
+When a tool fails or behaves unexpectedly:
+1. Report the failure to the user briefly
+2. DO NOT attempt to "fix" the system by:
+   - Running security scans or diagnostics
+   - Invoking other bots to investigate
+   - Updating configuration files
+   - Going into "emergency protocol" mode
+3. DO NOT send messages to yourself or other bots asking for status updates
+4. Focus on answering the user's original question with available information
+5. If you can't complete the task due to tool failures, simply say so
+
+Example: If web_search fails, say "I couldn't search the web right now" - don't run diagnostics or invoke @researcher to investigate why.
+
+## Anti-Loop Protection
+- DO NOT create multiple related tasks one after another
+- DO NOT check status of tasks you just created
+- DO NOT stop and restart tasks repeatedly
+- If you create a task, move on - don't micromanage it
+"""
+
         # Add external content security guidance
         system_prompt += """
 

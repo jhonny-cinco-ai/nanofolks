@@ -26,7 +26,7 @@ Pick the kind of team that fits you.
 | ✨ | **Collaboration** over automation |
 | 🎭 | **Characters** over tools |
 | 🤝 | **Companionship** over commands |
-| 🏠 | **Room-centric** organization over fragmented sessions |
+| 🏠 | **Lobby + Project Rooms** workflow over fragmented sessions |
 
 > It's not just an assistant. It's a team.
 
@@ -223,6 +223,86 @@ Or enter interactive mode:
 ```bash
 nanofolks chat
 ```
+
+### Fleet Mode (Multi-Bot Architecture)
+
+Enable **true parallel bot collaboration** with the `--fleet` flag. Instead of a single bot processing all requests, Fleet Mode activates multiple specialists simultaneously:
+
+```bash
+# Start in the Lobby (default room)
+nanofolks chat --fleet
+
+# Create a project room with specific bots
+nanofolks chat --fleet --room project-alpha
+
+# Single message with fleet
+nanofolks chat --fleet -m "Review this code and suggest improvements"
+```
+
+**The Lobby (Default Room)**
+
+When you first start nanofolks, you'll be in the **Lobby** - a welcome area with just the Leader bot:
+
+- **Learn the system**: Ask the Leader how nanofolks works
+- **Get oriented**: Understand what each bot does
+- **Plan your projects**: Decide which bots you need
+
+Once you're ready, create dedicated rooms for your projects and invite the specific bots you need.
+
+**Project Rooms**
+
+Create rooms for each project and add the bots you need:
+
+```bash
+# Create a new project room
+/create room api-project
+
+# Invite specific bots to the room
+/invite coder
+/invite researcher
+
+# Now you have a dedicated workspace with just the bots you need
+```
+
+**Room-Scoped Bot Instances**
+
+Each room gets **independent bot instances**:
+- Room A's coder is completely separate from Room B's coder
+- Work on multiple projects simultaneously
+- No context bleeding between rooms
+
+**What Fleet Mode Does:**
+
+| Feature | Description |
+|---------|-------------|
+| **Parallel Processing** | Multiple bots work simultaneously in the same room |
+| **Room-Scoped Bots** | Each room gets its own bot instances (Room A's coder ≠ Room B's coder) |
+| **Smart Routing** | Messages automatically routed to the right specialist (@coder, @researcher, etc.) |
+| **Multi-Bot Discussions** | Use `@discuss` to have bots collaborate on complex tasks |
+
+**Team Collaboration in Fleet Mode:**
+
+```bash
+# Ask a specific bot
+@coder Create a Python function to parse JSON
+
+# Multi-bot discussion
+@discuss How should we architect this API?
+
+# Let the leader coordinate
+Help me plan this project
+```
+
+**Enable Fleet Mode by Default:**
+
+Add to your `~/.nanofolks/config.yaml`:
+
+```yaml
+features:
+  use_message_router: true
+```
+
+Then simply run `nanofolks chat` (no --fleet flag needed).
 
 ---
 

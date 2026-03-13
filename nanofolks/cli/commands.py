@@ -1555,13 +1555,16 @@ def chat(
         help="Session ID (room-centric format: room:{room_id}). If not set, uses --room value",
     ),
     room: str = typer.Option(
-        "general", "--room", "-r", help="Room to join (general, project-alpha, etc.)"
+        "general", "--room", "-r", help="Room to join (lobby, project-alpha, etc.)"
     ),
     markdown: bool = typer.Option(
         True, "--markdown/--no-markdown", help="Render assistant output as Markdown"
     ),
     logs: bool = typer.Option(
         False, "--logs/--no-logs", help="Show nanofolks runtime logs during chat"
+    ),
+    fleet: bool = typer.Option(
+        False, "--fleet", help="Use MessageRouter + BotFleet architecture for multi-bot support"
     ),
 ):
     """Start an interactive chat session."""
@@ -1583,9 +1586,44 @@ def chat(
 
     config = load_config()
 
-    # Load room context
+    # Load room context (needed for both legacy and fleet modes)
     room_manager = get_room_manager()
-    room, current_room, session_id = _resolve_chat_room_and_session(room, session_id, room_manager)
+    resolved_room, current_room, resolved_session = _resolve_chat_room_and_session(
+        room, session_id, room_manager
+    )
+
+    # Check if fleet mode should be used (CLI flag or config feature flag)
+    use_fleet_mode = fleet or (
+        hasattr(config, "features") and getattr(config.features, "use_message_router", False)
+    )
+
+    if use_fleet_mode:
+        # Use MessageRouter + BotFleet architecture
+        from nanofolks.cli.chat_fleet import chat_with_message_router
+
+        async def _run_fleet_chat():
+            return await chat_with_message_router(
+                config=config,
+                room=resolved_room,
+                console=console,
+                message=message,
+                markdown=markdown,
+            )
+
+        try:
+            success = asyncio.run(_run_fleet_chat())
+            if success:
+                return
+            # If fleet chat failed, fall back to legacy mode
+            console.print("[yellow]Fleet mode failed, falling back to standard mode...[/yellow]")
+        except Exception as e:
+            logger.error(f"Fleet mode error: {e}")
+            console.print(
+                f"[yellow]Fleet mode error: {e}. Falling back to standard mode...[/yellow]"
+            )
+
+    # Use resolved room/session for legacy mode
+    room, session_id = resolved_room, resolved_session
 
     bus = MessageBus()
     bus.set_room_manager(room_manager)  # Enable cross-channel broadcast

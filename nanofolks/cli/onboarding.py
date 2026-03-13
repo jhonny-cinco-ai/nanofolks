@@ -181,7 +181,9 @@ class OnboardingWizard:
             console.print(
                 "  [bright_magenta]nanofolks chat[/bright_magenta]        - Start chatting"
             )
-            console.print("  [bright_magenta]#general[/bright_magenta]            - Team chat room")
+            console.print(
+                "  [bright_magenta]#lobby[/bright_magenta]              - Welcome area to learn and explore"
+            )
             console.print(
                 "  [bright_magenta]@researcher[/bright_magenta]        - DM a bot directly"
             )
@@ -681,10 +683,28 @@ Then restart nanofolks for secure access.
                 # Qwen
                 "openrouter/qwen/qwen-2.5-72b-instruct",
                 "openrouter/qwen/qwen-2.5-32b-instruct",
+                "openrouter/qwen/qwen3.5-35b-a3b",
                 # Mistral
                 "openrouter/mistralai/mistral-small-3.1",
                 # Cohere
                 "openrouter/cohere/command-a",
+                # Arcee AI
+                "openrouter/arcee-ai/trinity-large-preview:free",
+                # Minimax
+                "openrouter/minimax/minimax-m2.5",
+                # Inception
+                "openrouter/inception/mercury-2",
+                # OpenRouter Hunter
+                "openrouter/openrouter/hunter-alpha",
+                # OpenRouter Healer
+                "openrouter/openrouter/healer-alpha",
+                # X-AI Grok
+                "openrouter/x-ai/grok-4.20-multi-agent-beta",
+                "openrouter/x-ai/grok-4.20-beta",
+                # Nvidia
+                "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+                # Z-AI GLM
+                "openrouter/z-ai/glm-5",
             ],
             "anthropic": [
                 "anthropic/claude-3.5-sonnet-20241022",
@@ -826,9 +846,7 @@ Then restart nanofolks for secure access.
 
         console.print(team_table)
         console.print()
-        console.print(
-            "[dim]All 6 bots are available. Starting with @leader in #general room.[/dim]"
-        )
+        console.print("[dim]All 6 bots are available. Starting with @leader in #lobby.[/dim]")
         console.print(
             "[dim]Use '@botname' to message other bots, or '@all' to message everyone.[/dim]\n"
         )
@@ -853,7 +871,7 @@ Then restart nanofolks for secure access.
         team_name = team_obj["name"] if team_obj else self.selected_team or "Unknown"
         summary_table.add_row("Team", team_name)
         summary_table.add_row("Bots", "6 available (starting with leader)")
-        summary_table.add_row("Room", "#general")
+        summary_table.add_row("Room", "#lobby")
 
         console.print(summary_table)
         console.print()
@@ -874,11 +892,11 @@ Then restart nanofolks for secure access.
         general_room = Room(
             id="general",
             type=RoomType.OPEN,
-            participants=["leader"],  # Only Leader in general room by default
+            participants=["leader"],  # Only Leader in lobby by default
             owner="system",
             metadata={
-                "name": "General",
-                "description": "General discussion and coordination room",
+                "name": "Lobby",
+                "description": "Welcome area - learn nanofolks, get help, or create project rooms",
             },
         )
         return general_room
